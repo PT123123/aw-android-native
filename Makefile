@@ -84,15 +84,21 @@ test-e2e-adb:
 
 install-apk-debug: $(APKDIR)/debug/mobile-debug.apk
 	adb install $(APKDIR)/debug/mobile-debug.apk
-	adb install $(APKDIR)/debug/mobile-debug-androidTest.apk
+	adb install $(APKDIR)/debug/mobile-debug-androidTest.apik
+
+install-apk-debug-win: $(APKDIR)/debug/mobile-debug.apk
+	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug.apk
+	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug-androidTest.apk
+bugreport:
+	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe bugreport
 
 # APK targets
 $(APKDIR)/$(RELEASE_TYPE)/mobile-$(RELEASE_TYPE_UNSIGNED).apk:
-	TERM=xterm ./gradlew assemble$(RELEASE_TYPE_CAPS)
+	TERM=xterm ./gradlew assemble$(RELEASE_TYPE_CAPS) --stacktrace --info
 	tree $(APKDIR)
 
 $(APKDIR)/androidTest/$(RELEASE_TYPE)/mobile-$(RELEASE_TYPE)-androidTest.apk:
-	TERM=xterm ./gradlew assembleAndroidTest
+	TERM=xterm ./gradlew assembleAndroidTest --stacktrace --info
 	tree $(APKDIR)
 
 # App bundle targets
@@ -207,6 +213,7 @@ $(WEBUI_DISTDIR):
 clean:
 	rm -rf mobile/src/main/assets/webui
 	rm -rf mobile/src/main/jniLibs
+	./gradlew clean
 
 .PHONY: fastlane/metadata/android/en-US/images/icon.png
 fastlane/metadata/android/en-US/images/icon.png: aw-server-rust/aw-webui/media/logo/logo.png

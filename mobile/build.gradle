@@ -1,10 +1,14 @@
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
+
 android {
     compileSdk 34
     ndkVersion "25.2.9519653"
 
+    lint {
+        baseline = file("lint-baseline.xml") // 添加这一行
+    }
     defaultConfig {
         applicationId "net.activitywatch.android"
         minSdkVersion 24
@@ -26,6 +30,9 @@ android {
         //packagingOptions {
         //    doNotStrip '**/*.so'
         //}
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a" // 按需选择架构
+        }
     }
     buildTypes {
         release {
@@ -34,6 +41,9 @@ android {
             ndk {
                 debugSymbolLevel 'SYMBOL_TABLE'
             }
+            // firebaseCrashlytics {
+            //     nativeSymbolUploadEnabled true
+            // }
         }
         debug {
             applicationIdSuffix ".debug"
@@ -68,6 +78,48 @@ android {
     }
 }
 
+// ======================
+// 🚨 新增：SO 文件强制检查 - Modified definition
+// ======================
+// 定义必检的 SO 文件（架构+路径）
+// 注意：这个定义放在了 android { ... } 块外面，这是有效的 Gradle 语法
+def mandatorySoFiles = [
+    "arm64-v8a/libaw_server.so",  // 主流 64 位设备（必选）
+    "armeabi-v7a/libaw_server.so" // 兼容 32 位设备（可选，可删除）
+]
+task checkRequiredSoFiles { // Removed (type: Check), defaults to DefaultTask
+    description = "🔍 检查必需的 SO 文件是否存在"
+    group = "Verification"
+
+    doLast { // Added doLast block - 将检查逻辑放在 doLast 块中
+        mandatorySoFiles.each { soPath -> // 这个 mandatorySoFiles 变量在这里可以访问到
+            def soFile = file("src/main/jniLibs/$soPath")
+            if (!soFile.exists()) {
+                throw new GradleException(
+                    "\n❌ 构建失败：缺失必需的 SO 文件\n" +
+                    "文件路径：$soFile.absolutePath\n" +
+                    "修复建议：\n" +
+                    "1. 确保 Rust 模块（aw-server-rust）已正确编译\n" +
+                    "2. 手动将 SO 文件复制到 jniLibs 对应架构目录\n" +
+                    "3. 运行命令：./gradlew cargoBuild（如使用 Rust 插件）"
+                )
+            }
+        }
+    }
+}
+// ======================
+
+// ======================
+// 将检查绑定到所有构建类型（debug/release）
+// ======================
+/*
+tasks.withType(com.android.build.gradle.tasks.PreBuildTask).all { // <--- Original line 108
+    dependsOn checkRequiredSoFiles
+}
+*/
+// ======================
+preBuild.dependsOn checkRequiredSoFiles
+
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
@@ -82,6 +134,10 @@ dependencies {
 
     implementation 'com.google.android.material:material:1.7.0'
     implementation 'com.jakewharton.threetenabp:threetenabp:1.4.3'
+    implementation(platform("com.google.firebase:firebase-bom:32.3.1")) 
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-crashlytics")
+    implementation 'com.google.firebase:firebase-crashlytics-ndk:18.4.2'
 
     testImplementation "junit:junit:4.13.2"
     androidTestImplementation "androidx.test.ext:junit-ktx:$extJUnitVersion"
@@ -117,3 +173,6 @@ tasks.whenTaskAdded { task ->
     //    })
     //}
 }
+
+apply plugin: "com.google.gms.google-services" // 必须存在，且在最后一行
+apply plugin: "com.google.firebase.crashlytics" // <--- **新增这一行**
