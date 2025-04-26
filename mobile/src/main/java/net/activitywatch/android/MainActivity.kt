@@ -16,10 +16,13 @@ import net.activitywatch.android.fragments.TestFragment
 import net.activitywatch.android.fragments.WebUIFragment
 import net.activitywatch.android.watcher.UsageStatsWatcher
 
+// Firebase 导入
+import com.google.firebase.FirebaseApp
+import com.google.firebase.crashlytics.FirebaseCrashlytics
+
 private const val TAG = "MainActivity"
 
 const val baseURL = "http://127.0.0.1:5600"
-
 
 class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener, WebUIFragment.OnFragmentInteractionListener {
 
@@ -36,42 +39,61 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.i(TAG, "启动 onCreate, starting onboarding activity")
 
-        // If first time, or usage not allowed, show onboarding activity
+        // 在 onCreate 方法中初始化 Firebase
+        try {
+            Log.d(TAG, "尝试在 MainActivity.onCreate 中初始化 FirebaseApp")
+            FirebaseApp.initializeApp(this) // 在 MainActivity 的 onCreate 中调用 Firebase 初始化
+            Log.d(TAG, "FirebaseApp 初始化完成")
+
+            Log.d(TAG, "尝试在 MainActivity.onCreate 中获取并开启 Crashlytics")
+            FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(true) // 启用 Crashlytics 崩溃收集
+            Log.d(TAG, "Firebase Crashlytics 开启崩溃收集")
+        } catch (e: Throwable) {
+            Log.e(TAG, "Firebase 初始化失败 (FirebaseApp 或 Crashlytics) 在 MainActivity.onCreate 中", e)
+        }
+
+        // 如果是第一次使用或未授权使用统计，启动 Onboarding Activity
         val prefs = AWPreferences(this)
         if (prefs.isFirstTime() || !UsageStatsWatcher.isUsageAllowed(this)) {
             Log.i(TAG, "First time or usage not allowed, starting onboarding activity")
             val intent = Intent(this, OnboardingActivity::class.java)
             startActivity(intent)
+            return
         }
 
-        // Set up UI
+        // 设置 UI
         binding = ActivityMainBinding.inflate(layoutInflater)
-        val view = binding.root
-        setContentView(view)
+        setContentView(binding.root)
 
-        // Set up alarm to send heartbeats
+        // 设置心跳发送的闹钟
         val usw = UsageStatsWatcher(this)
         usw.setupAlarm()
 
+        // 设置导航视图监听器
         binding.navView.setNavigationItemSelectedListener(this)
 
+        // 启动服务器任务
         val ri = RustInterface(this)
         ri.startServerTask(this)
 
+        // 如果 savedInstanceState 不为 null，则跳过添加 Fragment
         if (savedInstanceState != null) {
             return
         }
+
+        // 添加初始的 WebUIFragment
         val firstFragment = WebUIFragment.newInstance(baseURL)
         supportFragmentManager.beginTransaction()
-            .add(R.id.fragment_container, firstFragment).commit()
+            .add(R.id.fragment_container, firstFragment)
+            .commit()
+        Log.d(TAG, "Fragment 事务执行完成")
     }
 
     override fun onResume() {
         super.onResume()
-
-        // Ensures data is always fresh when app is opened,
-        // even if it was up to an hour since the last logging-alarm was triggered.
+        // 确保数据总是最新的
         val usw = UsageStatsWatcher(this)
         usw.sendHeartbeats()
     }
@@ -85,15 +107,11 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // Inflate the menu; this adds items to the action bar if it is present.
         menuInflater.inflate(R.menu.main, menu)
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
         return when (item.itemId) {
             R.id.action_settings -> {
                 Snackbar.make(binding.coordinatorLayout, "The settings button was clicked, but it's not yet implemented!", Snackbar.LENGTH_LONG)
@@ -108,7 +126,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         var fragmentClass: Class<out Fragment>? = null
         var url: String? = null
 
-        // Handle navigation view item clicks here.
+        // 处理导航视图点击事件
         when (item.itemId) {
             R.id.nav_dashboard -> {
                 fragmentClass = TestFragment::class.java
@@ -146,10 +164,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             null
         }
 
-        if(fragment != null) {
-            // Insert the fragment by replacing any existing fragment
-            val fragmentManager = supportFragmentManager
-            fragmentManager.beginTransaction().replace(R.id.fragment_container, fragment).commit()
+        if (fragment != null) {
+            // 插入 fragment，替换任何现有的 fragment
+            supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment).commit()
         }
 
         binding.drawerLayout.closeDrawer(GravityCompat.START)

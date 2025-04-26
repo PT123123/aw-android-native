@@ -1,7 +1,7 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
-    ext.kotlin_version = '1.7.20'
+    ext.kotlin_version = '1.9.20'
     ext.androidXTestVersion = '1.5.0'
     ext.espressoVersion = '3.5.0'
     ext.extJUnitVersion = '1.1.4'
@@ -9,9 +9,13 @@ buildscript {
     repositories {
         google()
         mavenCentral()
-        maven {
-            url "https://plugins.gradle.org/m2/"
-        }
+        maven { url 'https://mirrors.cloud.tencent.com/maven/central' }
+        maven { url 'https://mirrors.huaweicloud.com/repository/maven/' }
+        maven { url 'https://jitpack.io' } // 若插件在 JitPack 托管（少数情况）
+        maven { url 'https://maven.aliyun.com/repository/central' } // 阿里云镜像
+        maven { url 'https://maven.aliyun.com/repository/google' } // Google镜像（针对Android依赖）
+        maven {url "https://plugins.gradle.org/m2/"}
+        
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.1.1'
@@ -20,6 +24,10 @@ buildscript {
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
+        classpath 'com.google.gms:google-services:4.4.1' // <-- 添加这一行，检查最新版本
+        // 如果你还要集成 Crashlytics Gradle 插件，也在这里添加它的 classpath
+        //classpath 'com.google.firebase:firebase-crashlytics-gradle:2.9.8' // <-- 添加 Crashlytics Gradle 插件，检查最新版本
+        classpath 'com.google.firebase:firebase-crashlytics-gradle:2.9.0'  // 必须使用这个插件版本
     }
 }
 
@@ -43,3 +51,5 @@ idea {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+apply plugin: "com.google.gms.google-services" // 必须存在，且在最后一行
