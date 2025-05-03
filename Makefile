@@ -1,3 +1,4 @@
+#!/bin/bash 
 SHELL := /bin/bash
 
 # We should probably do this the "Android way" (would also help with getting it on FDroid):
@@ -83,8 +84,8 @@ test-e2e-adb:
 		net.activitywatch.android.debug.test/androidx.test.runner.AndroidJUnitRunner
 
 install-apk-debug: $(APKDIR)/debug/mobile-debug.apk
-	adb install $(APKDIR)/debug/mobile-debug.apk
-	adb install $(APKDIR)/debug/mobile-debug-androidTest.apik
+	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug.apk
+	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug-androidTest.apik
 
 install-apk-debug-win: $(APKDIR)/debug/mobile-debug.apk
 	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug.apk

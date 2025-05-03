@@ -32,14 +32,16 @@ class RustInterface constructor(context: Context? = null) {
         System.loadLibrary("aw_server")
         Log.d(TAG, "已加载 aw_server 库")
 
-        Log.d(TAG, "调用 initialize 方法")
+        Log.d(TAG, "调用 init法3")
         //initialize()  // 对应到 Java_net_activitywatch_android_RustInterface_initialize
-        Log.d(TAG, "initialize 方法调用完成") // TODO-照理说运行到了，但是没正常显示
+        Log.d(TAG, "initialize 方法调用完成3") // TODO-照理说运行到了，但是没正常显示
 
         if(context != null) {
-            Log.d(TAG, "准备设置数据目录为 ${context.filesDir.absolutePath}")
+            Log.d(TAG, "3准备设置数据目录为 ${context.filesDir.absolutePath}")
             setDataDir(context.filesDir.absolutePath) // 对应到Java_net_activitywatch_android_RustInterface_setDataDir，日志没正常显示
             Log.d(TAG, "已设置数据目录为 ${context.filesDir.absolutePath}")
+        } else {
+            Log.d(TAG, "[版本3]context为空")
         }
         Log.d(TAG, "RustInterface 初始化完成")
     }
