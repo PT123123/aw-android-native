@@ -32,7 +32,7 @@ const val bucket_id = "aw-watcher-android-test"
 const val unlock_bucket_id = "aw-watcher-android-unlock"
 
 class UsageStatsWatcher constructor(val context: Context) {
-    private val ri = RustInterface(context) // TODO-应该是这行报错
+    private val ri = RustInterface(context)
     private val isoFormatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
 
     var lastUpdated: Instant? = null
