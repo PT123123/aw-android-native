@@ -85,7 +85,7 @@ test-e2e-adb:
 
 install-apk-debug: $(APKDIR)/debug/mobile-debug.apk
 	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug.apk
-	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug-androidTest.apik
+	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug-androidTest.apk
 
 install-apk-debug-win: $(APKDIR)/debug/mobile-debug.apk
 	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug.apk
