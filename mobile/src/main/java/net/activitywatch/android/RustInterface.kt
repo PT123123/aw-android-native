@@ -33,8 +33,8 @@ class RustInterface constructor(context: Context? = null) {
         Log.d(TAG, "[库加载] 已加载 aw_server 库")
 
         Log.d(TAG, "[初始化] 调用 init法3")
-        //initialize()  // 对应到 Java_net_activitywatch_android_RustInterface_initialize
-        Log.d(TAG, "[初始化] initialize 方法调用完成3") // TODO-照理说运行到了，但是没正常显示
+        initialize()  // 对应到 Java_net_activitywatch_android_RustInterface_initialize
+        Log.d(TAG, "[初始化] initialize 方法调用完成3")
 
         if(context != null) {
             Log.d(TAG, "[数据目录] 准备设置数据目录为 ${context.filesDir.absolutePath}")
@@ -50,7 +50,7 @@ class RustInterface constructor(context: Context? = null) {
         var serverStarted = false
     }
 
-    private external fun initialize(): String
+    private external fun initialize()
     private external fun greeting(pattern: String): String
     private external fun startServer()
     private external fun setDataDir(path: String)
