@@ -10,6 +10,9 @@ RELEASE_TYPE_UNSIGNED = $(shell test -n "$$RELEASE" && $$RELEASE && echo 'releas
 RELEASE_TYPE_CAPS = $(shell test -n "$$RELEASE" && $$RELEASE && echo 'Release' || echo 'Debug')
 HAS_SECRETS = $(shell test -n "$$JKS_KEYPASS" && echo 'true' || echo 'false')
 
+# Android NDK path (can be overridden by env)
+ANDROID_NDK_HOME ?= /home/user/Android/Sdk/ndk/25.2.9519653
+
 APKDIR = mobile/build/outputs/apk
 AABDIR = mobile/build/outputs/bundle
 
@@ -56,6 +59,17 @@ unzip-apks: dist/aw-android.apks
 build-apk-debug: $(APKDIR)/debug/mobile-debug.apk $(APKDIR)/androidTest/debug/mobile-debug-androidTest.apk
 	mkdir -p dist
 	cp -r $(APKDIR) dist
+
+.PHONY: build-and-install
+build-and-echo:
+	set -o pipefail; \
+	make build ; make install-apk-debug-win; \
+	rc=$$? ; \
+	if [ $$rc -eq 0 ]; then \
+		echo -e "\033]9;执行成功;构建或安装完成\007"; \
+	else \
+		echo -e "\033]9;执行失败;构建/安装出现错误\007"; \
+	fi
 
 # Test targets
 test: test-unit
@@ -196,7 +210,7 @@ $(RS_SRCDIR)/target/%/$(RELEASE_TYPE)/libaw_server.so: $(RS_SOURCES) $(WEBUI_DIS
 		echo "Using prebuilt libaw_server.so"; \
 	else \
 		echo "Building libaw_server.so from aw-server-rust repo"; \
-		env RUSTFLAGS=$(RUSTFLAGS_ANDROID) make -C aw-server-rust android; \
+		env ANDROID_NDK_HOME=$(ANDROID_NDK_HOME) RUSTFLAGS=$(RUSTFLAGS_ANDROID) make -C aw-server-rust android; \
 	fi
 
 # aw-webui

@@ -11,9 +11,9 @@ buildscript {
         mavenCentral()
         maven { url 'https://mirrors.cloud.tencent.com/maven/central' }
         maven { url 'https://mirrors.huaweicloud.com/repository/maven/' }
-        maven { url 'https://jitpack.io' } // 若插件在 JitPack 托管（少数情况）
-        maven { url 'https://maven.aliyun.com/repository/central' } // 阿里云镜像
-        maven { url 'https://maven.aliyun.com/repository/google' } // Google镜像（针对Android依赖）
+        maven { url 'https://jitpack.io' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
         maven {url "https://plugins.gradle.org/m2/"}
         
     }
@@ -24,10 +24,8 @@ buildscript {
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
-        classpath 'com.google.gms:google-services:4.4.1' // <-- 添加这一行，检查最新版本
-        // 如果你还要集成 Crashlytics Gradle 插件，也在这里添加它的 classpath
-        //classpath 'com.google.firebase:firebase-crashlytics-gradle:2.9.8' // <-- 添加 Crashlytics Gradle 插件，检查最新版本
-        classpath 'com.google.firebase:firebase-crashlytics-gradle:2.9.0'  // 必须使用这个插件版本
+        classpath 'com.google.gms:google-services:4.4.1'
+        classpath 'com.google.firebase:firebase-crashlytics-gradle:2.9.0'
     }
 }
 

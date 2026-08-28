@@ -40,6 +40,8 @@ class RustInterface constructor(context: Context? = null) {
             Log.d(TAG, "[数据目录] 准备设置数据目录为 ${context.filesDir.absolutePath}")
             setDataDir(context.filesDir.absolutePath) // 对应到Java_net_activitywatch_android_RustInterface_setDataDir，日志没正常显示
             Log.d(TAG, "[数据目录] 已设置数据目录为 ${context.filesDir.absolutePath}")
+            // 注入 Wi-Fi 链路真实 IP（绕过 VPN），供局域网同步展示/广播使用
+            applySyncWifiIp(context)
         } else {
             Log.d(TAG, "[初始化] context为空")
         }
@@ -54,6 +56,7 @@ class RustInterface constructor(context: Context? = null) {
     private external fun greeting(pattern: String): String
     private external fun startServer()
     private external fun setDataDir(path: String)
+    private external fun setSyncLocalIp(ip: String)
     external fun getBuckets(): String
     external fun createBucket(bucket: String): String
     external fun getEvents(bucket_id: String, limit: Int): String
@@ -66,8 +69,7 @@ class RustInterface constructor(context: Context? = null) {
         return result
     }
 
-    fun startServerTask(context: Context) {
-        Log.w(TAG, "[服务器] 调用Starting server...")
+    fun startServerTask(context: Context) {        Log.w(TAG, "[服务器] 调用Starting server...")
         if(!serverStarted) {
             Log.d(TAG, "[服务器] 服务器未启动，检查端口 5600 是否可用")
             // check if port 5600 is already in use
@@ -105,6 +107,55 @@ class RustInterface constructor(context: Context? = null) {
             Log.w(TAG, "Server started")
         } else {
             Log.d(TAG, "服务器已启动，跳过启动流程")
+        }
+    }
+
+    /**
+     * 从 Wi-Fi 链路直接读取本机 IPv4（不受 VPN 影响），注入到 Rust 侧供局域网同步使用。
+     * 优先用 ConnectivityManager 取 TRANSPORT_WIFI 网络的 LinkProperties（Android 10+ 开 VPN 时
+     * WifiManager.getConnectionInfo() 经常返回 0，导致拿到错误网卡地址）；WifiManager 仅作兜底。
+     * 读取失败时跳过，由 Rust 侧枚举网卡兜底。
+     */
+    fun applySyncWifiIp(context: Context) {
+        try {
+            val cm = context.applicationContext
+                .getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            if (cm == null) {
+                Log.d(TAG, "[同步] 无法获取 ConnectivityManager，交由 Rust 枚举网卡兜底")
+                return
+            }
+            var wifiIp: String? = null
+            for (net in cm.allNetworks) {
+                val caps = cm.getNetworkCapabilities(net) ?: continue
+                if (!caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) continue
+                val lp = cm.getLinkProperties(net) ?: continue
+                for (la in lp.linkAddresses) {
+                    val addr = la.address
+                    if (addr is java.net.Inet4Address && !addr.isLoopbackAddress) {
+                        wifiIp = addr.hostAddress
+                        break
+                    }
+                }
+                if (wifiIp != null) break
+            }
+            if (wifiIp != null) {
+                Log.d(TAG, "[同步] 读取到 Wi-Fi 真实 IP: $wifiIp")
+                setSyncLocalIp(wifiIp)
+                return
+            }
+            // 兜底：旧式 WifiManager
+            val wifi = context.applicationContext
+                .getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+            val ipInt = wifi?.connectionInfo?.ipAddress ?: 0
+            if (ipInt != 0) {
+                val ipStr = android.text.format.Formatter.formatIpAddress(ipInt)
+                Log.d(TAG, "[同步] 经 WifiManager 兜底读取到 Wi-Fi IP: $ipStr")
+                setSyncLocalIp(ipStr)
+            } else {
+                Log.d(TAG, "[同步] 未获取到 Wi-Fi IP，交由 Rust 枚举网卡兜底")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "[同步] 读取 Wi-Fi IP 失败: ${e.message}")
         }
     }
 
