@@ -7,6 +7,7 @@ import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.navigation.NavigationView
 import androidx.core.view.GravityCompat
 import androidx.appcompat.app.AppCompatActivity
+import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
 import androidx.fragment.app.Fragment
@@ -98,11 +99,31 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         usw.sendHeartbeats()
     }
 
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+            onBackPressed()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onBackPressed() {
         if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
             binding.drawerLayout.closeDrawer(GravityCompat.START)
-        } else {
+            return
+        }
+
+        val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+        val currentUrl = (currentFragment as? WebUIFragment)?.getCurrentUrl()
+        val isInbox = currentUrl == "$baseURL/#/inbox/" || currentUrl == baseURL
+
+        if (isInbox) {
             super.onBackPressed()
+        } else {
+            supportFragmentManager.popBackStackImmediate(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, WebUIFragment.newInstance("$baseURL/#/inbox/"))
+                .commit()
         }
     }
 
@@ -166,7 +187,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
         if (fragment != null) {
             // 插入 fragment，替换任何现有的 fragment
-            supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment).commit()
+            supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment).addToBackStack(null).commit()
         }
 
         binding.drawerLayout.closeDrawer(GravityCompat.START)
