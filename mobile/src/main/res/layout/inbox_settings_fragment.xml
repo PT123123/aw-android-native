@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/inbox_bg"
+    android:theme="@style/Theme.MaterialComponents">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/inbox_bg"
+            android:theme="@style/ThemeOverlay.MaterialComponents.Dark"
+            app:title="Inbox 设置"
+            app:titleTextColor="@color/inbox_text"
+            app:navigationIcon="@drawable/ic_menu"
+            app:navigationIconTint="@color/inbox_text" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    app:cardBackgroundColor="@color/inbox_card"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <LinearLayout
+                            android:id="@+id/rowDouble"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="?attr/selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:padding="14dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="双击行为"
+                                android:textColor="@color/inbox_text"
+                                android:textSize="15sp" />
+
+                            <TextView
+                                android:id="@+id/valueDouble"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="@color/inbox_sub"
+                                android:textSize="14sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/rowLong"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="?attr/selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:padding="14dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="长按行为"
+                                android:textColor="@color/inbox_text"
+                                android:textSize="15sp" />
+
+                            <TextView
+                                android:id="@+id/valueLong"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="@color/inbox_sub"
+                                android:textSize="14sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/rowSingle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="?attr/selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:padding="14dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="单击行为"
+                                android:textColor="@color/inbox_text"
+                                android:textSize="15sp" />
+
+                            <TextView
+                                android:id="@+id/valueSingle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="@color/inbox_sub"
+                                android:textSize="14sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    app:cardBackgroundColor="@color/inbox_card"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="14dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="侧滑打开抽屉"
+                                android:textColor="@color/inbox_text"
+                                android:textSize="15sp" />
+
+                            <TextView
+                                android:id="@+id/drawerEdgeValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="@color/inbox_sub"
+                                android:textSize="14sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/drawerEdgeSlider"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:stepSize="1"
+                            android:valueFrom="0"
+                            android:valueTo="4"
+                            app:haloColor="@android:color/transparent"
+                            app:labelStyle="@style/InboxSliderLabel"
+                            app:thumbColor="@color/inbox_accent"
+                            app:tickColorActive="@color/inbox_bg"
+                            app:tickColorInactive="@color/inbox_bg"
+                            app:trackColorActive="@color/inbox_accent"
+                            app:trackColorInactive="@color/inbox_sub" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginTop="8dp"
+                    android:text="提示：卡片右上角 ⋮ 菜单不受手势设置影响，始终可用"
+                    android:textColor="@color/inbox_sub"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+</FrameLayout>

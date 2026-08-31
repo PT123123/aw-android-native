@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/inbox_bg"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:theme="@style/Theme.MaterialComponents">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/inbox_bg"
+        android:theme="@style/ThemeOverlay.MaterialComponents.Dark"
+        app:navigationIcon="@drawable/ic_close"
+        app:navigationIconTint="@color/inbox_text"
+        app:title="历史版本"
+        app:titleTextColor="@color/inbox_text" />
+
+    <TextView
+        android:id="@+id/empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:padding="32dp"
+        android:text="暂无历史版本"
+        android:textColor="@color/inbox_sub"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="16dp" />
+</LinearLayout>

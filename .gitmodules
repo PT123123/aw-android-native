@@ -4,3 +4,6 @@
 [submodule "mobile/src/main/res/drawable/media"]
 	path = mobile/src/main/res/drawable/media
 	url = https://github.com/PT123123/media.git
+[submodule "aw-flutterui"]
+	path = aw-flutterui
+	url = git@github.com:PT123123/aw-flutterui.git

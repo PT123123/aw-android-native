@@ -33,6 +33,10 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Flutter 引擎构件（flutter_sync AAR 的 pom 依赖指向这里）
+        maven { url 'https://storage.googleapis.com/download.flutter.io' }
+        // flutter_sync 模块的本地产物（make flutter-aar 生成）
+        maven { url "$rootDir/flutter_sync/build/host/outputs/repo" }
     }
 }
 
