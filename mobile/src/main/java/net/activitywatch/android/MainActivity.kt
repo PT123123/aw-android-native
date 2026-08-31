@@ -20,7 +20,6 @@ import net.activitywatch.android.inbox.InboxFragment
 import net.activitywatch.android.inbox.InboxPrefs
 import net.activitywatch.android.inbox.InboxSettingsFragment
 import net.activitywatch.android.inbox.TrashFragment
-import net.activitywatch.android.sync.FlutterSyncFragment
 import net.activitywatch.android.watcher.UsageStatsWatcher
 
 // Firebase 导入
@@ -184,9 +183,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 fragmentClass = TrashFragment::class.java
             }
             R.id.nav_sync -> {
-                // 原生 Flutter 局域网同步页；回退方案为 WebUI：
-                // fragmentClass = WebUIFragment::class.java; url = "$baseURL/#/sync/"
-                fragmentClass = FlutterSyncFragment::class.java
+                // 临时回退 WebUI 同步页；后续提交将替换为原生同步页
+                fragmentClass = WebUIFragment::class.java
+                url = "$baseURL/#/sync/"
             }
             R.id.nav_settings -> {
                 fragmentClass = WebUIFragment::class.java
