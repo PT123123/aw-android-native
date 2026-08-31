@@ -4,7 +4,8 @@ apply plugin: 'kotlin-kapt'
 
 
 android {
-    compileSdk 34
+    // Flutter flutter_sync AAR 的 aar-metadata 要求 minCompileSdk=36
+    compileSdk 36
     ndkVersion "25.2.9519653"
 
     lint {
@@ -130,6 +131,8 @@ dependencies {
     implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.recyclerview:recyclerview:1.2.1'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
     implementation 'androidx.lifecycle:lifecycle-extensions:2.2.0'
     implementation 'androidx.annotation:annotation:1.5.0'
 
@@ -140,12 +143,20 @@ dependencies {
     implementation("com.google.firebase:firebase-crashlytics")
     implementation 'com.google.firebase:firebase-crashlytics-ndk:18.4.2'
 
+    // Markdown 渲染（笔记展示）
+    implementation 'io.noties.markwon:core:4.6.2'
+
     // ===== 同步模块依赖 =====
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     implementation 'com.google.code.gson:gson:2.10.1'
+
+    // ===== Flutter 局域网同步页（flutter_sync 模块 AAR，make flutter-aar 重生成）=====
+    debugImplementation 'net.activitywatch.flutter_sync:flutter_debug:1.0'
+    releaseImplementation 'net.activitywatch.flutter_sync:flutter_release:1.0'
+
     // Room 依赖
     implementation 'androidx.room:room-runtime:2.6.1'
     implementation 'androidx.room:room-ktx:2.6.1'

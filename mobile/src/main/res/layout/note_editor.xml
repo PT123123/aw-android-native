@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/inbox_bg"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:theme="@style/Theme.MaterialComponents">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/inbox_bg"
+        android:theme="@style/ThemeOverlay.MaterialComponents.Dark"
+        app:navigationIconTint="@color/inbox_text"
+        app:title="编辑笔记"
+        app:titleTextColor="@color/inbox_text" />
+
+    <EditText
+        android:id="@+id/editor"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@null"
+        android:gravity="top"
+        android:hint="记录点什么… 使用 #标签 标记"
+        android:inputType="textMultiLine|textCapSentences"
+        android:textColor="@color/inbox_text"
+        android:textColorHint="@color/inbox_sub"
+        android:textSize="16sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/save"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="保存"
+            android:text="➤"
+            app:backgroundTint="@color/inbox_accent" />
+    </LinearLayout>
+
+    <!-- Markdown 格式工具栏：位于布局底部，键盘弹出时贴在输入法上方 -->
+    <HorizontalScrollView
+        android:id="@+id/mdToolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/mdHeading"
+                android:layout_width="42dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="标题"
+                android:gravity="center"
+                android:text="#"
+                android:textColor="@color/inbox_sub"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/mdBold"
+                android:layout_width="42dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="加粗"
+                android:gravity="center"
+                android:text="B"
+                android:textColor="@color/inbox_sub"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/mdItalic"
+                android:layout_width="42dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="斜体"
+                android:gravity="center"
+                android:text="I"
+                android:textColor="@color/inbox_sub"
+                android:textSize="16sp"
+                android:textStyle="italic" />
+
+            <TextView
+                android:id="@+id/mdBullet"
+                android:layout_width="42dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="无序列表"
+                android:gravity="center"
+                android:text="•"
+                android:textColor="@color/inbox_sub"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/mdOrdered"
+                android:layout_width="42dp"
+                android:layout_height="38dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="有序列表"
+                android:gravity="center"
+                android:text="1."
+                android:textColor="@color/inbox_sub"
+                android:textSize="15sp" />
+        </LinearLayout>
+    </HorizontalScrollView>
+</LinearLayout>

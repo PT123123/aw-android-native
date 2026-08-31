@@ -1,13 +1,23 @@
 <resources>
 
     <!-- Base application theme. -->
-    <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+    <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+        <!-- colorPrimary 是白色，默认 MaterialButton 文字也是白色会不可见 -->
+        <item name="colorOnPrimary">@color/default_text_color</item>
+        <item name="materialAlertDialogTheme">@style/AppAlertDialogTheme</item>
 
         <item name="android:textColor">@color/default_text_color</item>
+    </style>
+
+    <!-- 评论等 Material 对话框使用深色外观，与 Inbox 界面一致 -->
+    <style name="AppAlertDialogTheme" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="colorSurface">@color/inbox_card</item>
+        <item name="colorOnSurface">@color/inbox_text</item>
+        <item name="colorPrimary">@color/inbox_accent</item>
     </style>
     <style name="AppTheme.NoActionBar">
         <item name="windowActionBar">false</item>
@@ -15,5 +25,28 @@
     </style>
     <style name="AppTheme.AppBarOverlay" parent="ThemeOverlay.AppCompat.Light"/>
     <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.AppCompat.Light"/>
+
+    <!-- Inbox 编辑笔记 BottomSheet 主题 -->
+    <style name="InboxBottomSheetDialogTheme" parent="ThemeOverlay.MaterialComponents.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/InboxBottomSheetStyle</item>
+    </style>
+
+    <!-- Inbox 卡片三点菜单：黑底白字 -->
+    <style name="InboxPopupMenu" parent="ThemeOverlay.MaterialComponents.Dark">
+        <item name="colorSurface">@color/inbox_card</item>
+        <item name="colorOnSurface">@color/inbox_text</item>
+        <item name="android:colorBackground">@color/inbox_bg</item>
+        <item name="android:textColor">@color/inbox_text</item>
+    </style>
+
+    <style name="InboxBottomSheetStyle" parent="Widget.MaterialComponents.BottomSheet.Modal">
+        <item name="android:background">@android:color/transparent</item>
+    </style>
+
+    <!-- Inbox 设置滑条的气泡标签 -->
+    <style name="InboxSliderLabel" parent="Widget.MaterialComponents.Tooltip">
+        <item name="backgroundTint">@color/inbox_accent</item>
+        <item name="android:textColor">@android:color/white</item>
+    </style>
 
 </resources>

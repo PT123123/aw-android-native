@@ -10,11 +10,17 @@ import androidx.appcompat.app.AppCompatActivity
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import android.util.Log
 import net.activitywatch.android.databinding.ActivityMainBinding
 import net.activitywatch.android.fragments.TestFragment
 import net.activitywatch.android.fragments.WebUIFragment
+import net.activitywatch.android.inbox.InboxFragment
+import net.activitywatch.android.inbox.InboxPrefs
+import net.activitywatch.android.inbox.InboxSettingsFragment
+import net.activitywatch.android.inbox.TrashFragment
+import net.activitywatch.android.sync.FlutterSyncFragment
 import net.activitywatch.android.watcher.UsageStatsWatcher
 
 // Firebase 导入
@@ -31,11 +37,16 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
     val version: String
         get() {
-            return packageManager.getPackageInfo(packageName, 0).versionName
+            return packageManager.getPackageInfo(packageName, 0).versionName ?: ""
         }
 
     override fun onFragmentInteraction(item: Uri) {
         Log.w(TAG, "URI onInteraction listener not implemented")
+    }
+
+    // 按设置应用抽屉的左滑热区宽度（0=关闭右滑开抽屉）
+    fun applyDrawerEdgeZone() {
+        binding.drawerLayout.edgeZoneRatio = InboxPrefs.drawerEdgeRatio(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,6 +79,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // 按设置应用抽屉的左滑热区宽度（0=关闭右滑开抽屉）
+        applyDrawerEdgeZone()
+
         // 设置心跳发送的闹钟
         val usw = UsageStatsWatcher(this)
         usw.setupAlarm()
@@ -84,8 +98,8 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             return
         }
 
-        // 添加初始的 WebUIFragment
-        val firstFragment = WebUIFragment.newInstance(baseURL)
+        // 添加初始的 InboxFragment（原生收件箱作为初始页）
+        val firstFragment: Fragment = InboxFragment()
         supportFragmentManager.beginTransaction()
             .add(R.id.fragment_container, firstFragment)
             .commit()
@@ -114,17 +128,24 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         }
 
         val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
-        val currentUrl = (currentFragment as? WebUIFragment)?.getCurrentUrl()
-        val isInbox = currentUrl == "$baseURL/#/inbox/" || currentUrl == baseURL
 
-        if (isInbox) {
-            super.onBackPressed()
-        } else {
-            supportFragmentManager.popBackStackImmediate(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, WebUIFragment.newInstance("$baseURL/#/inbox/"))
-                .commit()
+        // 编辑器等子页面在返回栈中，正常弹出返回
+        if (supportFragmentManager.backStackEntryCount > 0) {
+            supportFragmentManager.popBackStackImmediate()
+            return
         }
+
+        // 已在原生 Inbox 初始页，交由系统处理（退出）
+        if (currentFragment is InboxFragment) {
+            super.onBackPressed()
+            return
+        }
+
+        // 其他页面（如 WebUI），返回时回到原生 Inbox
+        supportFragmentManager.popBackStackImmediate(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, InboxFragment())
+            .commit()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -149,28 +170,27 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
         // 处理导航视图点击事件
         when (item.itemId) {
-            R.id.nav_dashboard -> {
-                fragmentClass = TestFragment::class.java
-            }
             R.id.nav_activity -> {
                 fragmentClass = WebUIFragment::class.java
                 url = "$baseURL/#/activity/unknown/"
             }
-            R.id.nav_buckets -> {
-                fragmentClass = WebUIFragment::class.java
-                url = "$baseURL/#/buckets/"
+            R.id.nav_inbox -> {
+                fragmentClass = InboxFragment::class.java
+            }
+            R.id.nav_inbox_settings -> {
+                fragmentClass = InboxSettingsFragment::class.java
+            }
+            R.id.nav_trash -> {
+                fragmentClass = TrashFragment::class.java
+            }
+            R.id.nav_sync -> {
+                // 原生 Flutter 局域网同步页；回退方案为 WebUI：
+                // fragmentClass = WebUIFragment::class.java; url = "$baseURL/#/sync/"
+                fragmentClass = FlutterSyncFragment::class.java
             }
             R.id.nav_settings -> {
                 fragmentClass = WebUIFragment::class.java
                 url = "$baseURL/#/settings/"
-            }
-            R.id.nav_share -> {
-                Snackbar.make(binding.coordinatorLayout, "The share button was clicked, but it's not yet implemented!", Snackbar.LENGTH_LONG)
-                    .setAction("Action", null).show()
-            }
-            R.id.nav_send -> {
-                Snackbar.make(binding.coordinatorLayout, "The send button was clicked, but it's not yet implemented!", Snackbar.LENGTH_LONG)
-                    .setAction("Action", null).show()
             }
         }
 

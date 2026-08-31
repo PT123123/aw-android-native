@@ -4,4 +4,11 @@
     <color name="colorPrimaryDark">#000000</color>
     <color name="colorAccent">#D81B60</color>
     <color name="default_text_color">#000000</color>
+
+    <!-- Inbox (native) dark theme -->
+    <color name="inbox_bg">#0f131a</color>
+    <color name="inbox_card">#1a1d24</color>
+    <color name="inbox_text">#e6e8eb</color>
+    <color name="inbox_sub">#9aa0a6</color>
+    <color name="inbox_accent">#4f8cff</color>
 </resources>

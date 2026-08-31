@@ -7,7 +7,7 @@
                                                  android:layout_height="match_parent"
                                                  tools:context=".MainActivity">
 
-    <androidx.drawerlayout.widget.DrawerLayout
+    <net.activitywatch.android.EdgeDragDrawerLayout
             xmlns:android="http://schemas.android.com/apk/res/android"
             xmlns:app="http://schemas.android.com/apk/res-auto"
             xmlns:tools="http://schemas.android.com/tools"
@@ -28,9 +28,13 @@
                 android:layout_height="match_parent"
                 android:layout_gravity="start"
                 android:fitsSystemWindows="true"
+                android:background="@color/inbox_bg"
+                android:theme="@style/ThemeOverlay.MaterialComponents.Dark"
+                app:itemIconTint="@color/inbox_text"
+                app:itemTextColor="@color/inbox_text"
                 app:headerLayout="@layout/nav_header_main"
                 app:menu="@menu/activity_main_drawer"/>
 
-    </androidx.drawerlayout.widget.DrawerLayout>
+    </net.activitywatch.android.EdgeDragDrawerLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -89,3 +89,6 @@ aw-server
 
 # 自动生成的 fastlane 图标
 fastlane/metadata/android/en-US/images/icon.png
+
+# 会话日志导出
+aw-webui-inbox.json

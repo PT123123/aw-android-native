@@ -24,9 +24,23 @@ WEBUI_DISTDIR := $(WEBUI_SRCDIR)/dist
 BUNDLETOOL := java -jar ~/Downloads/bundletool-all-1.15.5.jar
 
 # Main targets
-all: aw-server-rust metadata
+all: aw-server-rust metadata flutter-aar
 build: all
 metadata: fastlane/metadata/android/en-US/images/icon.png
+
+# Flutter 局域网同步页 AAR（flutter_sync 模块，官方 add-to-app 方式接入）。
+# 修改 flutter_sync/lib 下的 Dart 代码后需重新执行；宿主 gradle 从
+# flutter_sync/build/host/outputs/repo 读取产物。
+.PHONY: flutter-aar
+flutter-aar:
+	@if command -v flutter >/dev/null 2>&1; then \
+		cd flutter_sync && flutter build aar --no-profile; \
+	else \
+		echo "⚠️  flutter 不在 PATH，跳过 flutter_sync AAR 构建（沿用已有产物）"; \
+		test -d flutter_sync/build/host/outputs/repo || { \
+			echo "❌ 且无已有 AAR 产物，宿主构建将失败：请安装 Flutter SDK 后运行 make flutter-aar"; \
+			exit 1; }; \
+	fi
 
 # builds an app bundle, puts it in dist
 build-bundle: dist/aw-android.aab
@@ -104,6 +118,13 @@ install-apk-debug: $(APKDIR)/debug/mobile-debug.apk
 install-apk-debug-win: $(APKDIR)/debug/mobile-debug.apk
 	/mnt/c/Users/<user>/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug.apk
 	/mnt/c/Users/<user>/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug-androidTest.apk
+
+# 只构建安卓部分（跳过 Rust/webui）并安装，用于只改了 Kotlin/资源时的快速迭代
+# 不依赖 $(APKDIR) 下的文件规则（那条规则无依赖，APK 已存在时不会重建），直接交给 gradle 增量判断
+.PHONY: onlybuildandroid-install
+onlybuildandroid-install:
+	TERM=xterm ./gradlew :mobile:assembleDebug
+	/mnt/c/Users/<user>/AppData/Local/Android/Sdk/platform-tools/adb.exe install -r $(APKDIR)/debug/mobile-debug.apk
 bugreport:
 	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe bugreport
 
