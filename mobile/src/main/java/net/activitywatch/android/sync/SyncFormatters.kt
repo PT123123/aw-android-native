@@ -30,7 +30,8 @@ object SyncFormatters {
 
     fun protocolLabel(p: String?): String = when (p) {
         "http" -> "HTTP"
-        "udp_broadcast" -> "UDP 广播"
+        // 筛选参数用 "udp_broadcast"；日志序列化经 serde lowercase 为 "udpbroadcast"
+        "udp_broadcast", "udpbroadcast" -> "UDP 广播"
         "mdns" -> "mDNS"
         else -> if (!p.isNullOrEmpty()) p else "-"
     }
