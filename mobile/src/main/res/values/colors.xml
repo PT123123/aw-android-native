@@ -11,4 +11,16 @@
     <color name="inbox_text">#e6e8eb</color>
     <color name="inbox_sub">#9aa0a6</color>
     <color name="inbox_accent">#4f8cff</color>
+
+    <!-- 局域网同步页配色 -->
+    <color name="sync_card">#24272E</color>
+    <color name="sync_field">#2C3138</color>
+    <color name="sync_border">#667F7F7F</color>
+    <color name="sync_link">#4A9EFF</color>
+    <color name="sync_success">#28A781</color>
+    <color name="sync_warning">#FFC107</color>
+    <color name="sync_danger">#DC3545</color>
+    <!-- 已配对设备卡片底色：白色 5% 叠在卡片底色上 -->
+    <color name="sync_paired_card">#0DFFFFFF</color>
+    <color name="sync_details_card">#0AFFFFFF</color>
 </resources>
