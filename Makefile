@@ -24,23 +24,9 @@ WEBUI_DISTDIR := $(WEBUI_SRCDIR)/dist
 BUNDLETOOL := java -jar ~/Downloads/bundletool-all-1.15.5.jar
 
 # Main targets
-all: aw-server-rust metadata flutter-aar
+all: aw-server-rust metadata
 build: all
 metadata: fastlane/metadata/android/en-US/images/icon.png
-
-# Flutter 局域网同步页 AAR（flutter_sync 模块，官方 add-to-app 方式接入）。
-# 修改 flutter_sync/lib 下的 Dart 代码后需重新执行；宿主 gradle 从
-# flutter_sync/build/host/outputs/repo 读取产物。
-.PHONY: flutter-aar
-flutter-aar:
-	@if command -v flutter >/dev/null 2>&1; then \
-		cd flutter_sync && flutter build aar --no-profile; \
-	else \
-		echo "⚠️  flutter 不在 PATH，跳过 flutter_sync AAR 构建（沿用已有产物）"; \
-		test -d flutter_sync/build/host/outputs/repo || { \
-			echo "❌ 且无已有 AAR 产物，宿主构建将失败：请安装 Flutter SDK 后运行 make flutter-aar"; \
-			exit 1; }; \
-	fi
 
 # builds an app bundle, puts it in dist
 build-bundle: dist/aw-android.aab
