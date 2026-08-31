@@ -10,11 +10,24 @@ RELEASE_TYPE_UNSIGNED = $(shell test -n "$$RELEASE" && $$RELEASE && echo 'releas
 RELEASE_TYPE_CAPS = $(shell test -n "$$RELEASE" && $$RELEASE && echo 'Release' || echo 'Debug')
 HAS_SECRETS = $(shell test -n "$$JKS_KEYPASS" && echo 'true' || echo 'false')
 
-# Android NDK path (can be overridden by env)
-ANDROID_NDK_HOME ?= /home/user/Android/Sdk/ndk/25.2.9519653
+# Android NDK path (can be overridden by env, defaults depend on OS)
+NDK_VERSION = 25.2.9519653
+ifeq ($(OS),Windows_NT)
+ANDROID_NDK_HOME ?= $(LOCALAPPDATA)/Android/Sdk/ndk/$(NDK_VERSION)
+else
+ANDROID_NDK_HOME ?= $(HOME)/Android/Sdk/ndk/$(NDK_VERSION)
+endif
 
 APKDIR = mobile/build/outputs/apk
 AABDIR = mobile/build/outputs/bundle
+
+# adb: prefer env ADB; otherwise auto-detect Windows SDK under WSL (/mnt/c/Users/*);
+# otherwise fall back to adb on PATH. Override with: make ADB=/path/to/adb ...
+ADB_DETECTED := $(shell ls /mnt/c/Users/*/AppData/Local/Android/Sdk/platform-tools/adb.exe 2>/dev/null | head -n1)
+ifeq ($(ADB_DETECTED),)
+ADB_DETECTED := adb
+endif
+ADB ?= $(ADB_DETECTED)
 
 WEBUI_SRCDIR := aw-server-rust/aw-webui
 WEBUI_DISTDIR := $(WEBUI_SRCDIR)/dist
@@ -98,35 +111,35 @@ test-e2e-adb:
 		net.activitywatch.android.debug.test/androidx.test.runner.AndroidJUnitRunner
 
 install-apk-debug: $(APKDIR)/debug/mobile-debug.apk
-	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug.apk
-	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug-androidTest.apk
+	$(ADB) install $(APKDIR)/debug/mobile-debug.apk
+	$(ADB) install $(APKDIR)/debug/mobile-debug-androidTest.apk
 
 install-apk-debug-win: $(APKDIR)/debug/mobile-debug.apk
-	/mnt/c/Users/<user>/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug.apk
-	/mnt/c/Users/<user>/AppData/Local/Android/Sdk/platform-tools/adb.exe install $(APKDIR)/debug/mobile-debug-androidTest.apk
+	$(ADB) install $(APKDIR)/debug/mobile-debug.apk
+	$(ADB) install $(APKDIR)/debug/mobile-debug-androidTest.apk
 
 # 只构建安卓部分（跳过 Rust/webui）并安装，用于只改了 Kotlin/资源时的快速迭代
 # 不依赖 $(APKDIR) 下的文件规则（那条规则无依赖，APK 已存在时不会重建），直接交给 gradle 增量判断
 .PHONY: onlybuildandroid-install
 onlybuildandroid-install:
 	TERM=xterm ./gradlew :mobile:assembleDebug
-	/mnt/c/Users/<user>/AppData/Local/Android/Sdk/platform-tools/adb.exe install -r $(APKDIR)/debug/mobile-debug.apk
+	$(ADB) install -r $(APKDIR)/debug/mobile-debug.apk
 bugreport:
-	/mnt/c/Users/Admin/AppData/Local/Android/Sdk/platform-tools/adb.exe bugreport
+	$(ADB) bugreport
 
 # APK targets
 $(APKDIR)/$(RELEASE_TYPE)/mobile-$(RELEASE_TYPE_UNSIGNED).apk:
 	TERM=xterm ./gradlew assemble$(RELEASE_TYPE_CAPS) --stacktrace --info
-	tree $(APKDIR)
+	ls -lR $(APKDIR)
 
 $(APKDIR)/androidTest/$(RELEASE_TYPE)/mobile-$(RELEASE_TYPE)-androidTest.apk:
 	TERM=xterm ./gradlew assembleAndroidTest --stacktrace --info
-	tree $(APKDIR)
+	ls -lR $(APKDIR)
 
 # App bundle targets
 $(AABDIR)/$(RELEASE_TYPE)/mobile-$(RELEASE_TYPE).aab:
 	TERM=xterm ./gradlew bundle$(RELEASE_TYPE_CAPS)
-	tree $(AABDIR)
+	ls -lR $(AABDIR)
 
 # Signed release bundle
 dist/aw-android.aab: $(AABDIR)/$(RELEASE_TYPE)/mobile-$(RELEASE_TYPE).aab

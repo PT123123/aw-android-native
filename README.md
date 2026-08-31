@@ -55,6 +55,43 @@ To build aw-webui you need a recent version of node/npm installed. You can then 
 
 Once both aw-server-rust and aw-webui is built, you can build the Android app as any other Android app using Android Studio.
 
+### Building on Windows
+
+Two ways are supported. Both require the submodules to be initialized first
+(`git submodule update --init --recursive`).
+
+**Option A — native PowerShell (recommended).** A self-contained script drives
+the whole pipeline (webui → Rust cross-compile → jniLibs → Gradle) without WSL:
+
+```powershell
+# from the repo root
+powershell -ExecutionPolicy Bypass -File scripts\win\build.ps1
+# release build + install onto a connected device:
+powershell -ExecutionPolicy Bypass -File scripts\win\build.ps1 -BuildType release -Install
+```
+
+Prerequisites (install once): JDK 17, Android SDK + NDK r25c, Rust (`rustup`),
+Node.js/npm, and [Strawberry Perl](https://strawberryperl.com/) (needed to build
+the vendored OpenSSL). The script installs `cargo-ndk` automatically and uses it
+for the Rust → Android cross-compilation.
+
+**Option B — Git Bash / MSYS2 (reuses the `make` pipeline).** If you prefer the
+same flow as Linux, install [MSYS2](https://www.msys2.org/) (or Git for Windows),
+then run the usual `make` targets from that shell. The `Makefile`,
+`install-ndk.sh` and `compile-android.sh` detect the Windows host and use the
+`windows-x86_64` NDK toolchain. Set `ANDROID_NDK_HOME` (or let
+`install-ndk.sh` find the NDK under `%LOCALAPPDATA%\Android\Sdk\ndk`) first.
+
+Notes / common pitfalls on Windows:
+
+- Use forward slashes (or escaped backslashes) for `sdk.dir` in
+  `local.properties`; the build script writes it for you.
+- Building the vendored OpenSSL requires Perl on `PATH`.
+- Long paths: enable Windows long-path support or keep the repo in a short path
+  (e.g. `C:\src\aw-android`), as Rust builds produce deep directory trees.
+- Ensure the NDK version matches `mobile/build.gradle` (`ndkVersion`), currently
+  `25.2.9519653` (r25c).
+
 ### Making a release
 
 To make a release, make a signed tag and push it to GitHub:
