@@ -2,6 +2,7 @@ package net.activitywatch.android.sync
 
 import com.google.gson.annotations.SerializedName
 import org.threeten.bp.Instant
+import org.threeten.bp.OffsetDateTime
 
 // 数据模型：与 aw-sync-rust (aw-server-rust/aw-sync-rust) 的 JSON 序列化一一对应。
 // JSON key 为 snake_case。
@@ -129,8 +130,16 @@ data class OpResult(
     @SerializedName("id") val id: String? = null
 )
 
-fun parseEpochMilli(ts: String?): Long? = try {
-    if (ts.isNullOrBlank()) null else Instant.parse(ts).toEpochMilli()
-} catch (e: Exception) {
-    null
+fun parseEpochMilli(ts: String?): Long? {
+    if (ts.isNullOrBlank()) return null
+    return try {
+        Instant.parse(ts).toEpochMilli()
+    } catch (e: Exception) {
+        // 服务端 chrono 序列化带 +00:00 偏移时，Instant.parse 只接受 Z 后缀
+        try {
+            OffsetDateTime.parse(ts).toInstant().toEpochMilli()
+        } catch (e2: Exception) {
+            null
+        }
+    }
 }
