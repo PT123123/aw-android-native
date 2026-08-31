@@ -1,7 +1,6 @@
 package net.activitywatch.android.db
 
 import androidx.room.*
-import net.activitywatch.android.sync.*
 
 @Entity(tableName = "inbox_notes", indices = [
     Index(value = ["server_id"], unique = true),
@@ -22,50 +21,7 @@ data class InboxNoteEntity(
     @ColumnInfo(name = "synced_at") var syncedAt: Long? = null,
     @ColumnInfo(name = "pending_sync") var pendingSync: Boolean = true,
     @ColumnInfo(name = "local_version") var localVersion: Long = 0
-) {
-    fun toLocalNote(): LocalNote = LocalNote(
-        id = id,
-        serverId = serverId,
-        content = content,
-        timestamp = timestamp,
-        updatedAt = updatedAt,
-        tags = tagsToList(),
-        version = version,
-        deviceId = deviceId,
-        deleted = deleted,
-        syncedAt = syncedAt,
-        pendingSync = pendingSync,
-        localVersion = localVersion
-    )
-
-    private fun tagsToList(): List<String> {
-        return try {
-            com.google.gson.Gson().fromJson(tags, Array<String>::class.java).toList()
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    companion object {
-        fun fromLocalNote(note: LocalNote): InboxNoteEntity {
-            val tagsJson = com.google.gson.Gson().toJson(note.tags)
-            return InboxNoteEntity(
-                id = note.id,
-                serverId = note.serverId,
-                content = note.content,
-                timestamp = note.timestamp,
-                updatedAt = note.updatedAt,
-                tags = tagsJson,
-                version = note.version,
-                deviceId = note.deviceId,
-                deleted = note.deleted,
-                syncedAt = note.syncedAt,
-                pendingSync = note.pendingSync,
-                localVersion = note.localVersion
-            )
-        }
-    }
-}
+)
 
 @Entity(tableName = "sync_state", primaryKeys = ["device_id"])
 data class SyncStateEntity(
@@ -78,41 +34,7 @@ data class SyncStateEntity(
     @ColumnInfo(name = "pending_conflict_count") val pendingConflictCount: Int = 0,
     @ColumnInfo(name = "last_error") val lastError: String? = null,
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis()
-) {
-    fun toSyncState(): SyncState {
-        return SyncState(
-            deviceId = deviceId,
-            serverVersion = serverVersion,
-            vectorClock = try {
-                com.google.gson.Gson().fromJson(vectorClock, object : com.google.gson.reflect.TypeToken<Map<String, Long>>() {}.type)
-            } catch (e: Exception) {
-                emptyMap()
-            },
-            lastFullSyncAt = lastFullSyncAt,
-            lastSyncAt = lastSyncAt,
-            pendingPushCount = pendingPushCount,
-            pendingConflictCount = pendingConflictCount,
-            lastError = lastError
-        )
-    }
-
-    companion object {
-        fun fromSyncState(state: SyncState): SyncStateEntity {
-            val vectorClockJson = com.google.gson.Gson().toJson(state.vectorClock)
-            return SyncStateEntity(
-                deviceId = state.deviceId,
-                serverVersion = state.serverVersion,
-                vectorClock = vectorClockJson,
-                lastFullSyncAt = state.lastFullSyncAt,
-                lastSyncAt = state.lastSyncAt,
-                pendingPushCount = state.pendingPushCount,
-                pendingConflictCount = state.pendingConflictCount,
-                lastError = state.lastError,
-                updatedAt = System.currentTimeMillis()
-            )
-        }
-    }
-}
+)
 
 @Entity(tableName = "sync_devices", indices = [Index(value = ["is_current"], unique = true)])
 data class SyncDeviceEntity(
@@ -124,38 +46,9 @@ data class SyncDeviceEntity(
     @ColumnInfo(name = "pending_changes") val pendingChanges: Int = 0,
     @ColumnInfo(name = "version") val version: Long = 0,
     @ColumnInfo(name = "is_current") val isCurrent: Boolean = false,
-    @ColumnInfo(name = "status") val status: String = DeviceStatus.OFFLINE.name,
+    @ColumnInfo(name = "status") val status: String = "OFFLINE",
     @ColumnInfo(name = "updated_at") val updatedAt: Long = System.currentTimeMillis()
-) {
-    fun toSyncDevice(): SyncDevice = SyncDevice(
-        deviceId = deviceId,
-        name = name,
-        platform = platform,
-        lastSeenAt = lastSeenAt,
-        lastSyncedAt = lastSyncedAt,
-        pendingChanges = pendingChanges,
-        version = version,
-        isCurrent = isCurrent,
-        status = DeviceStatus.valueOf(status)
-    )
-
-    companion object {
-        fun fromSyncDevice(device: SyncDevice): SyncDeviceEntity {
-            return SyncDeviceEntity(
-                deviceId = device.deviceId,
-                name = device.name,
-                platform = device.platform,
-                lastSeenAt = device.lastSeenAt,
-                lastSyncedAt = device.lastSyncedAt,
-                pendingChanges = device.pendingChanges,
-                version = device.version,
-                isCurrent = device.isCurrent,
-                status = device.status.name,
-                updatedAt = System.currentTimeMillis()
-            )
-        }
-    }
-}
+)
 
 @Entity(tableName = "sync_conflicts")
 data class SyncConflictEntity(
@@ -179,31 +72,7 @@ data class SyncLogEntity(
     @ColumnInfo(name = "message") val message: String,
     @ColumnInfo(name = "count") val count: Int,
     @ColumnInfo(name = "details_json") val detailsJson: String? = null
-) {
-    fun toSyncLogEntry(): SyncLogEntry = SyncLogEntry(
-        id = id,
-        timestamp = timestamp,
-        phase = SyncPhase.valueOf(phase),
-        dataType = DataType.valueOf(dataType),
-        message = message,
-        count = count,
-        detailsJson = detailsJson
-    )
-
-    companion object {
-        fun fromSyncLogEntry(entry: SyncLogEntry): SyncLogEntity {
-            return SyncLogEntity(
-                id = entry.id,
-                timestamp = entry.timestamp,
-                phase = entry.phase.name,
-                dataType = entry.dataType.name,
-                message = entry.message,
-                count = entry.count,
-                detailsJson = entry.detailsJson
-            )
-        }
-    }
-}
+)
 
 @Entity(tableName = "note_sync_map")
 data class NoteSyncMapEntity(
