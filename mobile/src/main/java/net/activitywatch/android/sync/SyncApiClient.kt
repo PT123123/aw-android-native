@@ -6,7 +6,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object SyncApiClient {
-    // 与 MainActivity.baseURL 一致：应用内 Rust server 固定监听本机 5600
+    // 应用内 Rust server 固定监听本机 5600（与 aw-server 配置一致）
     private const val BASE_URL = "http://127.0.0.1:5600/"
 
     private val client = OkHttpClient.Builder()
