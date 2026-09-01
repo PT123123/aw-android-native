@@ -4,8 +4,8 @@ apply plugin: 'kotlin-kapt'
 
 
 android {
-    // 与最新平台 API 保持对齐
-    compileSdk 36
+    // 与最新平台 API 保持对齐（AGP 8.1.1 最高支持 compileSdk 34，故用 34）
+    compileSdk 34
     ndkVersion "25.2.9519653"
 
     lint {
@@ -171,33 +171,37 @@ dependencies {
     androidTestImplementation "androidx.test.espresso:espresso-web:$espressoVersion"
 }
 
-// 禁用 rust-android-gradle 插件，否则它会用 release 模式重新构建覆盖 jniLibs 中的 .so
-// 改用 Makefile 中的 make build 预编译 .so 到 mobile/src/main/jniLibs/
-// Can be used to build with: ./gradlew cargoBuild
-// NOTE: Doesn't work, chokes on building openssl-sys
-// apply plugin: 'org.mozilla.rust-android-gradle.rust-android'
-//
-// cargo {
-//     module  = "../aw-server-rust"       // Or whatever directory contains your Cargo.toml
-//     libname = "aw_server"          // Or whatever matches Cargo.toml's [package] name.
-//     targets = ["arm", "arm64", "x86", "x86_64"]  // See bellow for a longer list of options
-//     profile = 'release'  // Selects the Cargo release profile (defaults to 'debug')
-// }
+// ===== Rust 原生库：用 rust-android-gradle 插件接管（替代 Makefile 的 make -C aw-server-rust android）=====
+// 之前禁用是栽在 openssl-src 编 OpenSSL 找不到合适 perl（Git perl 缺模块、Strawberry 被拒）。
+// 升级到 0.9.x 后用 cargo { exec { ... } } 注入 OPENSSL_SRC_PERL（MSYS2 perl）即可解决，彻底不碰 make。
+apply plugin: 'org.mozilla.rust-android-gradle.rust-android'
 
-tasks.whenTaskAdded { task ->
-    // TODO: Build aw-server lib here instead of in Makefile?
-    // Doesn't work, chokes on building openssl-sys
-    //if ((task.name == 'javaPreCompileDebug' || task.name == 'javaPreCompileRelease')) {
-    //    task.dependsOn 'cargoBuild'
-    //}
+cargo {
+    // aw-server-rust 是 workspace 根，cargo build 会产出 libaw_server.so（与 Makefile 行为一致）
+    module  = "../aw-server-rust"
+    libname = "aw_server"
+    // 只编 abiFilters 发布的架构：arm=armeabi-v7a, arm64=arm64-v8a（与 ndk.abiFilters 对齐）
+    targets = ["arm", "arm64"]
+    profile = 'release'   // release 编一次，debug/release 共用（debug 也可运行，仅缺 debug 符号）
 
-    // TODO: Build aw-webui here?
-    //if (task.name.contains("assembleRelease")) {
-    //    task.getDependsOn().add({
-    //        // add your logic here
-    //    })
-    //}
+    // openssl-src 从源码编 OpenSSL 时通过 OPENSSL_SRC_PERL 指定的 perl 调用 Configure。
+    // Windows 必须用 MSYS2 的 perl（C:/msys64/usr/bin/perl.exe）：cygwin 风格路径 + 模块齐全，
+    // 既不会像 Git perl 那样缺 Locale::Maketext::Simple，也不会像 Strawberry(MSWin32) 被 Configure 拒。
+    // Linux/macOS/CI 用系统 perl，无需显式设置（openssl-src 默认从 PATH 找）。
+    exec { spec, toolchain ->
+        def osName = System.properties['os.name'].toLowerCase()
+        if (osName.contains('windows')) {
+            spec.environment("OPENSSL_SRC_PERL", "C:/msys64/usr/bin/perl.exe")
+        }
+    }
 }
+
+// Rust 库先于 Android 预编译产出；保留 .so 必检
+// 注意：rust-android-gradle 在 afterEvaluate 才创建 cargoBuild task，
+// 必须用字符串懒绑定，不能用直接属性引用（否则配置阶段报 unknown property）。
+preBuild.dependsOn 'cargoBuild'
+
+// ===== webui 已彻底移除：不再构建/打包 aw-webui，app 仪表盘入口 WebUIFragment 一并删除 =====
 
 //apply plugin: "com.google.gms.google-services" // 必须存在，且在最后一行
 //apply plugin: "com.google.firebase.crashlytics" // <--- **新增这一行**
