@@ -1,7 +1,6 @@
 package net.activitywatch.android
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.navigation.NavigationView
@@ -15,7 +14,6 @@ import androidx.fragment.app.Fragment
 import android.util.Log
 import net.activitywatch.android.databinding.ActivityMainBinding
 import net.activitywatch.android.fragments.TestFragment
-import net.activitywatch.android.fragments.WebUIFragment
 import net.activitywatch.android.inbox.InboxFragment
 import net.activitywatch.android.inbox.InboxPrefs
 import net.activitywatch.android.inbox.InboxSettingsFragment
@@ -29,9 +27,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 private const val TAG = "MainActivity"
 
-const val baseURL = "http://127.0.0.1:5600"
-
-class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener, WebUIFragment.OnFragmentInteractionListener {
+class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener {
 
     private lateinit var binding: ActivityMainBinding
 
@@ -39,10 +35,6 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         get() {
             return packageManager.getPackageInfo(packageName, 0).versionName ?: ""
         }
-
-    override fun onFragmentInteraction(item: Uri) {
-        Log.w(TAG, "URI onInteraction listener not implemented")
-    }
 
     // 按设置应用抽屉的左滑热区宽度（0=关闭右滑开抽屉）
     fun applyDrawerEdgeZone() {
@@ -141,7 +133,6 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             return
         }
 
-        // 其他页面（如 WebUI），返回时回到原生 Inbox
         supportFragmentManager.popBackStackImmediate(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, InboxFragment())
@@ -166,14 +157,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         var fragmentClass: Class<out Fragment>? = null
-        var url: String? = null
 
         // 处理导航视图点击事件
         when (item.itemId) {
-            R.id.nav_activity -> {
-                fragmentClass = WebUIFragment::class.java
-                url = "$baseURL/#/activity/unknown/"
-            }
             R.id.nav_inbox -> {
                 fragmentClass = InboxFragment::class.java
             }
@@ -186,18 +172,10 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             R.id.nav_sync -> {
                 fragmentClass = SyncFragment::class.java
             }
-            R.id.nav_settings -> {
-                fragmentClass = WebUIFragment::class.java
-                url = "$baseURL/#/settings/"
-            }
         }
 
         val fragment: Fragment? = try {
-            if (fragmentClass === WebUIFragment::class.java && url != null) {
-                WebUIFragment.newInstance(url)
-            } else {
-                fragmentClass?.newInstance()
-            }
+            fragmentClass?.newInstance()
         } catch (e: Exception) {
             e.printStackTrace()
             null

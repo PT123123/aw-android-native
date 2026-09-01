@@ -4,12 +4,11 @@
     Build aw-android natively on Windows (no WSL required).
 
 .DESCRIPTION
-    Mirrors the Linux `make` pipeline for Windows:
-      1. Build the webui (aw-server-rust/aw-webui) for Android.
-      2. Cross-compile aw-server-rust to Android .so via cargo-ndk.
-      3. Place the .so files into mobile/src/main/jniLibs/<abi>/.
-      4. Run Gradle to assemble the APK (or AAB with -Bundle).
-      5. Optionally install onto a device with adb (-Install).
+    Mirrors the Linux build pipeline for Windows:
+      1. Cross-compile aw-server-rust to Android .so via cargo-ndk.
+      2. Place the .so files into mobile/src/main/jniLibs/<abi>/.
+      3. Run Gradle to assemble the APK (or AAB with -Bundle).
+      4. Optionally install onto a device with adb (-Install).
 
     Rust -> Android cross-compilation uses `cargo-ndk`, which is the
     maintained, cross-platform way to drive the NDK toolchain. This avoids
@@ -20,7 +19,6 @@
       - JDK 17                        (java)
       - Android SDK + NDK r25c        (via Android Studio / SDK Manager)
       - Rust toolchain                (rustup, cargo)
-      - Node.js + npm                 (for the webui)
       - Strawberry Perl               (builds the vendored OpenSSL)
       - cargo-ndk                     (auto-installed by this script)
 
@@ -35,9 +33,6 @@
 .PARAMETER NdkPlatform
     Android API level for the NDK toolchain (matches the repo's use of the
     *-android26-clang wrappers). Default 26.
-
-.PARAMETER SkipWebui
-    Skip rebuilding the webui (reuse an existing aw-webui/dist).
 
 .PARAMETER SkipRust
     Skip the Rust cross-compile (reuse existing jniLibs .so files).
@@ -59,7 +54,7 @@
     .\build.ps1 -BuildType release -Install
 
 .EXAMPLE
-    .\build.ps1 -SkipWebui -SkipRust   # quick rebuild of just the APK
+    .\build.ps1 -SkipRust              # quick rebuild of just the APK
 #>
 [CmdletBinding()]
 param(
@@ -71,7 +66,6 @@ param(
 
     [int]$NdkPlatform = 26,
 
-    [switch]$SkipWebui,
     [switch]$SkipRust,
     [switch]$Install,
     [switch]$Bundle,
@@ -142,7 +136,6 @@ function Get-NdkRoot {
 # ---------------------------------------------------------------------------
 $RepoRoot   = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $ServerRust = Join-Path $RepoRoot 'aw-server-rust'
-$WebuiDir   = Join-Path $ServerRust 'aw-webui'
 $MobileDir  = Join-Path $RepoRoot 'mobile'
 $JniLibsDir = Join-Path $MobileDir 'src\main\jniLibs'
 $NdkVersionPinned = '25.2.9519653'   # r25c, matches mobile/build.gradle
@@ -157,7 +150,7 @@ Write-Info "ABIs      : $($Abis -join ', ')"
 # ---------------------------------------------------------------------------
 Write-Step "Checking prerequisites"
 
-foreach ($tool in @('java', 'cargo', 'rustup', 'node', 'npm')) {
+foreach ($tool in @('java', 'cargo', 'rustup')) {
     if (-not (Test-Command $tool)) {
         throw "Required tool '$tool' not found on PATH. Please install it first."
     }
@@ -215,29 +208,7 @@ if (-not $NoMirror) {
 }
 
 # ---------------------------------------------------------------------------
-# 1. webui
-# ---------------------------------------------------------------------------
-if (-not $SkipWebui) {
-    Write-Step "Building webui (aw-webui) for Android"
-    if (-not (Test-Path (Join-Path $WebuiDir 'node_modules'))) {
-        Invoke-Native 'npm' @('ci') -WorkDir $WebuiDir
-    }
-    # prebuild: copy logo assets expected by the build
-    $staticDir = Join-Path $WebuiDir 'static'
-    New-Item -ItemType Directory -Force -Path $staticDir | Out-Null
-    foreach ($ext in @('png', 'svg')) {
-        $src = Join-Path $WebuiDir "media\logo\logo.$ext"
-        if (Test-Path $src) { Copy-Item $src (Join-Path $staticDir "logo.$ext") -Force }
-    }
-    Invoke-Native 'npm' @('run', 'build', '--', '--os=android') -WorkDir $WebuiDir
-    Write-Ok "webui built -> $(Join-Path $WebuiDir 'dist')"
-}
-else {
-    Write-Step "Skipping webui build (-SkipWebui)"
-}
-
-# ---------------------------------------------------------------------------
-# 2. Rust cross-compile (cargo-ndk)
+# 1. Rust cross-compile (cargo-ndk)
 # ---------------------------------------------------------------------------
 if (-not $SkipRust) {
     Write-Step "Cross-compiling aw-server-rust with cargo-ndk"
