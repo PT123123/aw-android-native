@@ -9,10 +9,11 @@ aw-android（增强版 / Native UI Fork）
 
 - 用 **Kotlin + ViewBinding（MVVM）** 重写了核心界面，摆脱对 WebView 的依赖；
 - 内置 **Inbox 快速笔记**，支持 Markdown、置顶、历史、回收站；
-- 新增 **标签 Day 时间线**、**多日统计**、**按天活动浏览** 等原生页面；
+- 新增 **标签 Day 时间线**、**多日统计**、**按天活动浏览**等原生页面；
 - 用原生 Kotlin 重写 **局域网同步（LAN Sync）**，移除了原先的 Flutter 依赖；
 - 集成 Firebase Analytics / Crashlytics，修复了 SQLite 崩溃与 JNI 内存安全问题；
-- 完善构建体系：Makefile 预编译 Rust、国内镜像加速、Android 15 的 16KB 页对齐，以及**原生 Windows 构建**支持。
+- 完善构建体系：以 **Gradle 为唯一顶层编排**（`rust-android-gradle` 插件编译 Rust 原生库），国内镜像加速、Android 15 的 16KB 页对齐，以及**原生 Windows 构建**支持；
+- **已移除内嵌 WebUI（aw-webui）**：不再通过 WebView 加载仪表盘，应用界面完全原生。
 
 当前版本：`0.13.0`（versionCode 35）。
 
@@ -31,9 +32,9 @@ aw-android（增强版 / Native UI Fork）
 | **回收站** | 已删除笔记的查看与恢复。 |
 | **标签 Day** | 时间线选择 + 打标签，提供 Details / Summary 两种视图，支持新增与管理标签、按未打标签筛选。 |
 | **统计** | 多日统计（移植自 `statspage.cpp`），含自绘图表（环形图 / 横向条形图 / 每小时柱状图 / 统计曲线），支持日期范围选择与导出。 |
-| **Activity** | 按天浏览活动数据，支持前一天 / 后一天 / 回到今天 / 刷新。 |
 | **Sync (LAN)** | 局域网同步页（原生重写），见下文。 |
-| **Settings** | 仍通过内嵌 WebUI 提供（`WebUIFragment`），作为原生页面的补充。 |
+
+> 说明：上游的 **Activity** 与 **Settings** 页面此前通过内嵌 WebUI（WebView）提供；本分支已彻底移除 WebUI 构建与对应导航入口，这两个页面当前暂未提供（使用数据仍由内嵌 Rust 服务器采集与存储）。
 
 ### Inbox 快速笔记
 
@@ -66,7 +67,7 @@ Inbox 是本分支的核心功能之一，背后由 [`aw-server-rust` 子模块]
 
 ## 构建
 
-构建本应用需要先编译 `aw-server-rust`（`./aw-server-rust`）与 `aw-webui`（`./aw-server-rust/aw-webui`）。
+构建本应用需要先编译 `aw-server-rust`（`./aw-server-rust`）。
 
 如果还没有初始化子模块：`git submodule update --init --recursive`。
 
@@ -80,41 +81,43 @@ Inbox 是本分支的核心功能之一，背后由 [`aw-server-rust` 子模块]
 ```
 export ANDROID_NDK_HOME=`pwd`/aw-server-rust/NDK  # 指向你的 NDK
 pushd aw-server-rust && ./install-ndk.sh; popd    # 配置并（如缺失）安装 NDK
-env RELEASE=false make aw-server-rust             # RELEASE=true 为发布模式（更慢、更难调试）
+./gradlew :mobile:cargoBuild             # 编 Rust 原生库（Gradle 自动触发，debug/release 共用 release profile）
 ```
 
 > **提示**
 > 若未设置 `ANDROID_NDK_HOME`，`install-ndk.sh` 会把 NDK 下载到 `aw-server-rust/NDK`。若 NDK 已在别处（如 Arch 的 `/opt/android-ndk/`），可建一个软链接指向它。
 
-### 构建 aw-webui
-
-需要较新的 node/npm，然后执行 `make aw-webui`。
-
 ### 组装应用
 
-`aw-server-rust` 与 `aw-webui` 都构建好后，即可像普通 Android 应用一样构建（Android Studio 或 `./gradlew :mobile:assembleDebug`）。
+`aw-server-rust` 构建好后，即可像普通 Android 应用一样构建（Android Studio 或 `./gradlew :mobile:assembleDebug`）。
 
 ### 在 Windows 上构建
 
-支持两种方式，二者都需要先初始化子模块（`git submodule update --init --recursive`）。
+顶层构建完全由 **Gradle** 驱动——编排层不再使用 `make`/`cmake`/`ninja`（已删除 `Makefile`）。先初始化子模块：
+`git submodule update --init --recursive`。
 
-**方式 A — 原生 PowerShell（推荐）。** 一个自包含脚本驱动整条流水线（webui → Rust 交叉编译 → jniLibs → Gradle），无需 WSL：
+**推荐方式 — 任意 shell 下使用 `./gradlew`（PowerShell / Git Bash / cmd）。**
+Gradle 是唯一编排者：它通过 `rust-android-gradle` 插件交叉编译 Rust 原生库（`cargoBuild`，在 `preBuild` 前自动执行），并打包 APK/AAB。示例：
 
-```powershell
-# 在仓库根目录执行
-powershell -ExecutionPolicy Bypass -File scripts\win\build.ps1
-# 发布构建 + 安装到已连接设备：
-powershell -ExecutionPolicy Bypass -File scripts\win\build.ps1 -BuildType release -Install
+```sh
+./gradlew build                 # debug APK（等价于旧的 make build）
+./gradlew buildApk             # release APK  -> dist/aw-android.apk（设了 JKS_* 环境变量则自动签名）
+./gradlew buildBundle          # release AAB  -> dist/aw-android.aab
+./gradlew install              # 通过 adb 安装 debug APK
+./gradlew :mobile:cargoBuild   # 仅编译 Rust .so
 ```
 
-前置依赖（装一次即可）：JDK 17、Android SDK + NDK r25c、Rust（`rustup`）、Node.js/npm，以及 [Strawberry Perl](https://strawberryperl.com/)（用于编译 vendored OpenSSL）。脚本会自动安装 `cargo-ndk` 并用它完成 Rust → Android 交叉编译。
+在 Windows 上，`rust-android-gradle` 插件需要 MSYS2 的 perl 来编译 vendored OpenSSL：它会自动设置
+`OPENSSL_SRC_PERL=C:/msys64/usr/bin/perl.exe`（仅 Windows）。MSYS2 perl 优于 Git for Windows 的 perl（缺模块）
+和 Strawberry Perl（被 OpenSSL 的 Configure 拒绝）。
 
-**方式 B — Git Bash / MSYS2（复用 `make` 流程）。** 若偏好与 Linux 相同的流程，安装 [MSYS2](https://www.msys2.org/)（或 Git for Windows），然后在该 shell 里运行常规 `make` 目标。`Makefile`、`install-ndk.sh`、`compile-android.sh` 会探测 Windows 宿主并使用 `windows-x86_64` NDK 工具链。先设置 `ANDROID_NDK_HOME`（或让 `install-ndk.sh` 在 `%LOCALAPPDATA%\Android\Sdk\ndk` 下查找 NDK）。
+**备选 — `scripts\win\build.ps1`。** 一个自包含 PowerShell 脚本，直接用 `cargo-ndk` 编译 Rust（而非 Gradle 插件），
+然后调用 `gradlew.bat`。适合想自己预编译 Rust 的场景。该脚本**不使用 Makefile**（已删除）。
 
 Windows 上的注意事项 / 常见坑：
 
-- `local.properties` 里的 `sdk.dir` 用正斜杠（或转义反斜杠）；构建脚本会自动写好。
-- 编译 vendored OpenSSL 需要 `PATH` 里有 Perl。
+- `local.properties` 里的 `sdk.dir` 用正斜杠（或转义反斜杠）；构建脚本 / 插件会自动写好。
+- 编译 vendored OpenSSL 需要 `PATH` 里有 Perl（推荐 MSYS2）。
 - 长路径：建议开启 Windows 长路径支持，或把仓库放在较短的路径（如 `C:\src\aw-android`），因为 Rust 构建会产生很深的目录树。
 - 确保 NDK 版本与 `mobile/build.gradle` 的 `ndkVersion` 一致，当前为 `25.2.9519653`（r25c）。
 

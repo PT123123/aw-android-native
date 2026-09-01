@@ -20,7 +20,7 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.1.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        classpath 'gradle.plugin.org.mozilla.rust-android-gradle:plugin:0.8.3'
+        classpath 'org.mozilla.rust-android-gradle:plugin:0.9.3'
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
@@ -48,6 +48,46 @@ idea {
 
 task clean(type: Delete) {
     delete rootProject.buildDir
+    delete file('mobile/src/main/jniLibs')
+}
+
+// ======================
+// 顶层 Gradle 编排（替代已删除的 Makefile；不引入任何额外工具，Gradle 是唯一总指挥）
+// ======================
+task build(group: "build", description: "等价 make build：编 Rust + debug APK") {
+    dependsOn ':mobile:assembleDebug'
+}
+task buildApk(group: "build", description: "Release APK：assemble + 复制/签名到 dist/aw-android.apk") {
+    dependsOn ':mobile:assembleRelease'
+    doLast {
+        def unsigned = file('mobile/build/outputs/apk/release/mobile-release-unsigned.apk')
+        copy { from unsigned into 'dist' rename { 'aw-android.apk' } }
+        if (System.getenv('JKS_STOREPASS') != null) {
+            exec { commandLine 'bash', 'scripts/sign_apk.sh', 'dist/aw-android.apk', 'dist/aw-android.apk' }
+        }
+    }
+}
+task buildBundle(group: "build", description: "Release AAB：bundle + 复制/签名到 dist/aw-android.aab") {
+    dependsOn ':mobile:bundleRelease'
+    doLast {
+        def unsigned = file('mobile/build/outputs/bundle/release/mobile-release.aab')
+        copy { from unsigned into 'dist' rename { 'aw-android.aab' } }
+        if (System.getenv('JKS_STOREPASS') != null) {
+            exec { commandLine 'bash', 'scripts/sign_apk.sh', 'dist/aw-android.aab', 'dist/aw-android.aab' }
+        }
+    }
+}
+task install(group: "install", description: "安装 debug APK 到设备") {
+    dependsOn ':mobile:installDebug'
+}
+task testAll(group: "verification", description: "运行单元测试") {
+    dependsOn ':mobile:test'
+}
+task testE2e(group: "verification", description: "运行设备端 E2E 测试") {
+    dependsOn ':mobile:connectedAndroidTest'
+}
+task bumpVersion(type: Exec, group: "build", description: "release 版本自增（改 mobile/build.gradle versionName/versionCode）") {
+    commandLine 'bash', 'scripts/bump_version.sh'
 }
 
 apply plugin: "com.google.gms.google-services" // 必须存在，且在最后一行
