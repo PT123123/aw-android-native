@@ -20,6 +20,7 @@ import net.activitywatch.android.inbox.InboxSettingsFragment
 import net.activitywatch.android.inbox.TrashFragment
 import net.activitywatch.android.sync.SyncFragment
 import net.activitywatch.android.watcher.UsageStatsWatcher
+import net.activitywatch.android.dashboard.DashboardFragment
 
 // Firebase 导入
 import com.google.firebase.FirebaseApp
@@ -160,6 +161,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
         // 处理导航视图点击事件
         when (item.itemId) {
+            R.id.nav_dashboard -> {
+                fragmentClass = DashboardFragment::class.java
+            }
             R.id.nav_inbox -> {
                 fragmentClass = InboxFragment::class.java
             }
