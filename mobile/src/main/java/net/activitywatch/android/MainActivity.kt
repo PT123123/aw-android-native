@@ -22,6 +22,11 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import com.google.android.material.snackbar.Snackbar
 import net.activitywatch.android.databinding.ActivityMainBinding
+import net.activitywatch.android.focus.FocusAnalyticsFragment
+import net.activitywatch.android.focus.FocusCalendarFragment
+import net.activitywatch.android.focus.FocusCountdownFragment
+import net.activitywatch.android.focus.FocusRecordsFragment
+import net.activitywatch.android.focus.FocusTimerFragment
 import net.activitywatch.android.inbox.InboxFragment
 import net.activitywatch.android.inbox.InboxPrefs
 import net.activitywatch.android.inbox.InboxSettingsFragment
@@ -49,7 +54,9 @@ private data class NavRow(
     val id: Int,
     val icon: Drawable,
     val title: String,
-    val fragmentClass: Class<out Fragment>
+    val fragmentClass: Class<out Fragment>,
+    /** 传给 Fragment 的参数（如 Todo 视图）；null 表示无参 */
+    val args: Bundle? = null
 )
 
 private data class NavGroup(
@@ -222,12 +229,6 @@ class MainActivity : AppCompatActivity() {
                 InboxFragment::class.java
             ),
             NavRow(
-                R.id.nav_todo,
-                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_agenda)!!,
-                "任务",
-                TodoFragment::class.java
-            ),
-            NavRow(
                 R.id.nav_inbox_settings,
                 ContextCompat.getDrawable(this, android.R.drawable.ic_menu_preferences)!!,
                 "Inbox 设置",
@@ -238,6 +239,85 @@ class MainActivity : AppCompatActivity() {
                 ContextCompat.getDrawable(this, android.R.drawable.ic_menu_delete)!!,
                 "回收站",
                 TrashFragment::class.java
+            )
+        )),
+        // 任务（契约 §5.1 左栏）：4 个视图直接作为抽屉入口
+        NavGroup("任务", true, listOf(
+            NavRow(
+                R.id.nav_todo_inbox,
+                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_agenda)!!,
+                "收集箱",
+                TodoFragment::class.java,
+                todoArgs("inbox")
+            ),
+            NavRow(
+                R.id.nav_todo_today,
+                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_today)!!,
+                "今天",
+                TodoFragment::class.java,
+                todoArgs("today")
+            ),
+            NavRow(
+                R.id.nav_todo_next7,
+                ContextCompat.getDrawable(this, R.drawable.ic_sort)!!,
+                "最近 7 天",
+                TodoFragment::class.java,
+                todoArgs("next7")
+            ),
+            NavRow(
+                R.id.nav_todo_all,
+                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_sort_by_size)!!,
+                "全部",
+                TodoFragment::class.java,
+                todoArgs("all")
+            )
+        )),
+        // 专注模块（契约 §5.8）：8 个模块，记录详情由点记录弹窗承载
+        NavGroup("专注", true, listOf(
+            NavRow(
+                R.id.nav_focus_timer,
+                ContextCompat.getDrawable(this, R.drawable.ic_focus_timer)!!,
+                "计时",
+                FocusTimerFragment::class.java
+            ),
+            NavRow(
+                R.id.nav_focus_records,
+                ContextCompat.getDrawable(this, R.drawable.ic_focus_records)!!,
+                "专注记录",
+                FocusRecordsFragment::class.java
+            ),
+            NavRow(
+                R.id.nav_focus_timeline,
+                ContextCompat.getDrawable(this, R.drawable.ic_focus_timeline)!!,
+                "专注时间线",
+                FocusAnalyticsFragment::class.java,
+                focusArgs(FocusAnalyticsFragment.MODE_TIMELINE)
+            ),
+            NavRow(
+                R.id.nav_focus_heatmap,
+                ContextCompat.getDrawable(this, R.drawable.ic_focus_heatmap)!!,
+                "热力图",
+                FocusAnalyticsFragment::class.java,
+                focusArgs(FocusAnalyticsFragment.MODE_HEATMAP)
+            ),
+            NavRow(
+                R.id.nav_focus_best,
+                ContextCompat.getDrawable(this, R.drawable.ic_focus_best)!!,
+                "最佳专注时间",
+                FocusAnalyticsFragment::class.java,
+                focusArgs(FocusAnalyticsFragment.MODE_BEST)
+            ),
+            NavRow(
+                R.id.nav_focus_calendar,
+                ContextCompat.getDrawable(this, R.drawable.ic_focus_calendar)!!,
+                "日历",
+                FocusCalendarFragment::class.java
+            ),
+            NavRow(
+                R.id.nav_focus_countdown,
+                ContextCompat.getDrawable(this, R.drawable.ic_focus_countdown)!!,
+                "倒数纪念日",
+                FocusCountdownFragment::class.java
             )
         )),
         NavGroup("ActivityWatch", false, listOf(
@@ -372,13 +452,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun navigateTo(fragmentClass: Class<out Fragment>) {
+    private fun navigateTo(fragmentClass: Class<out Fragment>, args: Bundle? = null) {
         val fragment = fragmentClass.newInstance()
+        if (args != null) fragment.arguments = Bundle(args)
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, fragment)
             .addToBackStack(null)
             .commit()
     }
+
+    /** Todo 视图入口的参数包（与 TodoFragment.ARG_VIEW 对应） */
+    private fun todoArgs(view: String): Bundle =
+        Bundle().apply { putString(TodoFragment.ARG_VIEW, view) }
+
+    /** 专注分析页的模块参数（与 FocusAnalyticsFragment.ARG_MODE 对应） */
+    private fun focusArgs(mode: String): Bundle =
+        Bundle().apply { putString(FocusAnalyticsFragment.ARG_MODE, mode) }
 
     private fun navItemBg(): Drawable? = ContextCompat.getDrawable(this, R.drawable.nav_item_bg)
 
