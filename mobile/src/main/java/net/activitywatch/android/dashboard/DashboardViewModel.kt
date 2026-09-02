@@ -11,10 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.threeten.bp.Instant
-import org.threeten.bp.LocalDate
-import org.threeten.bp.ZoneId
-import org.threeten.bp.temporal.ChronoUnit
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 private const val TAG = "DashboardViewModel"
 
@@ -191,23 +190,51 @@ class DashboardViewModel : ViewModel() {
         return t.contains("afk") || id.contains("aw-watcher-afk")
     }
 
+    /**
+     * 计算时间窗的 ISO-8601 字符串（含本地时区偏移，如 2026-09-02T00:00:00+08:00）。
+     * 用 java.util.Calendar + SimpleDateFormat 而非 threetenbp：后者需要先调用
+     * AndroidThreeTen.init() 注册时区库，否则 ZoneId/LocalDate.now 会抛
+     * "No timezone data files registered"。本项目仅此处在意时区，故直接走系统 Calendar，
+     * 与 InboxAdapter 的 SimpleDateFormat("...XXX") 写法保持一致，aw-server 的 chrono 可正常解析。
+     */
     private fun TimeRange.toIso(): Pair<String?, String?> {
-        val zone = ZoneId.systemDefault()
-        val now = Instant.now()
+        val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
+        val endIso = fmt.format(Calendar.getInstance().time)
         return when (this) {
-            TimeRange.TODAY ->
-                Pair(LocalDate.now(zone).atStartOfDay(zone).toInstant().toString(), now.toString())
-            TimeRange.YESTERDAY -> {
-                val todayStart = LocalDate.now(zone).atStartOfDay(zone).toInstant()
-                val yStart = LocalDate.now(zone).minusDays(1).atStartOfDay(zone).toInstant()
-                Pair(yStart.toString(), todayStart.toString())
+            TimeRange.TODAY -> {
+                val start = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                Pair(fmt.format(start.time), endIso)
             }
-            TimeRange.LAST7 ->
-                Pair(now.minus(7, ChronoUnit.DAYS).toString(), now.toString())
-            TimeRange.LAST30 ->
-                Pair(now.minus(30, ChronoUnit.DAYS).toString(), now.toString())
-            TimeRange.ALL ->
-                Pair(null, null)
+            TimeRange.YESTERDAY -> {
+                val start = Calendar.getInstance().apply {
+                    add(Calendar.DAY_OF_MONTH, -1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                val end = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                Pair(fmt.format(start.time), fmt.format(end.time))
+            }
+            TimeRange.LAST7 -> {
+                val start = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, -7) }
+                Pair(fmt.format(start.time), endIso)
+            }
+            TimeRange.LAST30 -> {
+                val start = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, -30) }
+                Pair(fmt.format(start.time), endIso)
+            }
+            TimeRange.ALL -> Pair(null, null)
         }
     }
 }
