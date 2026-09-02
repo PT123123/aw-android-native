@@ -216,8 +216,7 @@ class MainActivity : AppCompatActivity() {
         NavGroup("Inbox", true, listOf(
             NavRow(
                 R.id.nav_inbox,
-                resolveAttrDrawable(android.R.attr.actionModeCopyDrawable)
-                    ?: ContextCompat.getDrawable(this, android.R.drawable.ic_menu_edit)!!,
+                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_edit)!!,
                 "Inbox",
                 InboxFragment::class.java
             ),
@@ -372,13 +371,6 @@ class MainActivity : AppCompatActivity() {
             .replace(R.id.fragment_container, fragment)
             .addToBackStack(null)
             .commit()
-    }
-
-    private fun resolveAttrDrawable(attr: Int): Drawable? {
-        val a = obtainStyledAttributes(intArrayOf(attr))
-        val d = a.getDrawable(0)
-        a.recycle()
-        return d
     }
 
     private fun navItemBg(): Drawable? = ContextCompat.getDrawable(this, R.drawable.nav_item_bg)

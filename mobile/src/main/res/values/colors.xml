@@ -45,6 +45,8 @@
     <color name="aw_chip_bg">#E9EBEF</color>
     <color name="aw_chip_text">#1B1F24</color>
     <color name="aw_scrim">#1A000000</color>
+    <!-- 水波纹高亮（导航项按下反馈，亮色主题用黑色半透明） -->
+    <color name="aw_ripple">#26000000</color>
 
     <!-- 分类色板：Timeline / Trends 按应用着色用，两套主题各自的取值 -->
     <color name="aw_cat_1">#4F8CFF</color>

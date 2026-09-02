@@ -23,6 +23,8 @@
     <color name="aw_chip_bg">#1F232B</color>
     <color name="aw_chip_text">#E6E8EB</color>
     <color name="aw_scrim">#4D000000</color>
+    <!-- 水波纹高亮（导航项按下反馈，深色主题用白色半透明） -->
+    <color name="aw_ripple">#33FFFFFF</color>
 
     <!-- 分类色板：深色背景上提亮一档，保证色块可辨识 -->
     <color name="aw_cat_1">#5B93FF</color>
