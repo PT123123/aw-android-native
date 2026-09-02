@@ -20,6 +20,14 @@
             android:id="@+id/nav_trash"
             android:icon="@android:drawable/ic_menu_delete"
             android:title="回收站" />
+        <item
+            android:id="@+id/nav_stopwatch"
+            android:icon="@android:drawable/ic_menu_today"
+            android:title="秒表" />
+        <item
+            android:id="@+id/nav_query"
+            android:icon="@android:drawable/ic_menu_search"
+            android:title="Query Explorer" />
     </group>
 
     <item android:title="Misc">

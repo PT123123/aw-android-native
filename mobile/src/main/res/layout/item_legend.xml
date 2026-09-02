@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 图例/榜单项：分类色块 + 名称 + 时长。Timeline 与 Trends 共用。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingVertical="5dp">
+
+    <View
+        android:id="@+id/v_color"
+        android:layout_width="12dp"
+        android:layout_height="12dp"/>
+
+    <TextView
+        android:id="@+id/tv_label"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="8dp"
+        android:ellipsize="end"
+        android:singleLine="true"
+        android:textColor="@color/aw_text_primary"
+        android:textSize="13sp"/>
+
+    <TextView
+        android:id="@+id/tv_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:textColor="@color/aw_text_secondary"
+        android:textSize="12sp"/>
+
+</LinearLayout>

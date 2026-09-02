@@ -6,24 +6,21 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
-import kotlinx.coroutines.launch
-import net.activitywatch.android.R
+import com.google.android.material.tabs.TabLayoutMediator
 import net.activitywatch.android.databinding.FragmentDashboardBinding
 
 /**
- * 原生实现的 ActivityWatch 仪表盘，替代被移除的 WebUIFragment（aw-webui）。
- * 通过 ActivityApi 访问本机 aw-server，渲染应用/网站时长榜与专注/闲置统计。
+ * 活动页宿主：时间范围选择 + 概览/时间线/趋势 三个 Tab。
+ *
+ * ViewModel 挂在自己身上，子 Fragment 通过 requireParentFragment() 取同一实例，
+ * 所以切换时间范围只会触发一次事件拉取，三个 Tab 同时刷新。
  */
 class DashboardFragment : Fragment() {
     private var _binding: FragmentDashboardBinding? = null
     private val binding get() = _binding!!
 
     private lateinit var viewModel: DashboardViewModel
-    private lateinit var appAdapter: RankAdapter
-    private lateinit var webAdapter: RankAdapter
-    private lateinit var bucketAdapter: BucketAdapter
+    private var tabMediator: TabLayoutMediator? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -39,28 +36,8 @@ class DashboardFragment : Fragment() {
         ActivityApi.init()
         viewModel = ViewModelProvider(this)[DashboardViewModel::class.java]
 
-        appAdapter = RankAdapter()
-        webAdapter = RankAdapter()
-        bucketAdapter = BucketAdapter()
-
-        binding.rvApps.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvApps.isNestedScrollingEnabled = false
-        binding.rvApps.adapter = appAdapter
-
-        binding.rvWebsites.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvWebsites.isNestedScrollingEnabled = false
-        binding.rvWebsites.adapter = webAdapter
-
-        binding.rvBuckets.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvBuckets.isNestedScrollingEnabled = false
-        binding.rvBuckets.adapter = bucketAdapter
-
         setupChips()
-        binding.swipe.setOnRefreshListener { viewModel.reload() }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.state.collect { render(it) }
-        }
+        setupTabs()
     }
 
     private fun setupChips() {
@@ -78,54 +55,21 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun render(s: DashboardState) {
-        binding.swipe.isRefreshing = s.loading
-
-        if (s.error != null) {
-            binding.tvError.visibility = View.VISIBLE
-            binding.tvError.text = "加载失败：${s.error}"
-        } else {
-            binding.tvError.visibility = View.GONE
-        }
-
-        binding.tvSummary.text = buildSummary(s)
-
-        // 卡片始终可见：空数据用占位行，避免界面整块消失（即便出错也应把结构亮出来）
-        appAdapter.submit(if (s.apps.isEmpty()) listOf(RankItem("本时间段暂无应用记录", 0.0, 0f)) else s.apps)
-        webAdapter.submit(if (s.websites.isEmpty()) listOf(RankItem("本时间段暂无网站记录", 0.0, 0f)) else s.websites)
-        bucketAdapter.submit(
-            if (s.buckets.isEmpty()) listOf(BucketRow("（暂无数据桶）", null, null, false)) else s.buckets
-        )
-
-        renderAfk(s)
-    }
-
-    private fun buildSummary(s: DashboardState): String {
-        val parts = mutableListOf<String>()
-        parts.add("已记录 ${formatDuration(s.totalTrackedSec)}")
-        if (s.activeSec != null || s.afkSec != null) {
-            parts.add("专注 ${formatDuration(s.activeSec ?: 0.0)}")
-            parts.add("闲置 ${formatDuration(s.afkSec ?: 0.0)}")
-        }
-        return parts.joinToString("  ·  ")
-    }
-
-    private fun renderAfk(s: DashboardState) {
-        binding.cardAfk.visibility = View.VISIBLE
-        val active = s.activeSec ?: 0.0
-        val afk = s.afkSec ?: 0.0
-        if (s.activeSec == null && s.afkSec == null) {
-            binding.pbAfk.progress = 0
-            binding.tvAfk.text = "本设备暂无专注 / 闲置（AFK）数据"
-            return
-        }
-        val total = active + afk
-        val activePct = if (total > 0) (active / total * 100).toInt() else 0
-        binding.pbAfk.progress = activePct
-        binding.tvAfk.text = "专注 $activePct%（${formatDuration(active)}） · 闲置 ${formatDuration(afk)}"
+    private fun setupTabs() {
+        binding.vpActivity.adapter = ActivityPagerAdapter(this)
+        tabMediator = TabLayoutMediator(binding.tabLayout, binding.vpActivity) { tab, position ->
+            tab.text = ActivityPagerAdapter.TITLES[position]
+        }.apply { attach() }
     }
 
     override fun onDestroyView() {
+        // TabLayoutMediator 会往 ViewPager2 注册 OnPageChangeCallback 并持有 TabLayout，
+        // 不解绑的话每次进出活动页都会泄漏一个 TabLayout
+        tabMediator?.detach()
+        tabMediator = null
+        // ViewPager2 的 adapter 持有 childFragmentManager 的 Fragment，
+        // 销毁视图时必须解绑，否则重建后 Fragment 复用旧 view 会抛 NPE
+        binding.vpActivity.adapter = null
         super.onDestroyView()
         _binding = null
     }

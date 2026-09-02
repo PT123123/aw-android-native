@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ===== 深色主题下的基础色（被 styles.xml 的 AppTheme 引用）===== -->
+    <color name="colorPrimary">#171A21</color>
+    <color name="colorPrimaryDark">#0E1116</color>
+    <color name="colorAccent">#4F8CFF</color>
+    <color name="default_text_color">#E6E8EB</color>
+
+    <!-- ===== 语义色：深色取值 ===== -->
+    <color name="aw_bg">#0E1116</color>
+    <color name="aw_surface">#171A21</color>
+    <color name="aw_surface_2">#1F232B</color>
+    <color name="aw_border">#2A2F38</color>
+    <color name="aw_text_primary">#E6E8EB</color>
+    <color name="aw_text_secondary">#9AA0A6</color>
+    <color name="aw_text_disabled">#6B7280</color>
+    <color name="aw_accent">#4F8CFF</color>
+    <color name="aw_accent_soft">#2A4F8CFF</color>
+    <color name="aw_bar_track">#2A2F38</color>
+    <color name="aw_success">#28A781</color>
+    <color name="aw_warning">#FFC107</color>
+    <color name="aw_danger">#DC3545</color>
+    <color name="aw_chip_bg">#1F232B</color>
+    <color name="aw_chip_text">#E6E8EB</color>
+    <color name="aw_scrim">#4D000000</color>
+
+    <!-- 分类色板：深色背景上提亮一档，保证色块可辨识 -->
+    <color name="aw_cat_1">#5B93FF</color>
+    <color name="aw_cat_2">#2FBFA8</color>
+    <color name="aw_cat_3">#F5AE4B</color>
+    <color name="aw_cat_4">#E8748F</color>
+    <color name="aw_cat_5">#A98AFF</color>
+    <color name="aw_cat_6">#57C875</color>
+    <color name="aw_cat_7">#DDCA57</color>
+    <color name="aw_cat_8">#57C0EE</color>
+</resources>
