@@ -4,8 +4,12 @@
     android:id="@+id/row"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="4dp"
+    android:layout_marginStart="4dp"
+    android:layout_marginEnd="4dp"
+    android:layout_marginTop="3dp"
+    android:layout_marginBottom="3dp"
     android:background="@drawable/todo_task_bg"
+    android:foreground="?attr/selectableItemBackground"
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:paddingStart="8dp"
@@ -17,8 +21,10 @@
         android:id="@+id/check"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
         android:contentDescription="完成"
-        app:buttonTint="@color/inbox_accent" />
+        app:buttonTint="@color/aw_accent" />
 
     <LinearLayout
         android:layout_width="0dp"
@@ -31,15 +37,25 @@
             android:id="@+id/title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="@color/inbox_text"
+            android:textColor="@color/aw_text_primary"
             android:textSize="15sp" />
 
         <LinearLayout
             android:id="@+id/metaRow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
+            android:gravity="center_vertical"
             android:orientation="horizontal">
+
+            <!-- 清单色点（listId != 0 时显示） -->
+            <View
+                android:id="@+id/listDot"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/todo_dot"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/priorityFlag"
@@ -55,6 +71,16 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="8dp"
+                android:background="@drawable/todo_due_bg"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/subtasks"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:textColor="@color/aw_text_secondary"
                 android:textSize="12sp"
                 android:visibility="gone" />
 
@@ -62,6 +88,7 @@
                 android:id="@+id/tags"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:textColor="@color/aw_text_secondary"
                 android:textSize="12sp"
                 android:visibility="gone" />
         </LinearLayout>

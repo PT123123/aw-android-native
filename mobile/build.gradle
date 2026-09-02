@@ -95,7 +95,7 @@ task checkRequiredSoFiles { // Removed (type: Check), defaults to DefaultTask
 
     doLast { // Added doLast block - 将检查逻辑放在 doLast 块中
         mandatorySoFiles.each { soPath -> // 这个 mandatorySoFiles 变量在这里可以访问到
-            def soFile = file("src/main/jniLibs/$soPath")
+            def soFile = file("build/rustJniLibs/android/$soPath")
             if (!soFile.exists()) {
                 throw new GradleException(
                     "\n❌ 构建失败：缺失必需的 SO 文件\n" +
@@ -121,6 +121,8 @@ tasks.withType(com.android.build.gradle.tasks.PreBuildTask).all { // <--- Origin
 */
 // ======================
 preBuild.dependsOn checkRequiredSoFiles
+// 确保检查在 Rust 库（cargoBuild 会输出到 build/rustJniLibs）之后执行
+checkRequiredSoFiles.dependsOn 'cargoBuild'
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])

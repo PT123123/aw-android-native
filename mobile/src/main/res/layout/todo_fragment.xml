@@ -3,8 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/inbox_bg"
-    android:theme="@style/Theme.MaterialComponents">
+    android:background="@color/aw_bg">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -15,12 +14,13 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="@color/inbox_bg"
-            android:theme="@style/ThemeOverlay.MaterialComponents.Dark"
-            app:titleTextColor="@color/inbox_text"
+            android:background="@color/aw_bg"
+            app:menu="@menu/menu_todo"
+            app:title="任务"
+            app:titleTextColor="@color/aw_text_primary"
+            app:subtitleTextColor="@color/aw_text_secondary"
             app:navigationIcon="@drawable/ic_menu"
-            app:navigationIconTint="@color/inbox_text"
-            app:subtitleTextColor="@color/inbox_sub" />
+            app:navigationIconTint="@color/aw_text_primary" />
 
         <!-- 视图导航：收集箱 / 今天 / 最近 7 天 / 全部 -->
         <HorizontalScrollView
@@ -29,6 +29,7 @@
             android:layout_height="wrap_content"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
+            android:paddingBottom="2dp"
             android:scrollbars="none">
 
             <LinearLayout
@@ -38,13 +39,14 @@
                 android:orientation="horizontal" />
         </HorizontalScrollView>
 
-        <!-- 清单导航：彩色清单 chips（由 tag 派生） -->
+        <!-- 清单导航：彩色清单 chips（本地源来自 lists，REST 源由 tag 派生） -->
         <HorizontalScrollView
             android:id="@+id/listChipRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
+            android:paddingBottom="4dp"
             android:scrollbars="none">
 
             <LinearLayout
@@ -60,24 +62,20 @@
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:padding="8dp">
+            android:paddingStart="12dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="6dp">
 
             <EditText
                 android:id="@+id/quickAdd"
+                style="@style/AwEditText"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:background="@drawable/todo_input_bg"
                 android:hint="添加任务…"
                 android:imeOptions="actionDone"
                 android:inputType="text"
-                android:maxLines="1"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:paddingTop="10dp"
-                android:paddingBottom="10dp"
-                android:textColor="@color/inbox_text"
-                android:textColorHint="@color/inbox_sub" />
+                android:maxLines="1" />
 
             <ImageButton
                 android:id="@+id/addBtn"
@@ -86,22 +84,66 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="添加任务"
                 android:src="@android:drawable/ic_input_add"
-                app:tint="@color/inbox_accent" />
+                app:tint="@color/aw_accent" />
         </LinearLayout>
 
-        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-            android:id="@+id/swipe"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/list"
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/swipe"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/list"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="8dp" />
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+            <!-- 空态（契约 §5.4） -->
+            <TextView
+                android:id="@+id/empty"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:padding="4dp" />
-        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+                android:gravity="center"
+                android:text="暂无任务\n在上方输入框回车即可添加"
+                android:textColor="@color/aw_text_disabled"
+                android:textSize="14sp"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <!-- 全局进度（契约 §5.4：已完成 X / Y，统计范围为全量而非当前视图） -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="10dp">
+
+            <ProgressBar
+                android:id="@+id/progressBar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:progressDrawable="@drawable/todo_progress" />
+
+            <TextView
+                android:id="@+id/progressText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/aw_text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -112,6 +154,6 @@
         android:layout_margin="16dp"
         android:contentDescription="新建清单"
         android:src="@android:drawable/ic_menu_add"
-        app:backgroundTint="@color/inbox_accent"
+        app:backgroundTint="@color/aw_accent"
         app:tint="@android:color/white" />
 </FrameLayout>

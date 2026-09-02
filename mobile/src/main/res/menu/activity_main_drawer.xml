@@ -13,9 +13,49 @@
             android:icon="?attr/actionModeCopyDrawable"
             android:title="Inbox" />
         <item
-            android:id="@+id/nav_todo"
+            android:id="@+id/nav_todo_inbox"
             android:icon="@android:drawable/ic_menu_agenda"
-            android:title="任务" />
+            android:title="收集箱" />
+        <item
+            android:id="@+id/nav_todo_today"
+            android:icon="@android:drawable/ic_menu_day"
+            android:title="今天" />
+        <item
+            android:id="@+id/nav_todo_next7"
+            android:icon="@android:drawable/ic_menu_week"
+            android:title="最近 7 天" />
+        <item
+            android:id="@+id/nav_todo_all"
+            android:icon="@drawable/ic_sort"
+            android:title="全部" />
+        <item
+            android:id="@+id/nav_focus_timer"
+            android:icon="@drawable/ic_focus_timer"
+            android:title="计时" />
+        <item
+            android:id="@+id/nav_focus_records"
+            android:icon="@drawable/ic_focus_records"
+            android:title="专注记录" />
+        <item
+            android:id="@+id/nav_focus_timeline"
+            android:icon="@drawable/ic_focus_timeline"
+            android:title="专注时间线" />
+        <item
+            android:id="@+id/nav_focus_heatmap"
+            android:icon="@drawable/ic_focus_heatmap"
+            android:title="热力图" />
+        <item
+            android:id="@+id/nav_focus_best"
+            android:icon="@drawable/ic_focus_best"
+            android:title="最佳专注时间" />
+        <item
+            android:id="@+id/nav_focus_calendar"
+            android:icon="@drawable/ic_focus_calendar"
+            android:title="日历" />
+        <item
+            android:id="@+id/nav_focus_countdown"
+            android:icon="@drawable/ic_focus_countdown"
+            android:title="倒数纪念日" />
         <item
             android:id="@+id/nav_inbox_settings"
             android:icon="@android:drawable/ic_menu_preferences"

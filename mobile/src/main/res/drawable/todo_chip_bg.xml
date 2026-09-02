@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 未选中 chip：语义色 aw_surface_2 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="@color/inbox_card" />
+    <solid android:color="@color/aw_surface_2" />
     <corners android:radius="16dp" />
 </shape>

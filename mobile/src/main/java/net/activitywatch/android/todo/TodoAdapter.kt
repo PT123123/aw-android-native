@@ -9,31 +9,34 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.TodoTaskItemBinding
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
 
 /**
- * 任务列表适配器。
- * 布局（模仿 aw-qtui TodoPage）：未完成任务在前（按优先级→期限排序），
- * 已完成任务折叠在「已完成 (N)」按钮后面，可展开。
- * 行渲染：复选框 + 标题 + 元信息（优先级旗标 / 截止日期 / 标签）。
+ * 任务列表适配器（契约 §5.3 / §5.4）。
+ *
+ * 显示顺序：未完成任务 → 「显示已完成 (n)」折叠头 →（展开时）已完成任务。
+ * 任务行：复选框 + 标题（已完成加删除线）+ 元信息行（清单色点 / 优先级图标 / 期限徽章 / 子任务数 / 标签）。
  */
 class TodoAdapter(
-    private val onToggle: (TodoResponse, Boolean) -> Unit,
-    private val onClick: (TodoResponse) -> Unit,
+    private val onToggle: (TodoTask, Boolean) -> Unit,
+    private val onClick: (TodoTask) -> Unit,
     private val onToggleCompleted: () -> Unit,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    private val open = mutableListOf<TodoResponse>()
-    private val done = mutableListOf<TodoResponse>()
+    private val open = mutableListOf<TodoTask>()
+    private val done = mutableListOf<TodoTask>()
+    private val ordered = mutableListOf<TodoTask>()
     private var showCompleted = false
-
-    /** 显示顺序：未完成 + [已完成折叠头] + [已完成（展开时）] */
-    private val ordered = mutableListOf<TodoResponse>()
     private var headerIndex = -1
 
-    fun submit(openItems: List<TodoResponse>, doneItems: List<TodoResponse>, showDone: Boolean) {
+    /** 清单 id → 颜色（行首色点用） */
+    private var listColors: Map<Long, Int> = emptyMap()
+
+    fun setListColors(colors: Map<Long, Int>) {
+        listColors = colors
+        notifyDataSetChanged()
+    }
+
+    fun submit(openItems: List<TodoTask>, doneItems: List<TodoTask>, showDone: Boolean) {
         open.clear(); open.addAll(openItems)
         done.clear(); done.addAll(doneItems)
         showCompleted = showDone
@@ -52,12 +55,6 @@ class TodoAdapter(
         if (showCompleted == show) return
         showCompleted = show
         rebuildOrder()
-    }
-
-    private companion object {
-        private const val TYPE_TASK = 0
-        private const val TYPE_HEADER = 1
-        private val DUMMY = TodoResponse(id = -1, title = "")
     }
 
     override fun getItemViewType(position: Int): Int =
@@ -83,47 +80,81 @@ class TodoAdapter(
     }
 
     inner class TaskVH(private val b: TodoTaskItemBinding) : RecyclerView.ViewHolder(b.root) {
-        fun bind(task: TodoResponse) {
+        fun bind(task: TodoTask) {
             val ctx = b.root.context
+
+            b.check.setOnCheckedChangeListener(null)
             b.check.isChecked = task.completed
+            b.check.setOnCheckedChangeListener { _, checked -> onToggle(task, checked) }
+
             b.title.text = task.title
             if (task.completed) {
                 b.title.paintFlags = b.title.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
-                b.title.setTextColor(ContextCompat.getColor(ctx, R.color.inbox_sub))
+                b.title.setTextColor(ContextCompat.getColor(ctx, R.color.aw_text_disabled))
             } else {
                 b.title.paintFlags = b.title.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
-                b.title.setTextColor(ContextCompat.getColor(ctx, R.color.inbox_text))
+                b.title.setTextColor(ContextCompat.getColor(ctx, R.color.aw_text_primary))
             }
 
-            // 元信息行
-            val flag = task.priority ?: 0
-            b.priorityFlag.visibility = if (flag >= 2) View.VISIBLE else View.GONE
-            b.priorityFlag.text = if (flag >= 3) "‼" else "!"
-            b.priorityFlag.setTextColor(
-                ContextCompat.getColor(ctx, if (flag >= 3) R.color.sync_danger else R.color.sync_warning)
-            )
+            // 清单色点（listId != 0 时显示）
+            val dotColor = listColors[task.listId]
+            if (task.listId != 0L && dotColor != null) {
+                b.listDot.visibility = View.VISIBLE
+                b.listDot.background = gradient(dotColor)
+            } else {
+                b.listDot.visibility = View.GONE
+            }
 
-            val due = task.dueDate
-            if (due != null) {
+            // 优先级图标（契约 §1.4）
+            if (task.priority > 0) {
+                b.priorityFlag.visibility = View.VISIBLE
+                b.priorityFlag.text = priorityIcon(task.priority)
+                b.priorityFlag.setTextColor(ContextCompat.getColor(ctx, priorityColorRes(task.priority)))
+            } else {
+                b.priorityFlag.visibility = View.GONE
+            }
+
+            // 期限徽章：今天 / 明天 / 昨天 / M月d日 / yyyy年M月d日；逾期变红
+            if (task.hasDue()) {
+                val today = todayStr()
+                val overdue = isOverdue(task)
                 b.dueDate.visibility = View.VISIBLE
-                b.dueDate.text = due
-                b.dueDate.setTextColor(ContextCompat.getColor(ctx, dueColor(due, task.completed)))
+                b.dueDate.text = dueLabel(task.dueDate)
+                b.dueDate.setBackgroundResource(
+                    if (overdue) R.drawable.todo_due_bg_overdue else R.drawable.todo_due_bg
+                )
+                b.dueDate.setTextColor(
+                    ContextCompat.getColor(
+                        ctx,
+                        when {
+                            task.completed -> R.color.aw_text_disabled
+                            overdue -> R.color.aw_danger
+                            task.dueDate == today -> R.color.aw_warning
+                            else -> R.color.aw_text_secondary
+                        }
+                    )
+                )
             } else {
                 b.dueDate.visibility = View.GONE
             }
 
-            val tagText = task.tags.take(3).joinToString(" ") { "#$it" }
+            // 子任务进度
+            if (task.subtasks.isNotEmpty()) {
+                b.subtasks.visibility = View.VISIBLE
+                b.subtasks.text = "☑ ${task.subtasks.size - task.openSubtaskCount()}/${task.subtasks.size}"
+            } else {
+                b.subtasks.visibility = View.GONE
+            }
+
+            // 标签行
+            val tagText = task.tags.joinToString(" · ")
             if (tagText.isNotEmpty()) {
                 b.tags.visibility = View.VISIBLE
                 b.tags.text = tagText
-                b.tags.setTextColor(ContextCompat.getColor(ctx, R.color.inbox_accent))
             } else {
                 b.tags.visibility = View.GONE
             }
 
-            b.check.setOnClickListener {
-                onToggle(task, b.check.isChecked)
-            }
             b.root.setOnClickListener { onClick(task) }
         }
     }
@@ -131,32 +162,20 @@ class TodoAdapter(
     inner class HeaderVH(v: View) : RecyclerView.ViewHolder(v) {
         private val label: TextView = v.findViewById(R.id.doneHeader)
         fun bind(count: Int, expanded: Boolean) {
-            label.text = if (expanded) "▲ 收起已完成 ($count)" else "▼ 已完成 ($count)"
+            label.text = if (expanded) "隐藏已完成 ($count)" else "显示已完成 ($count)"
             label.setOnClickListener { onToggleCompleted() }
         }
     }
 
-    /** 截止日期颜色：过期红 / 今天黄 / 其他次文本色 */
-    private fun dueColor(due: String, completed: Boolean): Int {
-        if (completed) return R.color.inbox_sub
-        return try {
-            val df = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            val dueDate = df.parse(due) ?: return R.color.inbox_sub
-            val today = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.time
-            val dueCal = Calendar.getInstance().apply { time = dueDate }
-            val dueDay = Calendar.getInstance().apply {
-                set(Calendar.YEAR, dueCal.get(Calendar.YEAR))
-                set(Calendar.MONTH, dueCal.get(Calendar.MONTH))
-                set(Calendar.DAY_OF_MONTH, dueCal.get(Calendar.DAY_OF_MONTH))
-                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-            }.time
-            when {
-                dueDay.before(today) -> R.color.sync_danger
-                dueDay == today -> R.color.sync_warning
-                else -> R.color.inbox_sub
-            }
-        } catch (e: Exception) {
-            R.color.inbox_sub
+    private fun gradient(color: Int): android.graphics.drawable.GradientDrawable =
+        android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
+            setColor(color)
         }
+
+    private companion object {
+        private const val TYPE_TASK = 0
+        private const val TYPE_HEADER = 1
+        private val DUMMY = TodoTask(id = -1, title = "")
     }
 }
