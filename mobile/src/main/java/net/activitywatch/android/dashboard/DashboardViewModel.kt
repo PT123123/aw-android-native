@@ -58,6 +58,14 @@ data class TrendDay(
     val items: List<RankItem>,
 )
 
+/** 一条「泳道」：某个数据桶在整段时间窗内的着色段集合。priority 越小合并时越优先。 */
+data class BucketTimeline(
+    val id: String,
+    val displayName: String,
+    val priority: Int,
+    val segments: List<TimelineSegment>,
+)
+
 data class DashboardState(
     val loading: Boolean = false,
     val error: String? = null,
@@ -75,6 +83,8 @@ data class DashboardState(
     val segments: List<TimelineSegment> = emptyList(),
     val hours: List<HourSlot> = emptyList(),
     val trendDays: List<TrendDay> = emptyList(),
+    /** 各数据桶独立的时间线泳道（应用 / 网页 / 离开 / 秒表…），空桶不列出。 */
+    val bucketTimelines: List<BucketTimeline> = emptyList(),
 )
 
 enum class TimeRange(val label: String) {
@@ -118,15 +128,23 @@ class DashboardViewModel : ViewModel() {
                 val appBuckets = buckets.values.filter { isAppUsage(it) }
                 val webBuckets = buckets.values.filter { isWeb(it) }
                 val afkBuckets = buckets.values.filter { isAfk(it) }
+                val stopBuckets = buckets.values.filter { isStopwatch(it) }
 
                 val limit = if (range == TimeRange.ALL) 200_000L else 100_000L
 
                 val appEvents = appBuckets.flatMap { safeFetch(it.id, startIso, endIso, limit) }
                 val webEvents = webBuckets.flatMap { safeFetch(it.id, startIso, endIso, limit) }
                 val afkEvents = afkBuckets.flatMap { safeFetch(it.id, startIso, endIso, limit) }
+                val stopEvents = stopBuckets.flatMap { safeFetch(it.id, startIso, endIso, limit) }
 
-                // 颜色按「全区间总时长」的排名分配，保证跨 Tab 同色
-                val colors = buildColorIndex(listOf(appEvents, webEvents), ::activityLabel)
+                // 颜色按「全区间总时长」的排名分配，保证跨 Tab 同色；秒表标签也参与排名
+                val colors = buildColorIndex(
+                    listOf(
+                        appEvents to ::activityLabel,
+                        webEvents to ::websiteLabel,
+                        stopEvents to ::stopwatchLabel,
+                    )
+                )
 
                 val apps = rank(appEvents, ::activityLabel, colors).take(10)
                 val websites = rank(webEvents, ::websiteLabel, colors).take(10)
@@ -134,15 +152,26 @@ class DashboardViewModel : ViewModel() {
                 val (activeSec, afkSec) = aggregateAfk(afkEvents)
                 val totalTracked = appEvents.sumOf { it.duration }
 
-                // Timeline 只吃应用事件：window watcher 与 web watcher 在同一时刻会重叠，
-                // 混在一起画会出现互相覆盖的色块；没有应用数据时才回退到网站事件。
+                // 概览 / 按小时 / 趋势仍按时间线标签页口径：应用事件优先，没有才回退到网站事件
                 val timelineSrc = appEvents.ifEmpty { webEvents }
                 val timelineLabel: (EventDto) -> String? =
                     if (appEvents.isNotEmpty()) ::activityLabel else ::websiteLabel
 
-                val segments = buildSegments(timelineSrc, timelineLabel, colors)
                 val hours = buildHours(timelineSrc, timelineLabel, colors)
                 val trendDays = buildTrendDays(timelineSrc, timelineLabel, afkEvents, colors)
+
+                // 分桶时间线：每个桶各自一条泳道；合并时按优先级（应用>网页>离开>秒表）解决重叠
+                val afkColors = mapOf(
+                    "离开" to ActivityPalette.AFK_AWAY,
+                    "活跃" to ActivityPalette.AFK_ACTIVE,
+                )
+                val lanes = listOfNotNull(
+                    bucketLane("app", "应用", 1, appEvents, ::activityLabel, colors),
+                    bucketLane("web", "网页", 2, webEvents, ::websiteLabel, colors),
+                    bucketLane("afk", "离开", 3, afkEvents, ::afkLabel, afkColors),
+                    bucketLane("stopwatch", "秒表", 4, stopEvents, ::stopwatchLabel, colors),
+                )
+                val segments = mergeLanes(lanes.map { it.priority to it.segments })
 
                 val window = range.windowMs(segments)
 
@@ -167,6 +196,7 @@ class DashboardViewModel : ViewModel() {
                         segments = segments,
                         hours = hours,
                         trendDays = trendDays,
+                        bucketTimelines = lanes,
                         windowStartMs = window.first,
                         windowEndMs = window.second,
                     )
@@ -217,13 +247,12 @@ class DashboardViewModel : ViewModel() {
 
     /** 时长前 RANKED 名的标签各自拿一个颜色，其余统一灰色。 */
     private fun buildColorIndex(
-        eventGroups: List<List<EventDto>>,
-        label: (EventDto) -> String?,
+        groups: List<Pair<List<EventDto>, (EventDto) -> String?>>,
     ): Map<String, Int> {
         val totals = LinkedHashMap<String, Double>()
-        for (group in eventGroups) {
+        for ((group, labelFn) in groups) {
             for (e in group) {
-                val key = label(e) ?: continue
+                val key = labelFn(e) ?: continue
                 totals[key] = (totals[key] ?: 0.0) + e.duration
             }
         }
@@ -381,6 +410,60 @@ class DashboardViewModel : ViewModel() {
         return active to afk
     }
 
+    // ---------- 分桶泳道 ----------
+
+    /** 把某个桶的事件压成一条泳道；事件为空则返回 null（不展示该桶）。 */
+    private fun bucketLane(
+        id: String,
+        name: String,
+        priority: Int,
+        events: List<EventDto>,
+        label: (EventDto) -> String?,
+        colors: Map<String, Int>,
+    ): BucketTimeline? {
+        if (events.isEmpty()) return null
+        return BucketTimeline(id, name, priority, buildSegments(events, label, colors))
+    }
+
+    /**
+     * 把多条泳道按时间合并成一条：在任意时刻取优先级最高（priority 最小）的桶的段。
+     * 用于「合并展示」——应用与网页同一时刻重叠时应用优先，离开时段则露出 AFK 段。
+     */
+    private fun mergeLanes(lanes: List<Pair<Int, List<TimelineSegment>>>): List<TimelineSegment> {
+        data class Pt(val ms: Long, val type: Int, val prio: Int, val seg: TimelineSegment)
+        val pts = ArrayList<Pt>()
+        for ((prio, segs) in lanes) {
+            for (s in segs) {
+                pts.add(Pt(s.startMs, 1, prio, s))
+                pts.add(Pt(s.endMs, -1, prio, s))
+            }
+        }
+        if (pts.isEmpty()) return emptyList()
+        // 同一时刻先处理「结束」再处理「开始」，避免相邻段之间出现空隙
+        pts.sortWith(compareBy({ it.ms }, { it.type }, { it.prio }))
+
+        val active = LinkedHashMap<Int, MutableList<TimelineSegment>>()
+        val out = ArrayList<TimelineSegment>()
+        var prevMs: Long? = null
+        var curTop: TimelineSegment? = null
+        for (p in pts) {
+            if (p.type == 1) {
+                active.getOrPut(p.prio) { ArrayList() }.add(p.seg)
+            } else {
+                active[p.prio]?.remove(p.seg)
+            }
+            val newTop = active.keys.minOrNull()?.let { active[it]!!.lastOrNull() }
+            if (newTop !== curTop) {
+                if (prevMs != null && curTop != null && p.ms > prevMs) {
+                    out.add(TimelineSegment(prevMs, p.ms, curTop.label, curTop.colorIndex))
+                }
+                curTop = newTop
+                prevMs = p.ms
+            }
+        }
+        return out
+    }
+
     // ---------- 标签与类型判定 ----------
 
     private fun activityLabel(e: EventDto): String? = strOf(e.data, "app")?.ifBlank { null }
@@ -421,6 +504,22 @@ class DashboardViewModel : ViewModel() {
         val id = b.id.lowercase()
         return t.contains("afk") || id.contains("aw-watcher-afk")
     }
+
+    private fun isStopwatch(b: BucketInfo): Boolean {
+        val t = (b.type ?: "").lowercase()
+        val id = b.id.lowercase()
+        return t.contains("stopwatch") || id.contains("aw-stopwatch-android") || id.contains("stopwatch")
+    }
+
+    /** AFK 桶的标签：离开 / 活跃（未知状态按活跃计）。 */
+    private fun afkLabel(e: EventDto): String? {
+        val status = strOf(e.data, "status")?.lowercase()
+        return if (status == "afk") "离开" else "活跃"
+    }
+
+    /** 秒表桶的标签：取记录时填的名称，没有则兜底「手动记录」。 */
+    private fun stopwatchLabel(e: EventDto): String? =
+        strOf(e.data, "label")?.ifBlank { null } ?: "手动记录"
 
     // ---------- 时间窗 ----------
 
