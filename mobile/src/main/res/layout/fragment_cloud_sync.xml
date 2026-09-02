@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 云备份设置页（实验性）：WebDAV / S3 共用布局，按协议显示对应区块 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/aw_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/aw_bg"
+            app:navigationIcon="@drawable/ic_menu"
+            app:navigationIconTint="@color/aw_text_primary"
+            app:titleTextColor="@color/aw_text_primary" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <!-- 连接设置 -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/AwCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="连接设置"
+                            android:textColor="@color/aw_text_secondary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <!-- WebDAV 区块 -->
+                        <LinearLayout
+                            android:id="@+id/sectionWebdav"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:hint="服务器地址（如 https://dav.example.com/dav）"
+                                app:boxStrokeColor="@color/aw_accent"
+                                app:hintTextColor="@color/aw_accent">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/tetWebdavUrl"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="textUri"
+                                    android:textColor="@color/aw_text_primary" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:hint="用户名（可留空）"
+                                app:boxStrokeColor="@color/aw_accent"
+                                app:hintTextColor="@color/aw_accent">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/tetWebdavUser"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="text"
+                                    android:textColor="@color/aw_text_primary" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:hint="密码（可留空）"
+                                app:boxStrokeColor="@color/aw_accent"
+                                app:endIconMode="password_toggle"
+                                app:hintTextColor="@color/aw_accent">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/tetWebdavPass"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="textPassword"
+                                    android:textColor="@color/aw_text_primary" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:hint="远程目录（可留空，备份时自动创建）"
+                                app:boxStrokeColor="@color/aw_accent"
+                                app:hintTextColor="@color/aw_accent">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/tetWebdavDir"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="text"
+                                    android:textColor="@color/aw_text_primary" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                        </LinearLayout>
+
+                        <!-- S3 区块 -->
+                        <LinearLayout
+                            android:id="@+id/sectionS3"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:visibility="gone">
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:hint="Endpoint（如 https://s3.example.com）"
+                                app:boxStrokeColor="@color/aw_accent"
+                                app:hintTextColor="@color/aw_accent">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/tetS3Endpoint"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="textUri"
+                                    android:textColor="@color/aw_text_primary" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:hint="Region（默认 us-east-1）"
+                                app:boxStrokeColor="@color/aw_accent"
+                                app:hintTextColor="@color/aw_accent">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/tetS3Region"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="text"
+                                    android:textColor="@color/aw_text_primary" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:hint="Bucket"
+                                app:boxStrokeColor="@color/aw_accent"
+                                app:hintTextColor="@color/aw_accent">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/tetS3Bucket"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="text"
+                                    android:textColor="@color/aw_text_primary" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:hint="Access Key"
+                                app:boxStrokeColor="@color/aw_accent"
+                                app:hintTextColor="@color/aw_accent">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/tetS3Ak"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="text"
+                                    android:textColor="@color/aw_text_primary" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:hint="Secret Key"
+                                app:boxStrokeColor="@color/aw_accent"
+                                app:endIconMode="password_toggle"
+                                app:hintTextColor="@color/aw_accent">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/tetS3Sk"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="textPassword"
+                                    android:textColor="@color/aw_text_primary" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:hint="对象前缀（可留空，如 backup/aw）"
+                                app:boxStrokeColor="@color/aw_accent"
+                                app:hintTextColor="@color/aw_accent">
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/tetS3Prefix"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="text"
+                                    android:textColor="@color/aw_text_primary" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.switchmaterial.SwitchMaterial
+                                android:id="@+id/switchPathStyle"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:text="Path-style 请求（MinIO / R2 等兼容存储）"
+                                android:textColor="@color/aw_text_primary" />
+                        </LinearLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:hint="备份文件名"
+                            app:boxStrokeColor="@color/aw_accent"
+                            app:hintTextColor="@color/aw_accent">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/tetFileName"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="text"
+                                android:textColor="@color/aw_text_primary" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 操作 -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/AwCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="操作"
+                            android:textColor="@color/aw_text_secondary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvStatus"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="备份内容：Todo 本地数据 + Inbox 笔记。"
+                            android:textColor="@color/aw_text_secondary"
+                            android:textSize="13sp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnTest"
+                                style="@style/AwButtonSecondary"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginEnd="8dp"
+                                android:layout_weight="1"
+                                android:text="测试连接" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnBackup"
+                                style="@style/AwButtonPrimary"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="立即备份" />
+                        </LinearLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnRestore"
+                            style="@style/AwButtonSecondary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="从云端恢复" />
+
+                        <TextView
+                            android:id="@+id/tvWarning"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="⚠️ 恢复会用云端数据覆盖本机同名内容；Todo 恢复后需重启应用生效。备份/恢复均按对象整体覆盖，请确认文件名。"
+                            android:textColor="@color/aw_warning"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+</FrameLayout>

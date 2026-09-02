@@ -74,13 +74,21 @@
             android:title="Query Explorer" />
     </group>
 
-    <item android:title="Misc">
+    <item android:title="同步">
         <menu>
             <group>
                 <item
                         android:id="@+id/nav_sync"
                         android:icon="@drawable/ic_menu_manage"
                         android:title="Sync (LAN)"/>
+                <item
+                        android:id="@+id/nav_webdav"
+                        android:icon="@drawable/ic_cloud_webdav"
+                        android:title="WebDAV（实验性）"/>
+                <item
+                        android:id="@+id/nav_s3"
+                        android:icon="@drawable/ic_cloud_s3"
+                        android:title="S3（实验性）"/>
             </group>
         </menu>
     </item>

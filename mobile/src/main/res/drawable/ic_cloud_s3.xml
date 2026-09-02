@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 云备份（S3，实验性）入口图标：桶 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M4,4h16v2H4zM4,7h16l-1.2,11.1c-0.1,1.1 -1,1.9 -2.1,1.9H7.3c-1.1,0 -2,-0.8 -2.1,-1.9L4,7zM12,10.5l-3.5,3.5h2.5v3h2v-3h2.5L12,10.5z" />
+</vector>
