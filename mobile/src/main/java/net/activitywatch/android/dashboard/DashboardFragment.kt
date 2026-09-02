@@ -90,14 +90,14 @@ class DashboardFragment : Fragment() {
 
         binding.tvSummary.text = buildSummary(s)
 
-        appAdapter.submit(s.apps)
-        binding.cardApps.visibility = if (s.apps.isEmpty()) View.GONE else View.VISIBLE
-
-        webAdapter.submit(s.websites)
-        binding.cardWebsites.visibility = if (s.websites.isEmpty()) View.GONE else View.VISIBLE
+        // 卡片始终可见：空数据用占位行，避免界面整块消失（即便出错也应把结构亮出来）
+        appAdapter.submit(if (s.apps.isEmpty()) listOf(RankItem("本时间段暂无应用记录", 0.0, 0f)) else s.apps)
+        webAdapter.submit(if (s.websites.isEmpty()) listOf(RankItem("本时间段暂无网站记录", 0.0, 0f)) else s.websites)
+        bucketAdapter.submit(
+            if (s.buckets.isEmpty()) listOf(BucketRow("（暂无数据桶）", null, null, false)) else s.buckets
+        )
 
         renderAfk(s)
-        bucketAdapter.submit(s.buckets)
     }
 
     private fun buildSummary(s: DashboardState): String {
@@ -111,13 +111,14 @@ class DashboardFragment : Fragment() {
     }
 
     private fun renderAfk(s: DashboardState) {
-        if (s.activeSec == null && s.afkSec == null) {
-            binding.cardAfk.visibility = View.GONE
-            return
-        }
         binding.cardAfk.visibility = View.VISIBLE
         val active = s.activeSec ?: 0.0
         val afk = s.afkSec ?: 0.0
+        if (s.activeSec == null && s.afkSec == null) {
+            binding.pbAfk.progress = 0
+            binding.tvAfk.text = "本设备暂无专注 / 闲置（AFK）数据"
+            return
+        }
         val total = active + afk
         val activePct = if (total > 0) (active / total * 100).toInt() else 0
         binding.pbAfk.progress = activePct
