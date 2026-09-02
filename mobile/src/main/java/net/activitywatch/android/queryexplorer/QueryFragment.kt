@@ -6,6 +6,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -38,6 +40,11 @@ class QueryFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         viewModel = ViewModelProvider(this)[QueryViewModel::class.java]
+
+        binding.toolbar.setNavigationOnClickListener {
+            requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
+                ?.openDrawer(GravityCompat.START)
+        }
 
         setupRangeChips()
         setupPresets()
