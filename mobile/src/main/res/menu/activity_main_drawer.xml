@@ -13,6 +13,10 @@
             android:icon="?attr/actionModeCopyDrawable"
             android:title="Inbox" />
         <item
+            android:id="@+id/nav_todo"
+            android:icon="@android:drawable/ic_menu_agenda"
+            android:title="任务" />
+        <item
             android:id="@+id/nav_inbox_settings"
             android:icon="@android:drawable/ic_menu_preferences"
             android:title="Inbox 设置" />
