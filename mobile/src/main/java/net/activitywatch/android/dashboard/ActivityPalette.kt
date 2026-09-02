@@ -16,6 +16,12 @@ object ActivityPalette {
     /** 未进入前 N 名的标签使用的色索引。 */
     const val OTHER = -1
 
+    /** AFK 泳道里「离开」状态的色索引，映射到 aw_danger。 */
+    const val AFK_AWAY = -2
+
+    /** AFK 泳道里「活跃」状态的色索引，映射到 aw_success。 */
+    const val AFK_ACTIVE = -3
+
     /** 进入排名、会单独分配颜色的标签数量上限。 */
     const val RANKED = 8
 
@@ -32,7 +38,13 @@ object ActivityPalette {
 
     @ColorInt
     fun color(context: Context, colorIndex: Int): Int {
-        val res = if (colorIndex < 0) R.color.aw_text_disabled else CAT_RES[colorIndex % CAT_RES.size]
+        val res = when {
+            colorIndex == OTHER -> R.color.aw_text_disabled
+            colorIndex == AFK_AWAY -> R.color.aw_danger
+            colorIndex == AFK_ACTIVE -> R.color.aw_success
+            colorIndex < 0 -> R.color.aw_text_disabled
+            else -> CAT_RES[colorIndex % CAT_RES.size]
+        }
         return ContextCompat.getColor(context, res)
     }
 }
