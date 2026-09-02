@@ -60,6 +60,7 @@ class DashboardViewModel : ViewModel() {
     val state: StateFlow<DashboardState> = _state.asStateFlow()
 
     private var currentRange: TimeRange = TimeRange.TODAY
+    private var retried = false
 
     init {
         load(currentRange)
@@ -69,6 +70,7 @@ class DashboardViewModel : ViewModel() {
 
     fun load(range: TimeRange) {
         currentRange = range
+        retried = false
         viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(loading = true, error = null, rangeLabel = range.label) }
             try {
@@ -114,6 +116,14 @@ class DashboardViewModel : ViewModel() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "load($range) failed", e)
+                // 服务器可能还没起好（连接被拒）：1.5s 后重试一次，避免首开误报失败
+                if (!retried && e is java.io.IOException) {
+                    retried = true
+                    Log.w(TAG, "load($range) retrying once after delay (server likely not ready)")
+                    kotlinx.coroutines.delay(1500)
+                    load(range)
+                    return@launch
+                }
                 _state.update { it.copy(loading = false, error = e.message ?: e.javaClass.simpleName) }
             }
         }
