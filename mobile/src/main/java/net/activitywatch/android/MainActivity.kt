@@ -1,19 +1,27 @@
 package net.activitywatch.android
 
 import android.content.Intent
+import android.graphics.PorterDuff
+import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.os.Bundle
-import com.google.android.material.snackbar.Snackbar
-import com.google.android.material.navigation.NavigationView
-import androidx.core.view.GravityCompat
-import androidx.appcompat.app.AppCompatActivity
+import android.util.Log
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.appcompat.widget.AppCompatImageView
+import androidx.core.content.ContextCompat
+import androidx.core.view.GravityCompat
+import androidx.appcompat.app.AppCompatActivity
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
-import android.util.Log
+import com.google.android.material.snackbar.Snackbar
 import net.activitywatch.android.databinding.ActivityMainBinding
-import net.activitywatch.android.fragments.TestFragment
 import net.activitywatch.android.inbox.InboxFragment
 import net.activitywatch.android.inbox.InboxPrefs
 import net.activitywatch.android.inbox.InboxSettingsFragment
@@ -30,9 +38,38 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 private const val TAG = "MainActivity"
 
-class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener {
+/**
+ * 抽屉导航的两大（外加 Misc）可折叠分组。
+ * - Inbox：默认展开
+ * - ActivityWatch（活动 / 秒表 / Query Explorer）：默认折叠
+ * - Misc（Sync）：默认展开
+ */
+private data class NavRow(
+    val id: Int,
+    val icon: Drawable,
+    val title: String,
+    val fragmentClass: Class<out Fragment>
+)
+
+private data class NavGroup(
+    val title: String,
+    val expandedByDefault: Boolean,
+    val rows: List<NavRow>
+)
+
+private data class RowUI(
+    val id: Int,
+    val container: View,
+    val icon: AppCompatImageView,
+    val title: TextView
+)
+
+class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+
+    private val rowUIs = mutableListOf<RowUI>()
+    private var selectedNavId = View.NO_ID
 
     val version: String
         get() {
@@ -81,8 +118,8 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         val usw = UsageStatsWatcher(this)
         usw.setupAlarm()
 
-        // 设置导航视图监听器
-        binding.navView.setNavigationItemSelectedListener(this)
+        // 构建抽屉导航（可折叠分组）
+        setupDrawer()
 
         // 启动服务器任务
         val ri = RustInterface(this)
@@ -140,6 +177,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, InboxFragment())
             .commit()
+        selectRow(R.id.nav_inbox)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -158,47 +196,194 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         }
     }
 
-    override fun onNavigationItemSelected(item: MenuItem): Boolean {
-        var fragmentClass: Class<out Fragment>? = null
+    // ===================== 抽屉导航（可折叠分组）=====================
 
-        // 处理导航视图点击事件
-        when (item.itemId) {
-            R.id.nav_dashboard -> {
-                fragmentClass = DashboardFragment::class.java
-            }
-            R.id.nav_inbox -> {
-                fragmentClass = InboxFragment::class.java
-            }
-            R.id.nav_inbox_settings -> {
-                fragmentClass = InboxSettingsFragment::class.java
-            }
-            R.id.nav_trash -> {
-                fragmentClass = TrashFragment::class.java
-            }
-            R.id.nav_sync -> {
-                fragmentClass = SyncFragment::class.java
-            }
-            R.id.nav_stopwatch -> {
-                fragmentClass = StopwatchFragment::class.java
-            }
-            R.id.nav_query -> {
-                fragmentClass = QueryFragment::class.java
-            }
+    private fun setupDrawer() {
+        val navList = binding.navList
+        navList.removeAllViews()
+        rowUIs.clear()
+
+        for (group in buildNavGroups()) {
+            val (header, children) = buildGroup(group)
+            navList.addView(header)
+            navList.addView(children)
         }
-
-        val fragment: Fragment? = try {
-            fragmentClass?.newInstance()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-
-        if (fragment != null) {
-            // 插入 fragment，替换任何现有的 fragment
-            supportFragmentManager.beginTransaction().replace(R.id.fragment_container, fragment).addToBackStack(null).commit()
-        }
-
-        binding.drawerLayout.closeDrawer(GravityCompat.START)
-        return true
+        // 初始页是 Inbox，高亮对应项
+        selectRow(R.id.nav_inbox)
     }
+
+    private fun buildNavGroups(): List<NavGroup> = listOf(
+        NavGroup("Inbox", true, listOf(
+            NavRow(
+                R.id.nav_inbox,
+                resolveAttrDrawable(android.R.attr.actionModeCopyDrawable)
+                    ?: ContextCompat.getDrawable(this, android.R.drawable.ic_menu_edit)!!,
+                "Inbox",
+                InboxFragment::class.java
+            ),
+            NavRow(
+                R.id.nav_inbox_settings,
+                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_preferences)!!,
+                "Inbox 设置",
+                InboxSettingsFragment::class.java
+            ),
+            NavRow(
+                R.id.nav_trash,
+                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_delete)!!,
+                "回收站",
+                TrashFragment::class.java
+            )
+        )),
+        NavGroup("ActivityWatch", false, listOf(
+            NavRow(
+                R.id.nav_dashboard,
+                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_recent_history)!!,
+                "活动",
+                DashboardFragment::class.java
+            ),
+            NavRow(
+                R.id.nav_stopwatch,
+                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_today)!!,
+                "秒表",
+                StopwatchFragment::class.java
+            ),
+            NavRow(
+                R.id.nav_query,
+                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_search)!!,
+                "Query Explorer",
+                QueryFragment::class.java
+            )
+        )),
+        NavGroup("Misc", true, listOf(
+            NavRow(
+                R.id.nav_sync,
+                ContextCompat.getDrawable(this, R.drawable.ic_menu_manage)!!,
+                "Sync (LAN)",
+                SyncFragment::class.java
+            )
+        ))
+    )
+
+    private fun buildGroup(group: NavGroup): Pair<View, View> {
+        val children = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            setPaddingRelative(dp(48), 0, dp(16), 0)
+            visibility = if (group.expandedByDefault) View.VISIBLE else View.GONE
+        }
+        for (row in group.rows) {
+            val ui = buildRow(row)
+            rowUIs.add(ui)
+            children.addView(ui.container)
+        }
+
+        val chevron = AppCompatImageView(this).apply {
+            setImageResource(R.drawable.ic_chevron_right)
+            setColorFilter(color(R.color.aw_text_secondary), PorterDuff.Mode.SRC_IN)
+            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { marginEnd = dp(8) }
+            rotation = if (group.expandedByDefault) 90f else 0f
+        }
+        val title = TextView(this).apply {
+            text = group.title
+            textSize = 13f
+            letterSpacing = 0.04f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(color(R.color.aw_text_secondary))
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)
+            )
+            setPaddingRelative(dp(16), 0, dp(16), 0)
+            isClickable = true
+            isFocusable = true
+            background = navItemBg()
+            setOnClickListener {
+                val expanded = children.visibility == View.VISIBLE
+                children.visibility = if (expanded) View.GONE else View.VISIBLE
+                chevron.animate()
+                    .rotation(if (expanded) 0f else 90f)
+                    .setDuration(200)
+                    .start()
+            }
+        }
+        header.addView(chevron)
+        header.addView(title)
+        return header to children
+    }
+
+    private fun buildRow(row: NavRow): RowUI {
+        val icon = AppCompatImageView(this).apply {
+            setImageDrawable(row.icon)
+            setColorFilter(color(R.color.aw_text_secondary), PorterDuff.Mode.SRC_IN)
+            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply { marginEnd = dp(28) }
+        }
+        val title = TextView(this).apply {
+            text = row.title
+            textSize = 14f
+            setTextColor(color(R.color.aw_text_primary))
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)
+            )
+            isClickable = true
+            isFocusable = true
+            background = navItemBg()
+            setId(row.id)
+            setOnClickListener {
+                selectRow(row.id)
+                navigateTo(row.fragmentClass)
+                binding.drawerLayout.closeDrawer(GravityCompat.START)
+            }
+        }
+        container.addView(icon)
+        container.addView(title)
+        return RowUI(row.id, container, icon, title)
+    }
+
+    private fun selectRow(id: Int) {
+        selectedNavId = id
+        for (r in rowUIs) {
+            val sel = r.id == id
+            r.container.isSelected = sel
+            r.title.setTextColor(if (sel) color(R.color.aw_accent) else color(R.color.aw_text_primary))
+            r.icon.setColorFilter(
+                if (sel) color(R.color.aw_accent) else color(R.color.aw_text_secondary),
+                PorterDuff.Mode.SRC_IN
+            )
+        }
+    }
+
+    private fun navigateTo(fragmentClass: Class<out Fragment>) {
+        val fragment = fragmentClass.newInstance()
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack(null)
+            .commit()
+    }
+
+    private fun resolveAttrDrawable(attr: Int): Drawable? {
+        val a = obtainStyledAttributes(intArrayOf(attr))
+        val d = a.getDrawable(0)
+        a.recycle()
+        return d
+    }
+
+    private fun navItemBg(): Drawable? = ContextCompat.getDrawable(this, R.drawable.nav_item_bg)
+
+    private fun color(id: Int): Int = ContextCompat.getColor(this, id)
+
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 }
