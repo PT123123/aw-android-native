@@ -12,6 +12,16 @@
     android:background="@color/aw_bg"
     android:orientation="vertical">
 
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/aw_bg"
+        app:title="活动"
+        app:titleTextColor="@color/aw_text_primary"
+        app:navigationIcon="@drawable/ic_menu"
+        app:navigationIconTint="@color/aw_text_primary" />
+
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
