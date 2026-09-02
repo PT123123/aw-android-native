@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 选中态：语义色 surface_2 作为高亮底 -->
+    <item android:state_selected="true" android:drawable="@color/aw_surface_2" />
+    <!-- 默认态：Material 水波纹 -->
+    <item android:drawable="?attr/selectableItemBackground" />
+</selector>

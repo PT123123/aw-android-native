@@ -22,18 +22,33 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"/>
 
-        <com.google.android.material.navigation.NavigationView
+        <!-- 自定义抽屉：头部 + 可折叠分组（Inbox 默认展开 / ActivityWatch 默认折叠） -->
+        <LinearLayout
                 android:id="@+id/nav_view"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
+                android:minWidth="260dp"
                 android:layout_gravity="start"
                 android:fitsSystemWindows="true"
-                android:background="@color/inbox_bg"
-                android:theme="@style/ThemeOverlay.MaterialComponents.Dark"
-                app:itemIconTint="@color/inbox_text"
-                app:itemTextColor="@color/inbox_text"
-                app:headerLayout="@layout/nav_header_main"
-                app:menu="@menu/activity_main_drawer"/>
+                android:background="@color/aw_bg"
+                android:orientation="vertical">
+
+            <include layout="@layout/nav_header_main" />
+
+            <ScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:fillViewport="true"
+                    android:scrollbars="none">
+                <LinearLayout
+                        android:id="@+id/nav_list"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="8dp" />
+            </ScrollView>
+        </LinearLayout>
 
     </net.activitywatch.android.EdgeDragDrawerLayout>
 
