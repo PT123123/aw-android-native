@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- 数据源切换：服务器（/inbox/todos）⇄ 本地（todo_local.json） -->
+    <item
+        android:id="@+id/action_todo_source"
+        android:title="数据源：服务器"
+        app:showAsAction="never" />
+</menu>

@@ -7,59 +7,60 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
-import androidx.drawerlayout.widget.DrawerLayout
 import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.TodoFragmentBinding
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
 
 /**
- * Todo 页面 —— 界面模仿 aw-qtui TodoPage（TickTick 式三栏在手机上折叠为：
- * 顶部视图导航（收集箱/今天/最近 7 天/全部）→ 清单导航（tag 模拟）→ 快速添加 → 任务列表）。
+ * 任务页 —— aw-qtui TodoPage 的手机端映射（契约 §5）。
  *
- * 数据源为远端 feature/inbox 分支的 aw-server-rust：/inbox/todos REST API。
- * 视图过滤 / 排序在客户端内存完成（服务端只支持 completed/limit/offset）。
+ * 桌面端三栏（侧栏导航 + 任务列表 + 详情面板）在手机上折叠为：
+ * 顶部工具栏 → 视图 chips（收集箱 / 今天 / 最近 7 天 / 全部）→ 清单 chips → 快速添加 → 任务列表 → 全局进度，
+ * 详情面板改为全屏 [TodoDetailFragment]。
+ *
+ * 页面只依赖 [TodoSource]：所有写操作都等数据源的 onChange 后按新快照重渲染，**不做乐观更新**。
  */
 class TodoFragment : Fragment() {
 
     private var _binding: TodoFragmentBinding? = null
     private val binding get() = _binding!!
 
-    private val allTasks = mutableListOf<TodoResponse>()
-    private val listInfos = mutableListOf<TodoListInfo>()
+    private val source: TodoSource get() = TodoRepository.source(requireContext())
 
-    /** 本地新建的空清单（尚无任务使用该 tag 时也保留显示，避免清单一闪而过） */
-    private val extraLists = mutableListOf<String>()
+    private var mLists: List<TodoList> = emptyList()
+    private var mTasks: List<TodoTask> = emptyList()
 
     private var currentView = TodoView.INBOX
     private var currentListId = 0L
     private var showCompleted = false
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // 抽屉视图入口：nav_todo_today / next7 / all 通过参数直接落到对应视图
+        when (arguments?.getString(ARG_VIEW)) {
+            "today" -> currentView = TodoView.TODAY
+            "next7" -> currentView = TodoView.NEXT7
+            "all" -> currentView = TodoView.ALL
+        }
+    }
+
+    /** 刚新建的清单名：等数据源快照里出现后自动选中 */
+    private var pendingSelectListName: String? = null
+
     private lateinit var adapter: TodoAdapter
 
-    /** 清单颜色板（深色下可读的明亮色，按 tag 哈希取模） */
-    private val listColors = intArrayOf(
-        0xFF4F8CFF.toInt(), // 蓝
-        0xFF52C41A.toInt(), // 绿
-        0xFFFF8C42.toInt(), // 橙
-        0xFFE85C8B.toInt(), // 粉
-        0xFF9B59F0.toInt(), // 紫
-        0xFF00C2B8.toInt(), // 青
-        0xFFF5C518.toInt(), // 黄
-        0xFFE74C3C.toInt(), // 红
-    )
+    private val dataChanged: () -> Unit = { postRender() }
+    private val errorToast: (String) -> Unit = { msg -> toast(msg) }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -72,22 +73,36 @@ class TodoFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        TodoApi.init(requireContext())
 
-        binding.toolbar.title = "任务"
-        binding.toolbar.setNavigationOnClickListener { openDrawer() }
+        binding.toolbar.setNavigationOnClickListener {
+            requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
+                ?.openDrawer(GravityCompat.START)
+        }
+        binding.toolbar.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.action_todo_source -> {
+                    switchSource()
+                    true
+                }
+                else -> false
+            }
+        }
 
         adapter = TodoAdapter(
-            onToggle = { task, checked -> toggle(task, checked) },
+            onToggle = { task, checked -> source.setTaskCompleted(task.id, checked) },
             onClick = { task -> openDetail(task) },
-            onToggleCompleted = { toggleCompleted() },
+            onToggleCompleted = {
+                showCompleted = !showCompleted
+                adapter.setShowCompleted(showCompleted)
+                updateEmptyState()
+            },
         )
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         binding.list.adapter = adapter
 
-        binding.swipe.setOnRefreshListener { load() }
+        binding.swipe.setOnRefreshListener { source.load() }
         binding.quickAdd.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
                 addTask()
                 true
             } else false
@@ -95,84 +110,130 @@ class TodoFragment : Fragment() {
         binding.addBtn.setOnClickListener { addTask() }
         binding.fab.setOnClickListener { showNewListDialog() }
 
-        load()
+        TodoRepository.addErrorListener(errorToast)
+        TodoRepository.addListener(dataChanged)
+        refreshSourceMenu()
+        source.load()
+        render()
     }
 
     override fun onDestroyView() {
-        super.onDestroyView()
+        TodoRepository.removeListener(dataChanged)
+        TodoRepository.removeErrorListener(errorToast)
         _binding = null
+        super.onDestroyView()
     }
 
-    private fun openDrawer() {
-        requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
-            ?.openDrawer(GravityCompat.START)
+    private fun postRender() {
+        val v = view ?: return
+        v.post { render() }
     }
 
-    // ── 数据加载 ────────────────────────────────────────────
+    private fun toast(msg: String) {
+        val ctx = context ?: return
+        Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+    }
 
-    private fun load() {
-        binding.swipe.isRefreshing = true
-        lifecycleScope.launch {
-            try {
-                // 拉全量（含已完成），视图过滤/排序在本地做（对齐 aw-qtui getTodos(true)）
-                val list = TodoApi.service.getTodos(completed = true)
-                allTasks.clear()
-                allTasks.addAll(list)
-                rebuildLists()
-                rebuildChips()
-                rebuildList()
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "加载失败：${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                binding.swipe.isRefreshing = false
+    // ── 渲染（数据快照 → UI） ─────────────────────────────
+
+    private fun render() {
+        if (_binding == null) return
+        mLists = source.lists()
+        mTasks = source.tasks()
+        binding.swipe.isRefreshing = false
+
+        // 当前清单被删掉时回落到收集箱
+        if (currentView == TodoView.LIST && mLists.none { it.id == currentListId }) {
+            currentView = TodoView.INBOX
+            currentListId = 0L
+        }
+        // 新建的清单出现后自动切到它
+        pendingSelectListName?.let { name ->
+            mLists.firstOrNull { it.name == name }?.let {
+                currentView = TodoView.LIST
+                currentListId = it.id
+                showCompleted = false
+                pendingSelectListName = null
             }
         }
+
+        adapter.setListColors(mLists.associate { it.id to it.argb })
+        rebuildChips()
+
+        binding.quickAdd.hint = "添加任务到「${viewTitle()}」…"
+
+        val (open, done) = visibleTasks(mTasks, currentView, currentListId)
+        binding.toolbar.subtitle = "${viewTitle()} · ${open.size} 项待办"
+        adapter.submit(open, done, showCompleted)
+        updateEmptyState()
+        updateProgress()
     }
 
-    /** 从任务 tags 派生清单（收集箱 id=0 不算清单） */
-    private fun rebuildLists() {
-        val seen = LinkedHashSet<String>()
-        for (t in allTasks) seen.addAll(t.tags)
-        listInfos.clear()
-        for (name in seen) listInfos.add(TodoListInfo(tagToListId(name), name, colorFor(name)))
-        for (name in extraLists) {
-            if (seen.contains(name)) continue
-            listInfos.add(TodoListInfo(tagToListId(name), name, colorFor(name)))
+    private fun updateEmptyState() {
+        val (open, done) = visibleTasks(mTasks, currentView, currentListId)
+        val nothing = open.isEmpty() && (done.isEmpty() || !showCompleted)
+        binding.empty.visibility = if (nothing) View.VISIBLE else View.GONE
+        binding.empty.text = if (open.isEmpty() && done.isEmpty()) {
+            "暂无任务\n在上方输入框回车即可添加"
+        } else {
+            "该视图下的任务已全部完成"
         }
     }
 
-    private fun colorFor(name: String): Int =
-        listColors[(name.hashCode() and 0x7fffffff) % listColors.size]
+    /** 底部全局进度：已完成 X / Y（契约 §5.4 统计范围是全局而非当前视图） */
+    private fun updateProgress() {
+        val total = mTasks.size
+        val doneCount = mTasks.count { it.completed }
+        binding.progressBar.progress = if (total == 0) 0 else doneCount * 100 / total
+        binding.progressText.text = "已完成 $doneCount / $total"
+    }
 
-    // ── Chips 导航 ─────────────────────────────────────────
+    // ── 视图 / 清单导航 ──────────────────────────────────
+
+    private fun viewTitle(): String = when (currentView) {
+        TodoView.INBOX -> "收集箱"
+        TodoView.TODAY -> "今天"
+        TodoView.NEXT7 -> "最近 7 天"
+        TodoView.ALL -> "全部"
+        TodoView.LIST -> mLists.firstOrNull { it.id == currentListId }?.name ?: "清单"
+    }
 
     private fun rebuildChips() {
         binding.viewChips.removeAllViews()
         binding.listChips.removeAllViews()
 
-        val views = listOf(TodoView.INBOX, TodoView.TODAY, TodoView.NEXT7, TodoView.ALL)
-        for (v in views) {
+        for (v in listOf(TodoView.INBOX, TodoView.TODAY, TodoView.NEXT7, TodoView.ALL)) {
             val selected = currentView == v
-            binding.viewChips.addView(makeChip(viewLabel(v), selected, dotColor = null, dot = false) {
-                currentView = v
-                currentListId = 0L
-                rebuildChips()
-                rebuildList()
-            })
+            binding.viewChips.addView(
+                makeChip(viewTitleOf(v), selected, dotColor = null) {
+                    currentView = v
+                    currentListId = 0L
+                    showCompleted = false           // 切换视图重置折叠（契约 §5.4）
+                    render()
+                }
+            )
         }
 
-        for (l in listInfos) {
+        for (l in mLists) {
             val selected = currentView == TodoView.LIST && currentListId == l.id
-            binding.listChips.addView(makeChip(l.name, selected, dotColor = l.color, dot = true) {
-                currentView = TodoView.LIST
-                currentListId = l.id
-                rebuildChips()
-                rebuildList()
-            })
+            binding.listChips.addView(
+                makeChip(l.name, selected, dotColor = l.argb) {
+                    currentView = TodoView.LIST
+                    currentListId = l.id
+                    showCompleted = false
+                    render()
+                }.apply {
+                    // 长按管理清单：重命名 / 删除
+                    setOnLongClickListener {
+                        showListMenu(l)
+                        true
+                    }
+                }
+            )
         }
     }
 
-    private fun viewLabel(v: TodoView): String = when (v) {
+    private fun viewTitleOf(v: TodoView): String = when (v) {
         TodoView.INBOX -> "收集箱"
         TodoView.TODAY -> "今天"
         TodoView.NEXT7 -> "最近 7 天"
@@ -184,11 +245,10 @@ class TodoFragment : Fragment() {
         label: String,
         selected: Boolean,
         dotColor: Int?,
-        dot: Boolean,
         onClick: () -> Unit,
     ): TextView {
         val tv = TextView(requireContext())
-        if (dot && dotColor != null) {
+        if (dotColor != null) {
             val sp = SpannableString("● $label")
             sp.setSpan(ForegroundColorSpan(dotColor), 0, 1, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE)
             tv.text = sp
@@ -205,7 +265,7 @@ class TodoFragment : Fragment() {
         tv.setTextColor(
             ContextCompat.getColor(
                 requireContext(),
-                if (selected) android.R.color.white else R.color.inbox_text,
+                if (selected) R.color.aw_bg else R.color.aw_text_secondary,
             )
         )
         tv.isClickable = true
@@ -220,106 +280,28 @@ class TodoFragment : Fragment() {
         return tv
     }
 
-    // ── 视图过滤 + 排序（对齐 aw-qtui visibleTasks / taskLessThan） ──
-
-    private fun viewTitle(): String = when (currentView) {
-        TodoView.INBOX -> "收集箱"
-        TodoView.TODAY -> "今天"
-        TodoView.NEXT7 -> "最近 7 天"
-        TodoView.ALL -> "全部"
-        TodoView.LIST -> listInfos.firstOrNull { it.id == currentListId }?.name ?: "清单"
-    }
-
-    private fun rebuildList() {
-        val (open, done) = visibleTasks()
-        binding.toolbar.subtitle = "${viewTitle()} · ${open.size} 项未完成"
-        adapter.submit(open, done, showCompleted)
-    }
-
-    private fun visibleTasks(): Pair<List<TodoResponse>, List<TodoResponse>> {
-        val today = dateStr(0)
-        val next7 = dateStr(6)
-        val open = mutableListOf<TodoResponse>()
-        val done = mutableListOf<TodoResponse>()
-        for (t in allTasks) {
-            val inView = when (currentView) {
-                TodoView.INBOX -> t.listId == 0L
-                TodoView.TODAY -> t.dueDate != null && t.dueDate!! <= today
-                TodoView.NEXT7 -> t.dueDate != null && t.dueDate!! <= next7
-                TodoView.ALL -> true
-                TodoView.LIST -> t.listId == currentListId
-            }
-            if (!inView) continue
-            if (t.completed) done.add(t) else open.add(t)
-        }
-        // 未完成：优先级降序 → 有期限在前 → 期限升序 → id 升序
-        open.sortWith(
-            compareByDescending<TodoResponse> { it.priority ?: 0 }
-                .thenByDescending { it.dueDate != null }
-                .thenBy { it.dueDate ?: "" }
-                .thenBy { it.id }
-        )
-        // 已完成：按完成时间倒序
-        done.sortByDescending { it.completed_at ?: "" }
-        return open to done
-    }
-
-    private fun dateStr(daysFromToday: Int): String {
-        val c = Calendar.getInstance()
-        c.add(Calendar.DAY_OF_YEAR, daysFromToday)
-        return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.time)
-    }
-
-    // ── 操作 ────────────────────────────────────────────────
-
-    private fun toggle(task: TodoResponse, checked: Boolean) {
-        lifecycleScope.launch {
-            try {
-                TodoApi.service.updateTodo(task.id, UpdateTodoPayload(completed = checked))
-                load()
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "更新失败：${e.message}", Toast.LENGTH_SHORT).show()
-                load()
-            }
-        }
-    }
-
-    private fun toggleCompleted() {
-        showCompleted = !showCompleted
-        adapter.setShowCompleted(showCompleted)
-    }
+    // ── 快速添加（契约 §5.5） ────────────────────────────
 
     private fun addTask() {
         val title = binding.quickAdd.text?.toString()?.trim().orEmpty()
         if (title.isEmpty()) return
-        // 当前在某个清单视图时，新任务默认归入该清单（tag 模拟）
-        val tag = if (currentView == TodoView.LIST)
-            listInfos.firstOrNull { it.id == currentListId }?.name else null
-        binding.quickAdd.text?.clear()
-        lifecycleScope.launch {
-            try {
-                TodoApi.service.createTodo(
-                    CreateTodoPayload(title = title, tags = if (tag != null) listOf(tag) else null)
-                )
-                load()
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "添加失败：${e.message}", Toast.LENGTH_SHORT).show()
-            }
+        // 归属规则：清单视图 → 该清单；今天视图 → 收集箱 + 今天到期；其它 → 收集箱无期限
+        val (listId, due) = when (currentView) {
+            TodoView.LIST -> currentListId to ""
+            TodoView.TODAY -> 0L to todayStr()
+            else -> 0L to ""
         }
+        binding.quickAdd.text?.clear()
+        source.createTask(title, listId, due)
     }
 
-    private fun openDetail(task: TodoResponse) {
-        val dlg = TodoDetailDialog.newInstance(task, listInfos.map { it.name }, null)
-        dlg.onSaved = { load() }
-        dlg.onDeleted = { load() }
-        dlg.show(childFragmentManager, "todo_detail")
-    }
+    // ── 清单管理（契约 §5.7） ────────────────────────────
 
     private fun showNewListDialog() {
         val input = EditText(requireContext()).apply {
             hint = "清单名称"
-            setTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_text))
-            setHintTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_sub))
+            setTextColor(ContextCompat.getColor(requireContext(), R.color.aw_text_primary))
+            setHintTextColor(ContextCompat.getColor(requireContext(), R.color.aw_text_disabled))
             setSingleLine(true)
         }
         AlertDialog.Builder(requireContext())
@@ -328,19 +310,92 @@ class TodoFragment : Fragment() {
             .setPositiveButton("创建") { _, _ ->
                 val name = input.text.toString().trim()
                 if (name.isEmpty()) return@setPositiveButton
-                // 清单由任务 tag 派生：本地先保留该清单并切换到它；
-                // 之后创建任务时选择此清单，tag 即随任务持久化。
-                extraLists.remove(name)
-                extraLists.add(name)
-                rebuildLists()
-                currentView = TodoView.LIST
-                currentListId = tagToListId(name)
-                rebuildChips()
-                rebuildList()
+                source.createList(name, nextListColorHex())
+                // 清单 id 由数据源分配（本地自增 / REST 为 tag 哈希），等下一次快照再选中
+                pendingSelectListName = name
             }
             .setNegativeButton("取消", null)
             .show()
     }
 
+    /** 新建清单的配色：从 8 色调色板里挑一个尚未被占用的 */
+    private fun nextListColorHex(): String {
+        val used = mLists.map { it.argb }.toSet()
+        val pick = listPalette().firstOrNull { it !in used }
+            ?: colorForString(System.currentTimeMillis().toString())
+        return String.format("#%06X", pick and 0xFFFFFF)
+    }
+
+    private fun showListMenu(list: TodoList) {
+        AlertDialog.Builder(requireContext())
+            .setTitle(list.name)
+            .setItems(arrayOf("重命名", "删除清单")) { _, which ->
+                when (which) {
+                    0 -> showRenameListDialog(list)
+                    1 -> confirmDeleteList(list)
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showRenameListDialog(list: TodoList) {
+        val input = EditText(requireContext()).apply {
+            setText(list.name)
+            setSingleLine(true)
+            setTextColor(ContextCompat.getColor(requireContext(), R.color.aw_text_primary))
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle("重命名清单")
+            .setView(input)
+            .setPositiveButton("确定") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotEmpty()) source.renameList(list.id, name)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun confirmDeleteList(list: TodoList) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("删除清单")
+            .setMessage("删除清单后，其中任务将移入收集箱。确定删除？")
+            .setPositiveButton("删除") { _, _ -> source.deleteList(list.id) }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    // ── 数据源切换 ───────────────────────────────────────
+
+    private fun switchSource() {
+        val next = if (TodoRepository.kind(requireContext()) == TodoSourceKind.REST) {
+            TodoSourceKind.LOCAL
+        } else {
+            TodoSourceKind.REST
+        }
+        TodoRepository.switchTo(requireContext(), next)
+        currentView = TodoView.INBOX
+        currentListId = 0L
+        showCompleted = false
+        refreshSourceMenu()
+        toast("数据源已切换到：${next.title}")
+    }
+
+    private fun refreshSourceMenu() {
+        val kind = TodoRepository.kind(requireContext())
+        binding.toolbar.menu.findItem(R.id.action_todo_source)?.title = "数据源：${kind.title}"
+    }
+
+    // ── 详情 ────────────────────────────────────────────
+
+    private fun openDetail(task: TodoTask) {
+        TodoDetailFragment.newInstance(task.id).show(childFragmentManager, "todo_detail")
+    }
+
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    companion object {
+        /** 抽屉视图入口参数 key（MainActivity.todoArgs 写入） */
+        const val ARG_VIEW = "todo_view"
+    }
 }

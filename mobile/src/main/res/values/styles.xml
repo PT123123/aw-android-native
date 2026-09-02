@@ -143,4 +143,39 @@
         <item name="android:paddingBottom">10dp</item>
     </style>
 
+    <!-- ============================================================
+         Todo（任务）模块通用样式
+         ============================================================ -->
+
+    <!-- 详情页的「标签 + 值」行（点击弹出选择器） -->
+    <style name="TodoDetailRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:paddingStart">4dp</item>
+        <item name="android:paddingEnd">4dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+    </style>
+
+    <style name="TodoDetailLabel">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/aw_text_primary</item>
+    </style>
+
+    <style name="TodoDetailValue">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/aw_text_secondary</item>
+    </style>
+
+    <!-- 任务详情：手机上没有第三栏，用全屏对话框代替右栏详情面板 -->
+    <style name="TodoFullScreenDialog" parent="AppTheme">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowBackground">@color/aw_bg</item>
+    </style>
+
 </resources>
