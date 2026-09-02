@@ -23,4 +23,36 @@
     <!-- 已配对设备卡片底色：白色 5% 叠在卡片底色上 -->
     <color name="sync_paired_card">#0DFFFFFF</color>
     <color name="sync_details_card">#0AFFFFFF</color>
+
+    <!-- ============================================================
+         语义色（Semantic colors）
+         亮色 / 深色各一套，深色定义在 values-night/colors.xml。
+         新增界面请一律引用本组颜色，不要写死色值，否则无法跟随主题。
+         ============================================================ -->
+    <color name="aw_bg">#F4F5F7</color>
+    <color name="aw_surface">#FFFFFF</color>
+    <color name="aw_surface_2">#E9EBEF</color>
+    <color name="aw_border">#D6D9DE</color>
+    <color name="aw_text_primary">#1B1F24</color>
+    <color name="aw_text_secondary">#61676E</color>
+    <color name="aw_text_disabled">#9AA0A6</color>
+    <color name="aw_accent">#2F6FED</color>
+    <color name="aw_accent_soft">#2A2F6FED</color>
+    <color name="aw_bar_track">#DDE0E5</color>
+    <color name="aw_success">#1E8E5A</color>
+    <color name="aw_warning">#B47400</color>
+    <color name="aw_danger">#C62828</color>
+    <color name="aw_chip_bg">#E9EBEF</color>
+    <color name="aw_chip_text">#1B1F24</color>
+    <color name="aw_scrim">#1A000000</color>
+
+    <!-- 分类色板：Timeline / Trends 按应用着色用，两套主题各自的取值 -->
+    <color name="aw_cat_1">#4F8CFF</color>
+    <color name="aw_cat_2">#28B5A0</color>
+    <color name="aw_cat_3">#F2A33C</color>
+    <color name="aw_cat_4">#E4678A</color>
+    <color name="aw_cat_5">#9B7BFF</color>
+    <color name="aw_cat_6">#4FBF6A</color>
+    <color name="aw_cat_7">#D6C24A</color>
+    <color name="aw_cat_8">#4FB8E8</color>
 </resources>
