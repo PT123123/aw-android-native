@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 活动页「时间线」Tab：顶部色带 + 图例 + 按小时明细。 -->
+<!-- 活动页「时间线」Tab：顶部可缩放色带（多泳道 / 合并）+ 图例 + 按小时明细。 -->
 <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -26,19 +26,105 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:orientation="vertical"
+                    android:padding="12dp">
 
-                    <TextView
-                        style="@style/AwSectionTitle"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="活动时间线"/>
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
-                    <net.activitywatch.android.dashboard.TimelineStripView
-                        android:id="@+id/strip"
+                        <TextView
+                            style="@style/AwSectionTitle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="活动时间线"/>
+
+                        <com.google.android.material.button.MaterialButtonToggleGroup
+                            android:id="@+id/tg_mode"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:selectionRequired="true"
+                            app:singleSelection="true">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_separate"
+                                style="?attr/materialButtonOutlinedStyle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="12sp"
+                                android:minHeight="32dp"
+                                android:text="分开"/>
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_merged"
+                                style="?attr/materialButtonOutlinedStyle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="12sp"
+                                android:minHeight="32dp"
+                                android:text="合并"/>
+                        </com.google.android.material.button.MaterialButtonToggleGroup>
+                    </LinearLayout>
+
+                    <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="26dp"
-                        android:layout_marginTop="10dp"/>
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:id="@+id/tv_zoom_level"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="@color/aw_text_secondary"
+                            android:textSize="12sp"
+                            android:text="×1.0"/>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_zoom_out"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="40dp"
+                            android:layout_height="32dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="−"
+                            android:textSize="16sp"/>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_zoom_in"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="40dp"
+                            android:layout_height="32dp"
+                            android:layout_marginStart="4dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="+"
+                            android:textSize="16sp"/>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_zoom_reset"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="40dp"
+                            android:layout_height="32dp"
+                            android:layout_marginStart="4dp"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:text="⟲"
+                            android:textSize="16sp"/>
+                    </LinearLayout>
+
+                    <!-- 多泳道 / 合并色带都动态塞进这里 -->
+                    <LinearLayout
+                        android:id="@+id/ll_lanes"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="vertical"/>
 
                     <LinearLayout
                         android:layout_width="match_parent"
