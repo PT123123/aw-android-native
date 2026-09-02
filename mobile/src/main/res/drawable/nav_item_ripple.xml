@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 导航项默认态的水波纹背景：用具体语义色 @color/aw_ripple，
+     不引用任何 ?attr/，避免 StateListDrawable inflate 时 theme=null 崩溃 -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/aw_ripple" />
