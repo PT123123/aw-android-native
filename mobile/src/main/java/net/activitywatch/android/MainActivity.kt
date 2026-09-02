@@ -21,6 +21,8 @@ import net.activitywatch.android.inbox.TrashFragment
 import net.activitywatch.android.sync.SyncFragment
 import net.activitywatch.android.watcher.UsageStatsWatcher
 import net.activitywatch.android.dashboard.DashboardFragment
+import net.activitywatch.android.queryexplorer.QueryFragment
+import net.activitywatch.android.stopwatch.StopwatchFragment
 
 // Firebase 导入
 import com.google.firebase.FirebaseApp
@@ -175,6 +177,12 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             }
             R.id.nav_sync -> {
                 fragmentClass = SyncFragment::class.java
+            }
+            R.id.nav_stopwatch -> {
+                fragmentClass = StopwatchFragment::class.java
+            }
+            R.id.nav_query -> {
+                fragmentClass = QueryFragment::class.java
             }
         }
 
