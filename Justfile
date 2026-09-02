@@ -3,7 +3,7 @@
 # 常用命令：
 #   just                列出全部命令
 #   just build          编译 debug APK（复用 jniLibs 里已编好的 libaw_server.so，跳过 Rust 重编）
-#   just install        adb 安装 debug APK 到已连接设备
+#   just install-phone  adb 安装 debug APK 到红米手机（指定序列号）
 #   just run            编译 + 安装 + 启动
 #   just kotlinc        只快速校验 Kotlin/资源改动（不重建 .so、离线）
 #   just build-release  编 release APK（自动 versionName/versionCode +1）
@@ -24,7 +24,7 @@ export ANDROID_HOME := "/c/Users/<user>/AppData/Local/Android/Sdk"
 export GRADLE_OPTS := "-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=10809 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=10809"
 
 GRADLE      := "/c/Users/<user>/.gradle/wrapper/dists/gradle-8.1-bin/2eyty4r6kz6fpakefpk52nbbm/gradle-8.1/bin/gradle"
-ADB         := "/c/Users/<user>/AppData/Local/Android/Sdk/platform-tools/adb"
+export ADB        := "/c/Users/<user>/AppData/Local/Android/Sdk/platform-tools/adb"
 
 DEBUG_APK   := "mobile/build/outputs/apk/debug/mobile-debug.apk"
 UNSIGNED_APK := "mobile/build/outputs/apk/release/mobile-release-unsigned.apk"
@@ -38,13 +38,16 @@ default:
 build:
     {{GRADLE}} :mobile:assembleDebug -x cargoBuild
 
-# adb 安装 debug APK（-r 覆盖安装）
-install:
-    {{ADB}} install -r "{{DEBUG_APK}}"
+# adb 安装 debug APK（-r 覆盖安装，动态识别手机：grep 排除平板型号，Justfile 不写死序列号）
+PHONE_SERIAL := `bash scripts/pick_phone.sh`
 
-# 编译 + 安装 + 启动到设备
-run: build install
-    {{ADB}} shell am start -n net.activitywatch.android.debug/net.activitywatch.android.MainActivity
+install-phone:
+    @test -n "{{PHONE_SERIAL}}" || (echo "未检测到手机设备（已按型号排除平板），请确认手机已连接 adb"; exit 1)
+    {{ADB}} -s {{PHONE_SERIAL}} install -r "{{DEBUG_APK}}"
+
+# 编译 + 安装 + 启动到红米手机
+run: build install-phone
+    {{ADB}} -s {{PHONE_SERIAL}} shell am start -n net.activitywatch.android.debug/net.activitywatch.android.MainActivity
 
 # 只快速校验 Kotlin/资源改动（不重建 .so、离线，依赖已缓存）
 kotlinc:

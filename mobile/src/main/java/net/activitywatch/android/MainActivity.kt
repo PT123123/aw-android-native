@@ -32,6 +32,8 @@ import net.activitywatch.android.inbox.InboxPrefs
 import net.activitywatch.android.inbox.InboxSettingsFragment
 import net.activitywatch.android.inbox.TrashFragment
 import net.activitywatch.android.sync.SyncFragment
+import net.activitywatch.android.sync.cloud.S3Fragment
+import net.activitywatch.android.sync.cloud.WebDavFragment
 import net.activitywatch.android.todo.TodoFragment
 import net.activitywatch.android.watcher.UsageStatsWatcher
 import net.activitywatch.android.dashboard.DashboardFragment
@@ -45,10 +47,10 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 private const val TAG = "MainActivity"
 
 /**
- * 抽屉导航的两大（外加 Misc）可折叠分组。
+ * 抽屉导航的可折叠分组。
  * - Inbox：默认展开
  * - ActivityWatch（活动 / 秒表 / Query Explorer）：默认折叠
- * - Misc（Sync）：默认展开
+ * - 同步（Sync LAN / WebDAV / S3）：默认展开
  */
 private data class NavRow(
     val id: Int,
@@ -340,12 +342,24 @@ class MainActivity : AppCompatActivity() {
                 QueryFragment::class.java
             )
         )),
-        NavGroup("Misc", true, listOf(
+        NavGroup("同步", true, listOf(
             NavRow(
                 R.id.nav_sync,
                 ContextCompat.getDrawable(this, R.drawable.ic_menu_manage)!!,
                 "Sync (LAN)",
                 SyncFragment::class.java
+            ),
+            NavRow(
+                R.id.nav_webdav,
+                ContextCompat.getDrawable(this, R.drawable.ic_cloud_webdav)!!,
+                "WebDAV（实验性）",
+                WebDavFragment::class.java
+            ),
+            NavRow(
+                R.id.nav_s3,
+                ContextCompat.getDrawable(this, R.drawable.ic_cloud_s3)!!,
+                "S3（实验性）",
+                S3Fragment::class.java
             )
         ))
     )
