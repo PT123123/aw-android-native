@@ -194,6 +194,23 @@ cargo {
         def osName = System.properties['os.name'].toLowerCase()
         if (osName.contains('windows')) {
             spec.environment("OPENSSL_SRC_PERL", "C:/msys64/usr/bin/perl.exe")
+            // openssl-src 在 MSYS 里编 OpenSSL 时，若 CC 是 Windows 反斜杠路径，会被 /bin/sh
+            // 吞成 "C:Usersted..." 导致 clang 找不到（Error 127）。改为裸 basename 并把 NDK
+            // bin 放进 PATH，Configure 生成的 Makefile 里 CC 即 basename，MSYS 可直接执行。
+            // 思路与 aw-server-rust/compile-android.sh 的本地修复一致。
+            def ndkBin = new File(android.ndkDirectory, "toolchains/llvm/prebuilt/windows-x86_64/bin").path
+            // 只用 NDK 提供的 .exe 变体（26）：cc crate 在 Windows 上按 PATHEXT 查找，
+            // 24 只有无扩展名 + .cmd，会 "failed to find tool"；26 有 .exe 副本。
+            spec.environment("CC_armv7-linux-androideabi", "armv7a-linux-androideabi26-clang.exe")
+            spec.environment("CC_aarch64-linux-android", "aarch64-linux-android26-clang.exe")
+            // openssl-src 用 MSYS 的 make 跑 OpenSSL，make 需要 sh 在 PATH 里才能执行
+            // recipes；clang.exe 归一化后也从 PATH 找。故把 NDK bin 和 MSYS bin 都前置到 PATH。
+            def msysBin = "C:/msys64/usr/bin"
+            spec.environment("PATH", ndkBin + File.pathSeparator + msysBin + File.pathSeparator + (System.getenv("PATH") ?: ""))
+            // openssl-src 在 Windows 上不给 make 传 MAKEFLAGS，导致 OpenSSL 串行编译极慢；
+            // 这里显式注入并行度（22 核机器用 -j8 平衡速度与稳定性）。
+            // -j8 与双 target 并行曾把系统拖到无响应；降为 -j4，arm/arm64 改为串行构建。
+            spec.environment("MAKEFLAGS", "-j4")
         }
     }
 }

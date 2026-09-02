@@ -27,6 +27,7 @@ import net.activitywatch.android.inbox.InboxPrefs
 import net.activitywatch.android.inbox.InboxSettingsFragment
 import net.activitywatch.android.inbox.TrashFragment
 import net.activitywatch.android.sync.SyncFragment
+import net.activitywatch.android.todo.TodoFragment
 import net.activitywatch.android.watcher.UsageStatsWatcher
 import net.activitywatch.android.dashboard.DashboardFragment
 import net.activitywatch.android.queryexplorer.QueryFragment
@@ -219,6 +220,12 @@ class MainActivity : AppCompatActivity() {
                 ContextCompat.getDrawable(this, android.R.drawable.ic_menu_edit)!!,
                 "Inbox",
                 InboxFragment::class.java
+            ),
+            NavRow(
+                R.id.nav_todo,
+                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_agenda)!!,
+                "任务",
+                TodoFragment::class.java
             ),
             NavRow(
                 R.id.nav_inbox_settings,
