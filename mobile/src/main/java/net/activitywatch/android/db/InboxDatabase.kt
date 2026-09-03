@@ -1,69 +1,13 @@
 package net.activitywatch.android.db
 
 import android.content.Context
-import androidx.room.*
-import androidx.sqlite.db.SupportSQLiteDatabase
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import java.util.UUID
 
-@Database(
-    entities = [
-        InboxNoteEntity::class,
-        SyncStateEntity::class,
-        SyncDeviceEntity::class,
-        SyncConflictEntity::class,
-        SyncLogEntity::class,
-        NoteSyncMapEntity::class
-    ],
-    version = 1,
-    exportSchema = false
-)
-abstract class InboxDatabase : RoomDatabase() {
-    abstract fun inboxNoteDao(): InboxNoteDao
-    abstract fun syncStateDao(): SyncStateDao
-    abstract fun syncDeviceDao(): SyncDeviceDao
-    abstract fun syncConflictDao(): SyncConflictDao
-    abstract fun syncLogDao(): SyncLogDao
-    abstract fun noteSyncMapDao(): NoteSyncMapDao
-
-    companion object {
-        @Volatile private var INSTANCE: InboxDatabase? = null
-
-        fun getInstance(context: Context): InboxDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    InboxDatabase::class.java,
-                    "inbox_database"
-                )
-                    .fallbackToDestructiveMigration()
-                    .addCallback(object : RoomDatabase.Callback() {
-                        override fun onCreate(db: SupportSQLiteDatabase) {
-                            super.onCreate(db)
-                            CoroutineScope(Dispatchers.IO).launch {
-                                // 初始化当前设备
-                                val dao = INSTANCE?.syncDeviceDao()
-                                dao?.upsert(SyncDeviceEntity(
-                                    deviceId = DeviceIdProvider.getDeviceId(context),
-                                    name = DeviceIdProvider.getDeviceName(context),
-                                    platform = "android",
-                                    lastSeenAt = System.currentTimeMillis(),
-                                    isCurrent = true,
-                                    status = "ONLINE"
-                                ))
-                            }
-                        }
-                    })
-                    .build()
-                INSTANCE = instance
-                instance
-            }
-        }
-    }
-}
-
+/**
+ * 设备身份：X-Device-ID 请求头来源（局域网同步 / inbox / todo API 共用）。
+ * 注：原 Room InboxDatabase（本地优先同步的整套 SyncConflict/NoteSyncMap/vector_clock 设计）
+ * 已于 P3 清理移除，此处仅保留设备标识；笔记数据统一走本机 aw-server-rust 的 inbox API。
+ */
 object DeviceIdProvider {
     private const val PREFS_NAME = "device_id_prefs"
     private const val KEY_DEVICE_ID = "device_id"
