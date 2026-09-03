@@ -43,8 +43,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:ellipsize="end"
-            android:maxLines="1"
             android:textColor="@color/inbox_sub"
             android:textSize="13sp"
             android:visibility="gone" />

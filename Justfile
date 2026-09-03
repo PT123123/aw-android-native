@@ -41,24 +41,28 @@ build:
     {{GRADLE}} :mobile:assembleDebug -x cargoBuild
 
 # adb 安装 debug APK（-r 覆盖安装，动态识别设备：型号含 pad/tablet 或 TB 开头视为平板，Justfile 不写死序列号）
-PHONE_SERIAL := `bash scripts/pick_device.sh phone`
-TAB_SERIAL   := `bash scripts/pick_device.sh tab`
+# 顶层不执行反引号，避免 parse 时脚本 exit 1 炸掉所有命令
+export PHONE_SERIAL := ""
+export TAB_SERIAL := ""
 
 install-phone:
-    @test -n "{{PHONE_SERIAL}}" || (echo "未检测到手机设备（已按型号排除平板），请确认手机已连接 adb"; exit 1)
-    {{ADB}} -s {{PHONE_SERIAL}} install -r "{{DEBUG_APK}}"
+    @serial=$(bash scripts/pick_device.sh phone); \
+    test -n "$serial" || (echo "未检测到手机设备（已按型号排除平板），请确认手机已连接 adb"; exit 1); \
+    {{ADB}} -s "$serial" install -r "{{DEBUG_APK}}"
 
 # adb 安装 debug APK 到平板
 install-tab:
-    @test -n "{{TAB_SERIAL}}" || (echo "未检测到平板设备（按型号 pad/tablet/TB 识别），请确认平板已连接 adb"; exit 1)
-    {{ADB}} -s {{TAB_SERIAL}} install -r "{{DEBUG_APK}}"
+    @serial=$(bash scripts/pick_device.sh tab); \
+    test -n "$serial" || (echo "未检测到平板设备（按型号 pad/tablet/TB 识别），请确认平板已连接 adb"; exit 1); \
+    {{ADB}} -s "$serial" install -r "{{DEBUG_APK}}"
 
 # 两台都装
 install-all: install-phone install-tab
 
 # 编译 + 安装 + 启动到红米手机
 run: build install-phone
-    {{ADB}} -s {{PHONE_SERIAL}} shell am start -n net.activitywatch.android.debug/net.activitywatch.android.MainActivity
+    @serial=$(bash scripts/pick_device.sh phone); \
+    {{ADB}} -s "$serial" shell am start -n net.activitywatch.android.debug/net.activitywatch.android.MainActivity
 
 # 只快速校验 Kotlin/资源改动（不重建 .so、离线，依赖已缓存）
 kotlinc:
