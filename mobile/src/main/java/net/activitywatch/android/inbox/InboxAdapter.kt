@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import net.activitywatch.android.databinding.InboxNoteItemBinding
+import net.activitywatch.android.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -27,6 +28,46 @@ class InboxAdapter(
             field = value
             notifyDataSetChanged()
         }
+
+    /** 是否处于多选模式 */
+    var selectionMode: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                if (!value) {
+                    selectedIds.clear()
+                }
+                notifyDataSetChanged()
+            }
+        }
+
+    /** 已选中的笔记 id 集合 */
+    val selectedIds = mutableSetOf<Long>()
+
+    /** 选中状态变化回调 */
+    var onSelectionChanged: ((Int) -> Unit)? = null
+
+    /** 全选/取消全选 */
+    fun toggleSelectAll(allIds: List<Long>) {
+        if (selectedIds.size == allIds.size) {
+            selectedIds.clear()
+        } else {
+            selectedIds.clear()
+            selectedIds.addAll(allIds)
+        }
+        notifyDataSetChanged()
+        onSelectionChanged?.invoke(selectedIds.size)
+    }
+
+    /** 切换单条选中状态 */
+    fun toggleSelection(noteId: Long) {
+        if (noteId in selectedIds) {
+            selectedIds.remove(noteId)
+        } else {
+            selectedIds.add(noteId)
+        }
+        onSelectionChanged?.invoke(selectedIds.size)
+    }
 
     companion object {
         private val DIFF = object : DiffUtil.ItemCallback<NoteResponse>() {
@@ -86,16 +127,26 @@ class InboxAdapter(
             b.root.context,
             object : GestureDetector.SimpleOnGestureListener() {
                 override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                    if (selectionMode) {
+                        val pos = bindingAdapterPosition
+                        if (pos != RecyclerView.NO_POSITION) {
+                            toggleSelection(getItem(pos).id)
+                            notifyItemChanged(pos)
+                        }
+                        return true
+                    }
                     dispatch(InboxPrefs.Gesture.SINGLE)
                     return true
                 }
 
                 override fun onDoubleTap(e: MotionEvent): Boolean {
+                    if (selectionMode) return true
                     dispatch(InboxPrefs.Gesture.DOUBLE)
                     return true
                 }
 
                 override fun onLongPress(e: MotionEvent) {
+                    if (selectionMode) return
                     b.root.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                     dispatch(InboxPrefs.Gesture.LONG)
                 }
@@ -145,6 +196,25 @@ class InboxAdapter(
             holder.b.tags.visibility = View.GONE
         }
         holder.b.time.text = buildTimeString(note)
+
+        // 多选模式：显示/隐藏 checkbox
+        if (selectionMode) {
+            holder.b.checkboxLayout.visibility = View.VISIBLE
+            holder.b.checkbox.visibility = View.VISIBLE
+            val isSelected = note.id in selectedIds
+            holder.b.checkbox.setBackgroundResource(
+                if (isSelected) R.drawable.bg_checkbox_circle_checked
+                else R.drawable.bg_checkbox_circle
+            )
+            holder.b.checkmark.visibility = if (isSelected) View.VISIBLE else View.GONE
+            // 多选模式下隐藏 overflow
+            holder.b.overflow.visibility = View.GONE
+        } else {
+            holder.b.checkboxLayout.visibility = View.GONE
+            holder.b.checkbox.visibility = View.GONE
+            holder.b.checkmark.visibility = View.GONE
+            holder.b.overflow.visibility = View.VISIBLE
+        }
     }
 
     private fun buildTimeString(note: NoteResponse): String {

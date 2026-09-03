@@ -46,7 +46,7 @@ class TodoFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 抽屉视图入口：nav_todo_today / next7 / all 通过参数直接落到对应视图
+        // 抽屉视图入口：nav_todo_inbox 通过参数落到收集箱；today/next7/all 已不再由侧边栏传入
         when (arguments?.getString(ARG_VIEW)) {
             "today" -> currentView = TodoView.TODAY
             "next7" -> currentView = TodoView.NEXT7

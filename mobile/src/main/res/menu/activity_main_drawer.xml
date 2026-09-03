@@ -17,18 +17,6 @@
             android:icon="@android:drawable/ic_menu_agenda"
             android:title="收集箱" />
         <item
-            android:id="@+id/nav_todo_today"
-            android:icon="@android:drawable/ic_menu_day"
-            android:title="今天" />
-        <item
-            android:id="@+id/nav_todo_next7"
-            android:icon="@android:drawable/ic_menu_week"
-            android:title="最近 7 天" />
-        <item
-            android:id="@+id/nav_todo_all"
-            android:icon="@drawable/ic_sort"
-            android:title="全部" />
-        <item
             android:id="@+id/nav_focus_timer"
             android:icon="@drawable/ic_focus_timer"
             android:title="计时" />
@@ -81,6 +69,10 @@
                         android:id="@+id/nav_sync"
                         android:icon="@drawable/ic_menu_manage"
                         android:title="Sync (LAN)"/>
+                <item
+                        android:id="@+id/nav_sync_details"
+                        android:icon="@drawable/ic_menu_manage"
+                        android:title="同步详情"/>
                 <item
                         android:id="@+id/nav_webdav"
                         android:icon="@drawable/ic_cloud_webdav"
