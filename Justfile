@@ -3,7 +3,9 @@
 # 常用命令：
 #   just                列出全部命令
 #   just build          编译 debug APK（复用 jniLibs 里已编好的 libaw_server.so，跳过 Rust 重编）
-#   just install-phone  adb 安装 debug APK 到红米手机（指定序列号）
+#   just install-phone  adb 安装 debug APK 到手机（按型号自动识别）
+#   just install-tab    adb 安装 debug APK 到平板（按型号自动识别）
+#   just install-all    两台都装
 #   just run            编译 + 安装 + 启动
 #   just kotlinc        只快速校验 Kotlin/资源改动（不重建 .so、离线）
 #   just build-release  编 release APK（自动 versionName/versionCode +1）
@@ -38,12 +40,21 @@ default:
 build:
     {{GRADLE}} :mobile:assembleDebug -x cargoBuild
 
-# adb 安装 debug APK（-r 覆盖安装，动态识别手机：grep 排除平板型号，Justfile 不写死序列号）
-PHONE_SERIAL := `bash scripts/pick_phone.sh`
+# adb 安装 debug APK（-r 覆盖安装，动态识别设备：型号含 pad/tablet 或 TB 开头视为平板，Justfile 不写死序列号）
+PHONE_SERIAL := `bash scripts/pick_device.sh phone`
+TAB_SERIAL   := `bash scripts/pick_device.sh tab`
 
 install-phone:
     @test -n "{{PHONE_SERIAL}}" || (echo "未检测到手机设备（已按型号排除平板），请确认手机已连接 adb"; exit 1)
     {{ADB}} -s {{PHONE_SERIAL}} install -r "{{DEBUG_APK}}"
+
+# adb 安装 debug APK 到平板
+install-tab:
+    @test -n "{{TAB_SERIAL}}" || (echo "未检测到平板设备（按型号 pad/tablet/TB 识别），请确认平板已连接 adb"; exit 1)
+    {{ADB}} -s {{TAB_SERIAL}} install -r "{{DEBUG_APK}}"
+
+# 两台都装
+install-all: install-phone install-tab
 
 # 编译 + 安装 + 启动到红米手机
 run: build install-phone

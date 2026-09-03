@@ -15,6 +15,7 @@ data class SyncConfig(
     @SerializedName("udp_port") val udpPort: Int = 46000,
     @SerializedName("sync_inbox") val syncInbox: Boolean = true,
     @SerializedName("sync_activity") val syncActivity: Boolean = true,
+    @SerializedName("sync_todo") val syncTodo: Boolean = true,
     @SerializedName("self_alias") val selfAlias: String = "",
     @SerializedName("probe_interval") val probeInterval: Int = 10
 )
@@ -36,6 +37,15 @@ data class Device(
     @SerializedName("incoming_pair_request") val incomingPairRequest: Boolean = false,
     // 仅 GET /info 附带：本机 IP 所在网卡名
     @SerializedName("ip_iface") val ipIface: String? = null
+)
+
+// 同步快照（WiFi 传输 / push 载荷）：与 aw-sync-rust SyncSnapshot 一一对应。
+// activity / inbox / todo 是各目标库（sqlite.db / inbox.db / todo.db）导出的 JSON 文本。
+data class SyncSnapshot(
+    @SerializedName("source_device") val sourceDevice: Device? = null,
+    @SerializedName("activity") val activity: String? = null,
+    @SerializedName("inbox") val inbox: String? = null,
+    @SerializedName("todo") val todo: String? = null
 )
 
 val Device.displayName: String

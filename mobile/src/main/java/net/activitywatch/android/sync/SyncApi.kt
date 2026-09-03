@@ -50,6 +50,16 @@ interface SyncApi {
     @POST("api/0/sync/devices/{id}/sync")
     suspend fun syncDevice(@Path("id") id: String): SyncResult
 
+    // ---- WiFi 热点传输（实验性） ----
+
+    /** 导出本机快照（activity / inbox / todo 按「设置」里的同步目标裁剪） */
+    @GET("api/0/sync/snapshot")
+    suspend fun getSnapshot(): SyncSnapshot
+
+    /** 把「从对端拉来的快照」合并进本机（复用服务端 apply_snapshot：幂等 upsert + 冲突处理） */
+    @POST("api/0/sync/apply")
+    suspend fun applySnapshot(@Body snapshot: SyncSnapshot): SyncResult
+
     @GET("api/0/sync/devices/{id}/stats")
     suspend fun getDeviceStats(@Path("id") id: String): DeviceSyncStats
 
