@@ -51,9 +51,20 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="在本地网络内与其他设备同步 Inbox 与 ActivityWatch 数据。"
+                        android:text="在本地网络内与其他设备同步 Inbox / Todo 与 ActivityWatch 数据。"
                         android:textColor="@color/inbox_sub"
                         android:textSize="13sp" />
+
+                    <!-- 实验性 WiFi 热点传输入口 -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnWifiTransfer"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="WiFi 热点传输（实验性）— 无路由器点对点同步"
+                        android:textColor="@color/sync_link"
+                        app:strokeColor="@color/sync_link" />
 
                     <!-- ========== 面板 1：配对与设备 ========== -->
                     <com.google.android.material.card.MaterialCardView
@@ -332,6 +343,13 @@
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
                                     android:text="ActivityWatch 数据 (sqlite.db)"
+                                    android:textColor="@color/inbox_text" />
+
+                                <com.google.android.material.checkbox.MaterialCheckBox
+                                    android:id="@+id/cfgSyncTodo"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="Todo 数据 (todo.db)"
                                     android:textColor="@color/inbox_text" />
 
                                 <TextView
