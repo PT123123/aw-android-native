@@ -66,6 +66,20 @@ interface SyncApi {
     @GET("api/0/sync/devices/{id}/conflicts")
     suspend fun getDeviceConflicts(@Path("id") id: String): ConflictsResponse
 
+    // ---- 回收站（冲突归档，P0）----
+
+    @GET("api/0/sync/trash")
+    suspend fun getTrash(@Query("kind") kind: String? = null): TrashResponse
+
+    @POST("api/0/sync/trash/{id}/restore")
+    suspend fun restoreTrash(@Path("id") id: Long): TrashOpResult
+
+    @DELETE("api/0/sync/trash/{id}")
+    suspend fun deleteTrash(@Path("id") id: Long): TrashOpResult
+
+    @DELETE("api/0/sync/trash")
+    suspend fun clearTrash(): TrashOpResult
+
     // ---- 状态与日志 ----
 
     @GET("api/0/sync/status")

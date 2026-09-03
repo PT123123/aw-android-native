@@ -3,9 +3,12 @@ package net.activitywatch.android.sync.cloud
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.JsonParser
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import net.activitywatch.android.db.InboxDatabase
+import net.activitywatch.android.inbox.LocalInboxApi
+import net.activitywatch.android.inbox.NoteResponse
+import net.activitywatch.android.inbox.UpsertNotePayload
 import net.activitywatch.android.todo.LocalTodoStore
 import java.io.File
 import java.text.SimpleDateFormat
@@ -14,8 +17,9 @@ import java.util.Locale
 
 /**
  * 云备份（实验性）数据层：
- * 把本机数据打包成一个 JSON 备份文件（Todo 本地数据 + Inbox 笔记），
- * 由 [WebDavClient] / [S3Client] 上传到云端；恢复时反向写回本机。
+ * 把本机数据打包成一个 JSON 备份文件（Todo 本地文件 + Inbox 笔记——从本机内置
+ * aw-server-rust 的 /inbox/notes 导出真实数据，不再依赖已废弃的 Room InboxDatabase），
+ * 由 [WebDavClient] / [S3Client] 上传到云端；恢复时反向写回。
  *
  * 备份格式（schema 1）：
  * {
@@ -24,7 +28,7 @@ import java.util.Locale
  *   "created_at": "2026-09-03T06:30:00",
  *   "device": "...",
  *   "todo": { "file": "todo_local.json", "contents": "..." | null },
- *   "inbox": { "notes": [ {...} ] | null }
+ *   "inbox": { "notes": [ { NoteResponse... } ] | null }
  * }
  */
 object CloudBackup {
@@ -49,9 +53,13 @@ object CloudBackup {
             }
         } else null
 
-        // Inbox 笔记（软删除的不含，与界面可见数据保持一致）
-        val db = InboxDatabase.getInstance(context)
-        val notes = db.inboxNoteDao().getAll(limit = 100_000)
+        // Inbox 笔记：从本机 aw-server-rust 的 /inbox/notes 导出（真实数据；服务端默认不含软删）
+        val notes: List<NoteResponse> = try {
+            LocalInboxApi.init(context)
+            LocalInboxApi.service.getNotes(limit = 100_000)
+        } catch (_: Exception) {
+            emptyList()
+        }
 
         val root = linkedMapOf<String, Any?>(
             "app" to "activitywatch-android",
@@ -71,7 +79,7 @@ object CloudBackup {
     /**
      * 从备份 JSON 恢复到本机：
      * - Todo：覆写 todo_local.json（内存中的 LocalTodoStore 不自动重载，重启应用后生效）
-     * - Inbox：REPLACE 方式批量写回 Room
+     * - Inbox：经 /inbox/notes 逐条重建笔记（保留内容/标签/创建时间；不保留原 id/uuid，视为新建）
      */
     suspend fun restore(context: Context, json: String): RestoreResult = withContext(Dispatchers.IO) {
         val root = JsonParser.parseString(json).asJsonObject
@@ -96,14 +104,20 @@ object CloudBackup {
         val inbox = root.getAsJsonObject("inbox")
         if (inbox != null && inbox.has("notes") && !inbox.get("notes").isJsonNull) {
             val notesArr = inbox.getAsJsonArray("notes")
-            val type = com.google.gson.reflect.TypeToken.getParameterized(
-                List::class.java,
-                net.activitywatch.android.db.InboxNoteEntity::class.java
-            ).type
-            val notes: List<net.activitywatch.android.db.InboxNoteEntity> = gson.fromJson(notesArr, type)
+            val type = TypeToken.getParameterized(List::class.java, NoteResponse::class.java).type
+            val notes: List<NoteResponse> = gson.fromJson(notesArr, type)
             if (notes.isNotEmpty()) {
-                InboxDatabase.getInstance(context).inboxNoteDao().insertAll(notes)
-                notesRestored = notes.size
+                LocalInboxApi.init(context)
+                for (n in notes) {
+                    try {
+                        LocalInboxApi.service.createNote(
+                            UpsertNotePayload(content = n.content, tags = n.tags, created_at = n.created_at)
+                        )
+                        notesRestored++
+                    } catch (_: Exception) {
+                        // 单条失败不中断整体恢复
+                    }
+                }
             }
         }
 

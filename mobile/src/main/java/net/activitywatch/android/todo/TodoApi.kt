@@ -78,4 +78,7 @@ interface TodoService {
 
     @DELETE("inbox/todos/{id}")
     suspend fun deleteTodo(@Path("id") id: Long): Response<Void>
+
+    @PUT("inbox/todos/{id}/restore")
+    suspend fun restoreTodo(@Path("id") id: Long): TodoResponse
 }
