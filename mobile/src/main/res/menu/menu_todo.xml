@@ -2,9 +2,10 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 数据源切换：服务器（/inbox/todos）⇄ 本地（todo_local.json） -->
+    <!-- 数据源固定为服务器（/inbox/todos），本地仅做缓冲，不再提供切换入口 -->
     <item
-        android:id="@+id/action_todo_source"
-        android:title="数据源：服务器"
-        app:showAsAction="never" />
+        android:id="@+id/action_new_list"
+        android:icon="@drawable/ic_add"
+        android:title="新建清单"
+        app:showAsAction="ifRoom" />
 </menu>

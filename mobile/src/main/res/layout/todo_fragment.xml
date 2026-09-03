@@ -13,7 +13,8 @@
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
+            android:layout_height="wrap_content"
+            android:minHeight="?attr/actionBarSize"
             android:background="@color/aw_bg"
             app:menu="@menu/menu_todo"
             app:title="任务"
@@ -152,8 +153,8 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
-        android:contentDescription="新建清单"
-        android:src="@android:drawable/ic_menu_add"
+        android:contentDescription="添加任务"
+        android:src="@android:drawable/ic_input_add"
         app:backgroundTint="@color/aw_accent"
         app:tint="@android:color/white" />
 </FrameLayout>
