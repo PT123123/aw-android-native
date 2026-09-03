@@ -19,6 +19,20 @@ aw-android（增强版 / Native UI Fork）
 
 ---
 
+## 仓库与分支
+
+本仓库（`PT123123/aw-android-native`）是开发主仓库，原 [`PT123123/aw-android`](https://github.com/PT123123/aw-android) 保留为上游参照：
+
+| Remote | 地址（SSH） | 用途 |
+| --- | --- | --- |
+| `origin` | `git@github.com:PT123123/aw-android-native.git` | **主仓库**，日常开发与推送目标，默认分支 `main` |
+| `upstream` | `git@github.com:PT123123/aw-android.git` | 原仓库（`feature/native-ui` 分支），仅作历史参照 / 对比，不再推送 |
+
+- 本地开发分支为 `feature/native-ui`，推送目标为 `origin/main`（`git push` 即推到 `origin/main`）。
+- 同步上游改动：`git fetch upstream && git merge upstream/feature/native-ui`（或按需 cherry-pick）。
+
+---
+
 ## 功能特性
 
 ### 原生 UI（Kotlin + ViewBinding）
