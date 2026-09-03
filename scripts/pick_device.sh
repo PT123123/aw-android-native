@@ -5,7 +5,8 @@
 #   tab   -> 返回第一个命中平板特征的设备
 ADB="${ADB:-adb}"
 kind="${1:-phone}"
-for s in $("$ADB" devices | awk 'NR>1 && $2=="device"{print $1}'); do
+# Windows adb 输出为 CRLF（行尾带 \r），grep 只锚定前缀/中间匹配，天然不受行尾 \r 影响
+for s in $("$ADB" devices | grep -E '^[^[:space:]]+[[:space:]]+device' | cut -f1); do
   m=$("$ADB" -s "$s" shell getprop ro.product.model 2>/dev/null | tr -d '\r')
   if echo "$m" | grep -qiE 'pad|tablet|^tb'; then
     if [ "$kind" = "tab" ]; then echo "$s"; exit 0; fi
