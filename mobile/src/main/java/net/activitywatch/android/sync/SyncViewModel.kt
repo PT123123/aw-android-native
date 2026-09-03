@@ -3,6 +3,8 @@ package net.activitywatch.android.sync
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -249,6 +251,41 @@ class SyncViewModel : ViewModel() {
                 }
                 .onFailure { e -> toast("同步失败：${e.message}") }
             _state.update { it.copy(busyDevices = it.busyDevices - deviceId) }
+        }
+    }
+
+    /**
+     * 立即同步全部已配对设备（标题栏刷新触发）。
+     * 与 vue 的「立即同步」按钮语义一致：并发推给每台远端设备，最后统一刷新状态与日志。
+     */
+    fun syncAllPaired() {
+        viewModelScope.launch {
+            val targets = _state.value.pairedDevices.filter { !it.isSelf }
+            if (targets.isEmpty()) {
+                toast("还没有已配对的设备，先完成配对再同步")
+                return@launch
+            }
+            val ids = targets.map { it.id }
+            _state.update { it.copy(busyDevices = it.busyDevices + ids) }
+            val results = coroutineScope {
+                targets.map { d -> async { d to repo.call { api.syncDevice(d.id) } } }.awaitAll()
+            }
+            _state.update { it.copy(busyDevices = it.busyDevices - ids) }
+            val applied = results.sumOf { (_, r) -> r.getOrNull()?.applied ?: 0 }
+            val failed = results.count { (_, r) -> r.isFailure }
+            results.forEach { (d, r) ->
+                r.onFailure { e -> Log.w(TAG, "同步 ${d.displayName} 失败: ${e.message}") }
+            }
+            refreshDevices()
+            refreshLogs()
+            refreshStatus()
+            toast(
+                if (failed == 0) {
+                    "已同步 ${targets.size} 台设备，应用记录 $applied 条"
+                } else {
+                    "同步完成：成功 ${targets.size - failed} 台，失败 $failed 台"
+                }
+            )
         }
     }
 

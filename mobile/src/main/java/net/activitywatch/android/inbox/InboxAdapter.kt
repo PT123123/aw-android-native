@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.text.Spanned
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -20,6 +21,7 @@ class InboxAdapter(
     private val onGesture: (NoteResponse, InboxPrefs.Gesture, View) -> Unit,
     private val onOverflowClick: (NoteResponse, View) -> Unit,
     private val onParentClick: (NoteResponse) -> Unit,
+    private val onTagClick: (String) -> Unit,
 ) : ListAdapter<NoteResponse, InboxAdapter.VH>(DIFF) {
 
     /** 当前 Adapter 绑定的置顶集合（Fragment 每次 submit 前刷新） */
@@ -135,6 +137,12 @@ class InboxAdapter(
                         }
                         return true
                     }
+                    // 点在 #标签 上 → 按标签筛选，不再走单击手势（双击手势仍可用）
+                    val tag = tagAt(e)
+                    if (tag != null) {
+                        onTagClick(tag)
+                        return true
+                    }
                     dispatch(InboxPrefs.Gesture.SINGLE)
                     return true
                 }
@@ -172,6 +180,29 @@ class InboxAdapter(
                 if (n.parentId != null) onParentClick(n)
             }
         }
+
+        /**
+         * 命中测试：触点是否落在正文里的某个 #标签 上。
+         * 卡片根节点的 OnTouchListener 拦截了全部触摸，TextView 的 LinkMovementMethod
+         * 收不到事件，所以这里按屏幕坐标换算后自己找 TagSpan。
+         */
+        private fun tagAt(e: MotionEvent): String? {
+            val tv = b.content
+            val text = tv.text as? Spanned ?: return null
+            val layout = tv.layout ?: return null
+            val loc = IntArray(2)
+            tv.getLocationOnScreen(loc)
+            val localX = e.rawX - loc[0]
+            val localY = e.rawY - loc[1]
+            if (localX < 0 || localY < 0 || localX > tv.width || localY > tv.height) return null
+            val x = localX - tv.totalPaddingLeft + tv.scrollX
+            val y = localY - tv.totalPaddingTop + tv.scrollY
+            val line = layout.getLineForVertical(y.toInt())
+            if (line < 0 || line >= layout.lineCount) return null
+            val off = layout.getOffsetForHorizontal(line, x)
+            if (off < 0 || off > text.length) return null
+            return text.getSpans(off, off, TagSpan::class.java).firstOrNull()?.tag
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH =
@@ -181,19 +212,13 @@ class InboxAdapter(
         val note = getItem(position)
         val ctx = holder.b.root.context
         val displayContent = if (note.id in pinnedIds) "📌 ${note.content}" else note.content
-        holder.b.content.text = MarkdownRenderer.render(ctx, displayContent)
+        holder.b.content.text = MarkdownRenderer.render(ctx, displayContent) { onTagClick(it) }
         // 原笔记预览（仅评论笔记显示）
         if (note.parentId != null && note.parentPreview != null) {
             holder.b.parentPreview.visibility = View.VISIBLE
             holder.b.parentPreview.text = "↖️ ${note.parentPreview}"
         } else {
             holder.b.parentPreview.visibility = View.GONE
-        }
-        if (note.tags.isNotEmpty()) {
-            holder.b.tags.visibility = View.VISIBLE
-            holder.b.tags.text = note.tags.joinToString(" ") { "#$it" }
-        } else {
-            holder.b.tags.visibility = View.GONE
         }
         holder.b.time.text = buildTimeString(note)
 

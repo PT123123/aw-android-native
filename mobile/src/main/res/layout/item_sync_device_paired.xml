@@ -136,13 +136,7 @@
             android:layout_marginTop="8dp"
             android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnSync"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="立即同步" />
-
+            <!-- 「立即同步」已移到标题栏刷新按钮：点一次即对全部已配对设备触发同步 -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRemove"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"

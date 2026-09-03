@@ -1,5 +1,6 @@
 package net.activitywatch.android.todo
 
+import android.content.Context
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
@@ -8,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -80,8 +82,8 @@ class TodoFragment : Fragment() {
         }
         binding.toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
-                R.id.action_todo_source -> {
-                    switchSource()
+                R.id.action_new_list -> {
+                    showNewListDialog()
                     true
                 }
                 else -> false
@@ -108,11 +110,11 @@ class TodoFragment : Fragment() {
             } else false
         }
         binding.addBtn.setOnClickListener { addTask() }
-        binding.fab.setOnClickListener { showNewListDialog() }
+        // 右下角按钮 = 跳转到上方输入框并弹出键盘（新建清单移到标题栏菜单）
+        binding.fab.setOnClickListener { focusQuickAdd() }
 
         TodoRepository.addErrorListener(errorToast)
         TodoRepository.addListener(dataChanged)
-        refreshSourceMenu()
         source.load()
         render()
     }
@@ -282,6 +284,15 @@ class TodoFragment : Fragment() {
 
     // ── 快速添加（契约 §5.5） ────────────────────────────
 
+    /** 跳到顶部快速添加输入框：聚焦 + 弹出软键盘 */
+    private fun focusQuickAdd() {
+        binding.quickAdd.requestFocus()
+        binding.quickAdd.post {
+            val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(binding.quickAdd, InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
+
     private fun addTask() {
         val title = binding.quickAdd.text?.toString()?.trim().orEmpty()
         if (title.isEmpty()) return
@@ -366,25 +377,7 @@ class TodoFragment : Fragment() {
     }
 
     // ── 数据源切换 ───────────────────────────────────────
-
-    private fun switchSource() {
-        val next = if (TodoRepository.kind(requireContext()) == TodoSourceKind.REST) {
-            TodoSourceKind.LOCAL
-        } else {
-            TodoSourceKind.REST
-        }
-        TodoRepository.switchTo(requireContext(), next)
-        currentView = TodoView.INBOX
-        currentListId = 0L
-        showCompleted = false
-        refreshSourceMenu()
-        toast("数据源已切换到：${next.title}")
-    }
-
-    private fun refreshSourceMenu() {
-        val kind = TodoRepository.kind(requireContext())
-        binding.toolbar.menu.findItem(R.id.action_todo_source)?.title = "数据源：${kind.title}"
-    }
+    // 数据源固定为服务器（/inbox/todos），本地仅做缓冲，页面上不再提供切换入口。
 
     // ── 详情 ────────────────────────────────────────────
 

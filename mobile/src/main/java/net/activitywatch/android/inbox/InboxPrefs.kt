@@ -17,6 +17,7 @@ object InboxPrefs {
     private const val PREFS = "inbox_prefs"
     private const val KEY_ACTION_PREFIX = "gesture_action_"
     private const val KEY_DRAWER_EDGE_INDEX = "drawer_edge_index"
+    private const val KEY_AUTO_INPUT = "auto_input_on_start"
 
     // 旧版只存"哪个手势打开编辑"，用于迁移
     private const val KEY_LEGACY_EDIT_GESTURE = "edit_gesture"
@@ -35,6 +36,14 @@ object InboxPrefs {
     }
 
     fun drawerEdgeRatio(context: Context): Float = DRAWER_EDGE_RATIOS[drawerEdgeIndex(context)]
+
+    /** 进入 Inbox 时是否自动弹出输入框 */
+    fun autoInputOnStart(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_AUTO_INPUT, false)
+
+    fun setAutoInputOnStart(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_AUTO_INPUT, enabled).apply()
+    }
 
     private fun prefs(context: Context): SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

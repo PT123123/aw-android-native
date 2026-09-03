@@ -40,7 +40,6 @@ class SyncRowsAdapter(private val actions: Actions) :
     interface Actions {
         fun onInitiatePair(device: Device)
         fun onAcceptPair(device: Device)
-        fun onSync(device: Device)
         fun onRemove(device: Device)
         fun onStartRename(device: Device)
         fun onCommitRename(device: Device, alias: String)
@@ -174,7 +173,6 @@ class SyncRowsAdapter(private val actions: Actions) :
         private val btnRenameOk: MaterialButton = view.findViewById(R.id.btnRenameOk)
         private val btnRenameCancel: MaterialButton = view.findViewById(R.id.btnRenameCancel)
         private val actionsRow: View = view.findViewById(R.id.actionsRow)
-        private val btnSync: MaterialButton = view.findViewById(R.id.btnSync)
         private val btnRemove: MaterialButton = view.findViewById(R.id.btnRemove)
         private val btnRename: MaterialButton = view.findViewById(R.id.btnRename)
         private val summaryRow: View = view.findViewById(R.id.summaryRow)
@@ -220,10 +218,8 @@ class SyncRowsAdapter(private val actions: Actions) :
             } else {
                 renameRow.visibility = View.GONE
                 actionsRow.visibility = if (d.isSelf) View.GONE else View.VISIBLE
-                btnSync.isEnabled = !row.busy
                 btnRemove.isEnabled = !row.busy
                 btnRename.isEnabled = !row.busy
-                btnSync.setOnClickListener { actions.onSync(d) }
                 btnRemove.setOnClickListener { actions.onRemove(d) }
                 btnRename.setOnClickListener { actions.onStartRename(d) }
             }

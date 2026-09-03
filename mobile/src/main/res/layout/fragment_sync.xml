@@ -18,6 +18,7 @@
             android:layout_height="?attr/actionBarSize"
             android:background="@color/inbox_bg"
             android:theme="@style/ThemeOverlay.MaterialComponents.Dark"
+            app:menu="@menu/menu_sync"
             app:title="局域网同步"
             app:titleTextColor="@color/inbox_text"
             app:navigationIcon="@drawable/ic_menu"

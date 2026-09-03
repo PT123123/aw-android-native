@@ -91,6 +91,7 @@ class TrashFragment : Fragment() {
             onGesture = { note, _, _ -> restoreNote(note) },
             onOverflowClick = { note, anchor -> showItemMenu(note, anchor) },
             onParentClick = { },
+            onTagClick = { },
         )
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         binding.list.adapter = noteAdapter

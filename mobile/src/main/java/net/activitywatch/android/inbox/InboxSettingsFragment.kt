@@ -42,6 +42,15 @@ class InboxSettingsFragment : Fragment() {
         setupRow(binding.rowSingle, binding.valueSingle, InboxPrefs.Gesture.SINGLE, "单击行为")
 
         setupDrawerEdgeSlider()
+        setupAutoInputSwitch()
+    }
+
+    /** 进入 Inbox 时是否直接弹出记录输入框 */
+    private fun setupAutoInputSwitch() {
+        binding.autoInputSwitch.isChecked = InboxPrefs.autoInputOnStart(requireContext())
+        binding.autoInputSwitch.setOnCheckedChangeListener { _, checked ->
+            InboxPrefs.setAutoInputOnStart(requireContext(), checked)
+        }
     }
 
     /** 侧滑打开抽屉的热区范围：5 个固定档位，0=关闭 */

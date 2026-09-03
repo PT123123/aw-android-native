@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- 标题栏刷新：一次对全部已配对设备触发立即同步 -->
+    <item
+        android:id="@+id/action_sync_now"
+        android:icon="@drawable/ic_refresh"
+        android:title="刷新并立即同步"
+        app:showAsAction="ifRoom" />
+</menu>
