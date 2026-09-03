@@ -27,6 +27,7 @@ import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.FragmentSyncBinding
+import net.activitywatch.android.sync.wifi.WifiTransferFragment
 
 // 局域网同步页：
 // 配对与设备 / 设置 / 显示报文 三个可折叠面板，数据来自本机 Rust server 的 /api/0/sync
@@ -74,6 +75,14 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
         setupPanel(binding.peersHeader, binding.peersContent, binding.peersChevron, initiallyExpanded = true)
         setupPanel(binding.settingsHeader, binding.settingsContent, binding.settingsChevron, initiallyExpanded = false)
         setupPanel(binding.logsHeader, binding.logsContent, binding.logsChevron, initiallyExpanded = false)
+
+        // 实验性 WiFi 热点传输：无路由器 / 局域网时的点对点同步
+        binding.btnWifiTransfer.setOnClickListener {
+            requireActivity().supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, WifiTransferFragment())
+                .addToBackStack(null)
+                .commit()
+        }
 
         setupSettingsControls()
         setupLogsControls()
@@ -164,6 +173,7 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
                 udpPort = udp,
                 syncInbox = binding.cfgSyncInbox.isChecked,
                 syncActivity = binding.cfgSyncActivity.isChecked,
+                syncTodo = binding.cfgSyncTodo.isChecked,
                 selfAlias = binding.cfgSelfAlias.text.toString().trim(),
                 probeInterval = probe
             )
@@ -274,6 +284,7 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
             binding.cfgProbeInterval.setText(cfg.probeInterval.toString())
             binding.cfgSyncInbox.isChecked = cfg.syncInbox
             binding.cfgSyncActivity.isChecked = cfg.syncActivity
+            binding.cfgSyncTodo.isChecked = cfg.syncTodo
             binding.cfgSelfAlias.setText(cfg.selfAlias)
         }
     }

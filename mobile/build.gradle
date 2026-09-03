@@ -151,6 +151,9 @@ dependencies {
     // Markdown 渲染（笔记展示）
     implementation 'io.noties.markwon:core:4.6.2'
 
+    // ===== WiFi 热点传输（实验性）：扫码 / 出码（含 zxing core，生成二维码用）=====
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+
     // ===== 同步模块依赖 =====
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
