@@ -40,6 +40,9 @@ class InboxFragment : Fragment() {
     /** 搜索栏可见时拦截返回键：只收起搜索栏，不退出页面 */
     private lateinit var searchBackCallback: OnBackPressedCallback
 
+    /** 多选模式拦截返回键：退出多选模式 */
+    private lateinit var selectionBackCallback: OnBackPressedCallback
+
     private val items = mutableListOf<NoteResponse>()
     private val limit = 50
     private var hasMore = true
@@ -48,6 +51,9 @@ class InboxFragment : Fragment() {
     private var searchQuery: String? = null
     private var sortByUpdated = false
     private var retryCount = 0
+
+    /** 是否处于多选模式 */
+    private var selectionMode = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -74,6 +80,9 @@ class InboxFragment : Fragment() {
             onOverflowClick = { note, anchor -> showItemMenu(note, anchor) },
             onParentClick = { note -> openParent(note) },
         )
+        adapter.onSelectionChanged = { count ->
+            updateSelectionTitle(count)
+        }
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         binding.list.adapter = adapter
         binding.list.addOnScrollListener(object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
@@ -108,6 +117,13 @@ class InboxFragment : Fragment() {
         }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, searchBackCallback)
 
+        selectionBackCallback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                exitSelectionMode()
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, selectionBackCallback)
+
         // 历史面板恢复版本后刷新列表，让卡片正文与更新时间同步变化
         parentFragmentManager.setFragmentResultListener(
             NoteHistoryFragment.RESULT_KEY, viewLifecycleOwner
@@ -137,8 +153,106 @@ class InboxFragment : Fragment() {
                 ).show()
                 true
             }
+            R.id.action_multiselect -> {
+                enterSelectionMode()
+                true
+            }
+            R.id.action_copy -> {
+                copySelectedNotes()
+                true
+            }
+            R.id.action_delete -> {
+                deleteSelectedNotes()
+                true
+            }
+            R.id.action_select_all -> {
+                val allIds = items.map { it.id }
+                adapter.toggleSelectAll(allIds)
+                true
+            }
             else -> false
         }
+    }
+
+    private fun enterSelectionMode() {
+        selectionMode = true
+        selectionBackCallback.isEnabled = true
+        binding.fab.visibility = View.GONE
+        binding.toolbar.menu.clear()
+        binding.toolbar.inflateMenu(R.menu.inbox_selection_menu)
+        adapter.selectionMode = true
+        updateSelectionTitle(0)
+    }
+
+    private fun exitSelectionMode() {
+        selectionMode = false
+        selectionBackCallback.isEnabled = false
+        binding.fab.visibility = View.VISIBLE
+        binding.toolbar.title = ""
+        binding.toolbar.menu.clear()
+        binding.toolbar.inflateMenu(R.menu.inbox_menu)
+        adapter.selectionMode = false
+    }
+
+    private fun updateSelectionTitle(count: Int) {
+        binding.toolbar.title = if (count > 0) "已选 $count 项" else "选择笔记"
+    }
+
+    private fun copySelectedNotes() {
+        val selectedNotes = items.filter { it.id in adapter.selectedIds }
+        if (selectedNotes.isEmpty()) {
+            Toast.makeText(requireContext(), "请先选择笔记", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val textToCopy = selectedNotes.joinToString("\n") { it.content }
+        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("notes", textToCopy)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(requireContext(), "已复制 ${selectedNotes.size} 条笔记", Toast.LENGTH_SHORT).show()
+        exitSelectionMode()
+        loadInitial()
+    }
+
+    private fun deleteSelectedNotes() {
+        val selectedNotes = items.filter { it.id in adapter.selectedIds }
+        if (selectedNotes.isEmpty()) {
+            Toast.makeText(requireContext(), "请先选择笔记", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val count = selectedNotes.size
+        // 乐观删除：先从列表移除，再批量调服务端删除
+        val selectedIds = adapter.selectedIds.toSet()
+        items.removeAll { it.id in selectedIds }
+        adapter.submitList(ArrayList(items))
+        exitSelectionMode()
+
+        val snackbar = com.google.android.material.snackbar.Snackbar.make(
+            binding.root, "已删除 $count 条笔记", UNDO_DURATION_MS
+        ).setAnchorView(binding.fab)
+
+        snackbar.setAction("撤销") {
+            // 撤销：恢复列表
+            loadInitial()
+            Toast.makeText(requireContext(), "已撤销删除", Toast.LENGTH_SHORT).show()
+        }
+
+        snackbar.addCallback(object : com.google.android.material.snackbar.Snackbar.Callback() {
+            override fun onDismissed(transientBottomBar: com.google.android.material.snackbar.Snackbar, event: Int) {
+                super.onDismissed(transientBottomBar, event)
+                if (event == DISMISS_EVENT_ACTION) return
+                // 执行服务端删除
+                for (note in selectedNotes) {
+                    lifecycleScope.launch {
+                        try {
+                            LocalInboxApi.service.deleteNote(note.id)
+                        } catch (_: Exception) {
+                            // 忽略单条删除失败
+                        }
+                    }
+                }
+            }
+        })
+        snackbar.show()
     }
 
     private fun setSearchBarVisible(visible: Boolean) {
@@ -228,6 +342,7 @@ class InboxFragment : Fragment() {
         }
         adapter.submitList(ArrayList(items))
     }
+
     private fun performGesture(note: NoteResponse, gesture: InboxPrefs.Gesture, anchor: View) {
         when (InboxPrefs.actionFor(requireContext(), gesture)) {
             InboxPrefs.GestureAction.EDIT -> openEditor(note)
@@ -406,7 +521,6 @@ class InboxFragment : Fragment() {
             imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
         }, 100)
     }
-
 
     /** 快速发送弹窗底部的 Markdown 工具栏（与 note_editor.xml 中的样式一致） */
     private fun buildMarkdownToolbar(
@@ -608,7 +722,7 @@ class InboxFragment : Fragment() {
         snackbar.addCallback(object : com.google.android.material.snackbar.Snackbar.Callback() {
             override fun onDismissed(transientBottomBar: com.google.android.material.snackbar.Snackbar, event: Int) {
                 super.onDismissed(transientBottomBar, event)
-                // 点击“撤销”时不删除；其他情况（超时/被新浮条顶替/手动滑走）执行真正的删除
+                // 点击"撤销"时不删除；其他情况（超时/被新浮条顶替/手动滑走）执行真正的删除
                 if (event == DISMISS_EVENT_ACTION) return
                 val target = pendingDeleteNote ?: return
                 pendingDeleteNote = null

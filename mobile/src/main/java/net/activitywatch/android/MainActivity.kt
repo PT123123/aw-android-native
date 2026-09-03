@@ -32,6 +32,7 @@ import net.activitywatch.android.inbox.InboxPrefs
 import net.activitywatch.android.inbox.InboxSettingsFragment
 import net.activitywatch.android.inbox.TrashFragment
 import net.activitywatch.android.sync.SyncFragment
+import net.activitywatch.android.sync.SyncDetailsFragment
 import net.activitywatch.android.sync.cloud.S3Fragment
 import net.activitywatch.android.sync.cloud.WebDavFragment
 import net.activitywatch.android.todo.TodoFragment
@@ -243,7 +244,7 @@ class MainActivity : AppCompatActivity() {
                 TrashFragment::class.java
             )
         )),
-        // 任务（契约 §5.1 左栏）：4 个视图直接作为抽屉入口
+        // 任务（契约 §5.1 左栏）：侧边栏仅保留收集箱入口，其余视图由页面内 chips 切换
         NavGroup("任务", true, listOf(
             NavRow(
                 R.id.nav_todo_inbox,
@@ -251,27 +252,6 @@ class MainActivity : AppCompatActivity() {
                 "收集箱",
                 TodoFragment::class.java,
                 todoArgs("inbox")
-            ),
-            NavRow(
-                R.id.nav_todo_today,
-                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_today)!!,
-                "今天",
-                TodoFragment::class.java,
-                todoArgs("today")
-            ),
-            NavRow(
-                R.id.nav_todo_next7,
-                ContextCompat.getDrawable(this, R.drawable.ic_sort)!!,
-                "最近 7 天",
-                TodoFragment::class.java,
-                todoArgs("next7")
-            ),
-            NavRow(
-                R.id.nav_todo_all,
-                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_sort_by_size)!!,
-                "全部",
-                TodoFragment::class.java,
-                todoArgs("all")
             )
         )),
         // 专注模块（契约 §5.8）：8 个模块，记录详情由点记录弹窗承载
@@ -348,6 +328,12 @@ class MainActivity : AppCompatActivity() {
                 ContextCompat.getDrawable(this, R.drawable.ic_menu_manage)!!,
                 "Sync (LAN)",
                 SyncFragment::class.java
+            ),
+            NavRow(
+                R.id.nav_sync_details,
+                ContextCompat.getDrawable(this, R.drawable.ic_menu_manage)!!,
+                "同步详情",
+                SyncDetailsFragment::class.java
             ),
             NavRow(
                 R.id.nav_webdav,

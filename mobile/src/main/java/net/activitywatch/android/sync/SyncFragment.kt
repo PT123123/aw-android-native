@@ -1,20 +1,13 @@
 package net.activitywatch.android.sync
 
-import android.graphics.Typeface
 import android.os.Bundle
-import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.ImageView
-import android.widget.TableRow
-import android.widget.TextView
-import android.content.res.ColorStateList
-import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
-import androidx.core.widget.doAfterTextChanged
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
@@ -30,7 +23,7 @@ import net.activitywatch.android.databinding.FragmentSyncBinding
 import net.activitywatch.android.sync.wifi.WifiTransferFragment
 
 // 局域网同步页：
-// 配对与设备 / 设置 / 显示报文 三个可折叠面板，数据来自本机 Rust server 的 /api/0/sync
+// 配对与设备 / 设置 两个可折叠面板，数据来自本机 Rust server 的 /api/0/sync
 class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
 
     private var _binding: FragmentSyncBinding? = null
@@ -41,15 +34,6 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
 
     private var settingsHydrated = false
     private var discoveryMethod = "broadcast"
-
-    private val directionOptions = listOf("" to "全部", "out" to "去向（发出）", "in" to "来向（接收）")
-    private val eventTypeOptions = listOf(
-        "" to "全部", "discovery" to "发现", "pairing" to "配对", "sync" to "同步", "conflict" to "冲突"
-    )
-    private val protocolOptions = listOf(
-        "" to "全部", "http" to "HTTP", "udp_broadcast" to "UDP 广播", "mdns" to "mDNS"
-    )
-    private val pageSizeValues = listOf(5, 10, 50)
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -74,7 +58,6 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
 
         setupPanel(binding.peersHeader, binding.peersContent, binding.peersChevron, initiallyExpanded = true)
         setupPanel(binding.settingsHeader, binding.settingsContent, binding.settingsChevron, initiallyExpanded = false)
-        setupPanel(binding.logsHeader, binding.logsContent, binding.logsChevron, initiallyExpanded = false)
 
         // 实验性 WiFi 热点传输：无路由器 / 局域网时的点对点同步
         binding.btnWifiTransfer.setOnClickListener {
@@ -85,7 +68,6 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
         }
 
         setupSettingsControls()
-        setupLogsControls()
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -180,50 +162,6 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
         )
     }
 
-    // ==================== 报表面板 ====================
-
-    private fun setupLogsControls() {
-        binding.cfgRefreshInterval.doAfterTextChanged { s ->
-            if (binding.cfgRefreshInterval.isFocused) {
-                s?.toString()?.toIntOrNull()?.let { viewModel.setRefreshSeconds(it) }
-            }
-        }
-
-        bindDropdown(binding.cfgPageSize, pageSizeValues.map { it.toString() }, 1) { index ->
-            viewModel.setPageSize(pageSizeValues[index])
-        }
-        bindDropdown(binding.cfgFilterDirection, directionOptions.map { it.second }, 0) { index ->
-            viewModel.setFilterDirection(directionOptions[index].first)
-        }
-        bindDropdown(binding.cfgFilterEventType, eventTypeOptions.map { it.second }, 0) { index ->
-            viewModel.setFilterEventType(eventTypeOptions[index].first)
-        }
-        bindDropdown(binding.cfgFilterProtocol, protocolOptions.map { it.second }, 0) { index ->
-            viewModel.setFilterProtocol(protocolOptions[index].first)
-        }
-
-        binding.btnRefreshLogs.setOnClickListener { viewModel.refreshNow() }
-        binding.btnClearLogs.setOnClickListener {
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle("清空报文日志")
-                .setMessage("确定要清空所有报文日志吗？\n此操作仅清除「显示报文」里的调试记录，不影响设备与配对信息。")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("确定清空") { _, _ -> viewModel.clearLogs() }
-                .show()
-        }
-    }
-
-    private fun bindDropdown(field: AutoCompleteTextView, labels: List<String>, initialIndex: Int, onPick: (Int) -> Unit) {
-        field.setAdapter(ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, labels))
-        field.setText(labels[initialIndex.coerceIn(0, labels.size - 1)], false)
-        field.setOnItemClickListener { _, _, position, _ -> onPick(position) }
-    }
-
-    private fun syncDropdown(field: AutoCompleteTextView, options: List<Pair<String, String>>, value: String) {
-        val label = options.firstOrNull { it.first == value }?.second ?: return
-        if (field.text.toString() != label) field.setText(label, false)
-    }
-
     // ==================== 渲染 ====================
 
     private fun render(s: SyncUiState) {
@@ -234,7 +172,6 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
 
         renderDevices(s)
         renderSettings(s)
-        renderLogs(s)
         binding.btnSaveConfig.isEnabled = !s.savingConfig
     }
 
@@ -288,112 +225,6 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
             binding.cfgSelfAlias.setText(cfg.selfAlias)
         }
     }
-
-    private fun renderLogs(s: SyncUiState) {
-        if (!binding.cfgRefreshInterval.isFocused) {
-            val current = binding.cfgRefreshInterval.text.toString()
-            if (current != s.refreshSeconds.toString()) {
-                binding.cfgRefreshInterval.setText(s.refreshSeconds.toString())
-            }
-        }
-        val pageSizeIndex = pageSizeValues.indexOf(s.pageSize).coerceAtLeast(0)
-        val pageSizeLabel = pageSizeValues[pageSizeIndex].toString()
-        if (binding.cfgPageSize.text.toString() != pageSizeLabel) {
-            binding.cfgPageSize.setText(pageSizeLabel, false)
-        }
-        syncDropdown(binding.cfgFilterDirection, directionOptions, s.filterDirection)
-        syncDropdown(binding.cfgFilterEventType, eventTypeOptions, s.filterEventType)
-        syncDropdown(binding.cfgFilterProtocol, protocolOptions, s.filterProtocol)
-
-        if (s.logError != null) {
-            binding.logError.visibility = View.VISIBLE
-            binding.logError.text = "报文加载失败：${s.logError}"
-        } else {
-            binding.logError.visibility = View.GONE
-        }
-
-        if (s.logs.isEmpty()) {
-            binding.logsScroll.visibility = View.GONE
-            binding.logsEmpty.visibility = View.VISIBLE
-            val running = s.status?.discoveryRunning == true
-            binding.logsEmpty.text = if (running) {
-                "暂无报文记录（发现、配对、同步完成后会在这里显示）"
-            } else {
-                "局域网同步未开启 — 请在上方「设置」中开启并保存后，广播报文将在此显示"
-            }
-            binding.logsEmpty.setTextColor(
-                ContextCompat.getColor(
-                    requireContext(),
-                    if (running) R.color.inbox_sub else R.color.sync_warning
-                )
-            )
-        } else {
-            binding.logsEmpty.visibility = View.GONE
-            binding.logsScroll.visibility = View.VISIBLE
-            rebuildLogsTable(s.logs)
-        }
-    }
-
-    private fun rebuildLogsTable(logs: List<SyncLogEntry>) {
-        val table = binding.logsTable
-        table.removeAllViews()
-
-        val header = TableRow(requireContext())
-        for (title in listOf("时间", "方向", "协议", "对端", "阶段", "状态", "消息", "大小")) {
-            header.addView(tableCell(title, header = true))
-        }
-        table.addView(header)
-
-        for (log in logs) {
-            val row = TableRow(requireContext())
-            row.addView(tableCell(SyncFormatters.formatTime(log.timestamp)))
-            row.addView(tableCell(SyncFormatters.directionLabel(log.direction)))
-            row.addView(tableCell(SyncFormatters.protocolLabel(log.protocol)))
-            row.addView(tableCell(if (!log.peerId.isNullOrEmpty()) log.peerId else "-"))
-            row.addView(tableCell(SyncFormatters.eventLabel(log.eventType)))
-            row.addView(statusCell(log.status))
-            row.addView(tableCell(if (!log.message.isNullOrEmpty()) log.message else "-", maxWidthDp = 260))
-            row.addView(tableCell(SyncFormatters.humanSize(log.dataSize)))
-            table.addView(row)
-        }
-    }
-
-    private fun tableCell(text: String, header: Boolean = false, maxWidthDp: Int? = null): TextView {
-        val ctx = requireContext()
-        return TextView(ctx).apply {
-            this.text = text
-            textSize = 12.5f
-            setTypeface(typeface, if (header) Typeface.BOLD else Typeface.NORMAL)
-            setTextColor(ContextCompat.getColor(ctx, R.color.inbox_text))
-            setPadding(dp(7), dp(8), dp(7), dp(8))
-            maxWidthDp?.let { maxWidth = dp(it) }
-            ellipsize = TextUtils.TruncateAt.END
-            maxLines = 2
-        }
-    }
-
-    private fun statusCell(status: String): TextView {
-        val ctx = requireContext()
-        val color = when (status) {
-            "success" -> ContextCompat.getColor(ctx, R.color.sync_success)
-            "failed" -> ContextCompat.getColor(ctx, R.color.sync_danger)
-            else -> ContextCompat.getColor(ctx, R.color.inbox_sub)
-        }
-        return TextView(ctx).apply {
-            text = status
-            textSize = 11.5f
-            setTextColor(color)
-            setBackgroundResource(R.drawable.sync_rounded_4)
-            backgroundTintList = ColorStateList.valueOf((color and 0x00FFFFFF) or 0x33000000)
-            setPadding(dp(6), dp(2), dp(6), dp(2))
-            val params = TableRow.LayoutParams()
-            params.setMargins(0, dp(4), 0, dp(4))
-            layoutParams = params
-        }
-    }
-
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
 
     // ==================== SyncRowsAdapter.Actions ====================
 

@@ -82,7 +82,18 @@ data class SyncLogEntry(
     // success / failed / running
     @SerializedName("status") val status: String = "",
     @SerializedName("message") val message: String? = null,
-    @SerializedName("data_size") val dataSize: Long? = null
+    @SerializedName("data_size") val dataSize: Long? = null,
+    // P1 起：逐条传输明细（可为 null 表示老数据无明细）
+    @SerializedName("details") val details: List<SyncTransferRecord>? = null
+)
+
+/// 一条传输明细：某次同步中单条记录的操作结果。
+data class SyncTransferRecord(
+    @SerializedName("kind") val kind: String = "",
+    @SerializedName("logical_key") val logicalKey: String = "",
+    @SerializedName("title") val title: String = "",
+    @SerializedName("action") val action: String = "",
+    @SerializedName("reason") val reason: String? = null
 )
 
 data class LogPage(
