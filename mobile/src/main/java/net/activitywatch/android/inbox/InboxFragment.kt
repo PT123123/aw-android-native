@@ -79,6 +79,7 @@ class InboxFragment : Fragment() {
             onGesture = { note, gesture, anchor -> performGesture(note, gesture, anchor) },
             onOverflowClick = { note, anchor -> showItemMenu(note, anchor) },
             onParentClick = { note -> openParent(note) },
+            onTagClick = { tag -> toggleTagFilter(tag) },
         )
         adapter.onSelectionChanged = { count ->
             updateSelectionTitle(count)
@@ -99,6 +100,7 @@ class InboxFragment : Fragment() {
 
         binding.swipe.setOnRefreshListener { loadInitial() }
         binding.fab.setOnClickListener { showQuickNoteDialog() }
+        binding.filterClear.setOnClickListener { toggleTagFilter(currentTag) }
 
         binding.searchInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
@@ -130,6 +132,10 @@ class InboxFragment : Fragment() {
         ) { _, _ -> loadInitial() }
 
         loadInitial()
+        // 设置项：进入页面即弹出输入框（等首帧渲染完再弹，避免 BottomSheet 抢焦点失败）
+        if (InboxPrefs.autoInputOnStart(requireContext())) {
+            view.post { if (isAdded) showQuickNoteDialog() }
+        }
     }
 
     override fun onDestroyView() {
@@ -273,6 +279,24 @@ class InboxFragment : Fragment() {
         val q = binding.searchInput.text?.toString()?.trim()
         searchQuery = if (q.isNullOrEmpty()) null else q
         loadInitial()
+    }
+
+    /** 点正文里的 #标签筛选；再点同一标签（或点 ✕）取消筛选 */
+    private fun toggleTagFilter(tag: String?) {
+        if (tag.isNullOrEmpty()) return
+        currentTag = if (currentTag == tag) null else tag
+        updateFilterBar()
+        loadInitial()
+    }
+
+    private fun updateFilterBar() {
+        val tag = currentTag
+        if (tag == null) {
+            binding.filterBar.visibility = View.GONE
+        } else {
+            binding.filterBar.visibility = View.VISIBLE
+            binding.filterText.text = "仅显示 #$tag"
+        }
     }
 
     private fun loadInitial() {

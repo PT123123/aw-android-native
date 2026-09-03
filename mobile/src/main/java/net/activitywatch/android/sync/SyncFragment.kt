@@ -52,6 +52,16 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
                 ?.openDrawer(GravityCompat.START)
         }
 
+        // 标题栏刷新 = 立即同步：对全部已配对设备触发一次同步
+        binding.toolbar.setOnMenuItemClickListener {
+            if (it.itemId == R.id.action_sync_now) {
+                viewModel.syncAllPaired()
+                true
+            } else {
+                false
+            }
+        }
+
         rowsAdapter = SyncRowsAdapter(this)
         binding.devicesList.layoutManager = LinearLayoutManager(requireContext())
         binding.devicesList.adapter = rowsAdapter
@@ -231,8 +241,6 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
     override fun onInitiatePair(device: Device) = viewModel.initiatePair(device.id)
 
     override fun onAcceptPair(device: Device) = viewModel.acceptPair(device.id)
-
-    override fun onSync(device: Device) = viewModel.syncDevice(device.id)
 
     override fun onRemove(device: Device) {
         MaterialAlertDialogBuilder(requireContext())
