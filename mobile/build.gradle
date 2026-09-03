@@ -87,7 +87,7 @@ android {
 // 注意：这个定义放在了 android { ... } 块外面，这是有效的 Gradle 语法
 def mandatorySoFiles = [
     "arm64-v8a/libaw_server.so",  // 主流 64 位设备（必选）
-    "armeabi-v7a/libaw_server.so" // 兼容 32 位设备（可选，可删除）
+    // "armeabi-v7a/libaw_server.so" // 兼容 32 位设备（可选，可删除）
 ]
 task checkRequiredSoFiles { // Removed (type: Check), defaults to DefaultTask
     description = "🔍 检查必需的 SO 文件是否存在"
