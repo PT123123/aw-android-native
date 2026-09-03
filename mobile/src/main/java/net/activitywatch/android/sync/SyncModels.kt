@@ -131,6 +131,31 @@ data class SyncResult(
 
 data class ConflictsResponse(@SerializedName("conflicts") val conflicts: List<ConflictSummary> = emptyList())
 
+data class TrashEntry(
+    @SerializedName("id") val id: Long = 0,
+    @SerializedName("kind") val kind: String = "",
+    @SerializedName("logical_key") val logicalKey: String = "",
+    @SerializedName("archived") val archived: String = "",
+    @SerializedName("winner_rev") val winnerRev: String? = null,
+    @SerializedName("reason") val reason: String = "",
+    @SerializedName("source_device") val sourceDevice: String? = null,
+    @SerializedName("archived_at") val archivedAt: String = "",
+    @SerializedName("restored") val restored: Boolean = false
+)
+
+data class TrashResponse(
+    @SerializedName("trash") val trash: List<TrashEntry> = emptyList(),
+    @SerializedName("count") val count: Int = 0
+)
+
+// 回收站操作结果：restored / deleted / cleared / id
+data class TrashOpResult(
+    @SerializedName("restored") val restored: Boolean? = null,
+    @SerializedName("deleted") val deleted: Boolean? = null,
+    @SerializedName("cleared") val cleared: Int? = null,
+    @SerializedName("id") val id: Long? = null
+)
+
 // 宽松承载各操作端点的返回（cleared / deleted / updated / saved / id 等）
 data class OpResult(
     @SerializedName("cleared") val cleared: Int? = null,
