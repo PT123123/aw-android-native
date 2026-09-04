@@ -270,25 +270,11 @@ class MainActivity : AppCompatActivity() {
                 FocusRecordsFragment::class.java
             ),
             NavRow(
-                R.id.nav_focus_timeline,
+                R.id.nav_focus_analytics,
                 ContextCompat.getDrawable(this, R.drawable.ic_focus_timeline)!!,
-                "专注时间线",
+                "专注分析",
                 FocusAnalyticsFragment::class.java,
                 focusArgs(FocusAnalyticsFragment.MODE_TIMELINE)
-            ),
-            NavRow(
-                R.id.nav_focus_heatmap,
-                ContextCompat.getDrawable(this, R.drawable.ic_focus_heatmap)!!,
-                "热力图",
-                FocusAnalyticsFragment::class.java,
-                focusArgs(FocusAnalyticsFragment.MODE_HEATMAP)
-            ),
-            NavRow(
-                R.id.nav_focus_best,
-                ContextCompat.getDrawable(this, R.drawable.ic_focus_best)!!,
-                "最佳专注时间",
-                FocusAnalyticsFragment::class.java,
-                focusArgs(FocusAnalyticsFragment.MODE_BEST)
             ),
             NavRow(
                 R.id.nav_focus_calendar,
