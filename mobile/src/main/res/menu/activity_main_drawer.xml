@@ -81,6 +81,10 @@
                         android:id="@+id/nav_s3"
                         android:icon="@drawable/ic_cloud_s3"
                         android:title="S3（实验性）"/>
+                <item
+                        android:id="@+id/nav_d1"
+                        android:icon="@drawable/ic_cloud_d1"
+                        android:title="CF同步设置 (D1)"/>
             </group>
         </menu>
     </item>

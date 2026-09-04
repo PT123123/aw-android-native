@@ -17,7 +17,13 @@ data class SyncConfig(
     @SerializedName("sync_activity") val syncActivity: Boolean = true,
     @SerializedName("sync_todo") val syncTodo: Boolean = true,
     @SerializedName("self_alias") val selfAlias: String = "",
-    @SerializedName("probe_interval") val probeInterval: Int = 10
+    @SerializedName("probe_interval") val probeInterval: Int = 10,
+    // Cloudflare D1 云同步
+    @SerializedName("d1_enabled") val d1Enabled: Boolean = false,
+    @SerializedName("d1_account_id") val d1AccountId: String = "",
+    @SerializedName("d1_database_id") val d1DatabaseId: String = "",
+    @SerializedName("d1_api_token") val d1ApiToken: String = "",
+    @SerializedName("d1_sync_interval") val d1SyncInterval: Long = 300
 )
 
 data class Device(
@@ -174,6 +180,32 @@ data class OpResult(
     @SerializedName("updated") val updated: Boolean? = null,
     @SerializedName("saved") val saved: Boolean? = null,
     @SerializedName("id") val id: String? = null
+)
+
+// ---- Cloudflare D1 云同步 ----
+
+/** D1 同步状态响应 */
+data class D1Status(
+    @SerializedName("enabled") val enabled: Boolean = false,
+    @SerializedName("configured") val configured: Boolean = false,
+    @SerializedName("last_sync") val lastSync: String? = null
+)
+
+/** D1 同步结果 */
+data class D1SyncResult(
+    @SerializedName("ok") val ok: Boolean = false,
+    @SerializedName("pushed_notes") val pushedNotes: Int = 0,
+    @SerializedName("pushed_todos") val pushedTodos: Int = 0,
+    @SerializedName("pulled_notes") val pulledNotes: Int = 0,
+    @SerializedName("pulled_todos") val pulledTodos: Int = 0,
+    @SerializedName("conflicts") val conflicts: Int = 0,
+    @SerializedName("errors") val errors: List<String> = emptyList()
+)
+
+/** D1 连接测试结果 */
+data class D1TestResult(
+    @SerializedName("ok") val ok: Boolean = false,
+    @SerializedName("message") val message: String = ""
 )
 
 fun parseEpochMilli(ts: String?): Long? {
