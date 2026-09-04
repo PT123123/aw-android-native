@@ -13,30 +13,19 @@
         android:gravity="bottom">
 
     <LinearLayout
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:layout_width="match_parent"
-            android:layout_height="50dp" android:gravity="bottom">
-        <ImageView
-                app:srcCompat="@mipmap/aw_launcher_foreground"
-                android:contentDescription="@string/nav_header_desc"
-                android:id="@+id/imageView" android:scaleX="1.5" android:scaleY="1.5"
-                android:layout_width="50dp" android:layout_height="50dp"
-                android:layout_marginRight="8dp"/>
-        <LinearLayout
-                android:orientation="vertical"
+            android:layout_height="wrap_content" android:gravity="bottom">
+        <TextView
                 android:layout_width="match_parent"
-                android:layout_height="match_parent" android:gravity="center_vertical">
-            <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/nav_header_title"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Body1"/>
-            <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/versionName"
-                    android:id="@+id/textView"/>
-        </LinearLayout>
+                android:layout_height="wrap_content"
+                android:text="@string/nav_header_title"
+                android:textAppearance="@style/TextAppearance.AppCompat.Body1"/>
+        <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/versionName"
+                android:id="@+id/textView"/>
     </LinearLayout>
 
 </LinearLayout>

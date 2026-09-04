@@ -76,5 +76,46 @@
             <meta-data android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!-- 图标版本 activity-alias（由 scripts/gen_icon_versions.py 生成）-->
+        <activity-alias
+            android:name="net.activitywatch.android.IconAlias_version_01"
+            android:targetActivity=".MainActivity"
+            android:enabled="true"
+            android:icon="@mipmap/aw_launcher_version_01"
+            android:roundIcon="@mipmap/aw_launcher_round_version_01"
+            android:label="@string/app_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="net.activitywatch.android.IconAlias_version_02"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:icon="@mipmap/aw_launcher_version_02"
+            android:roundIcon="@mipmap/aw_launcher_round_version_02"
+            android:label="@string/app_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="net.activitywatch.android.IconAlias_version_03"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:icon="@mipmap/aw_launcher_version_03"
+            android:roundIcon="@mipmap/aw_launcher_round_version_03"
+            android:label="@string/app_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

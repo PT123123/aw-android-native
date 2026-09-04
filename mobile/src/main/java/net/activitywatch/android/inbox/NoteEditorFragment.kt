@@ -128,10 +128,15 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
         val payload = UpsertNotePayload(content = content, tags = tags)
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                if (note == null) {
+                val saved = if (note == null) {
                     LocalInboxApi.service.createNote(payload)
                 } else {
                     LocalInboxApi.service.updateNote(note!!.id, payload)
+                }
+                // 通知 InboxFragment 刷新并跳转到该笔记
+                val inbox = parentFragmentManager.findFragmentById(R.id.fragment_container)
+                if (inbox is InboxFragment) {
+                    inbox.refreshAndScrollToNote(saved.id)
                 }
                 dismiss()
             } catch (e: Exception) {
