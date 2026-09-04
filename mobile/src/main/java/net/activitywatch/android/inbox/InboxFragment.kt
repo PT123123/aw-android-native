@@ -138,6 +138,42 @@ class InboxFragment : Fragment() {
         }
     }
 
+    /**
+     * 保存/编辑笔记后调用：刷新列表并滚动到指定笔记。
+     * @param noteId 要定位的笔记 ID（新建/刚编辑的）
+     */
+    fun refreshAndScrollToNote(noteId: Long) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                // 重新加载第一页
+                val list = LocalInboxApi.service.getNotes(limit = limit, offset = 0, tag = currentTag, search = searchQuery)
+                val sorted = if (sortByUpdated) {
+                    list.sortedByDescending {
+                        InboxAdapter.parseTime(it.updated_at ?: it.created_at)?.time ?: 0L
+                    }
+                } else {
+                    list
+                }
+                items.clear()
+                queriedRelations.clear()
+                resolvedParent.clear()
+                items.addAll(sorted)
+                adapter.pinnedIds = PinStore.pinnedIdsSet(requireContext())
+                sortItems()
+                hydrateRelations()
+
+                // 滚动到目标笔记
+                val idx = items.indexOfFirst { it.id == noteId }
+                if (idx >= 0) {
+                    (binding.list.layoutManager as LinearLayoutManager)
+                        .scrollToPositionWithOffset(idx, 0)
+                }
+            } catch (e: Exception) {
+                // 刷新失败不阻塞用户操作
+            }
+        }
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
