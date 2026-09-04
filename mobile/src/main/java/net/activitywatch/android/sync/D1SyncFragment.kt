@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.appcompat.app.AlertDialog
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
@@ -44,8 +45,12 @@ class D1SyncFragment : Fragment() {
                 ?.openDrawer(GravityCompat.START)
         }
 
-        // 加载当前配置
-        loadConfig()
+        // 优先从保存的状态恢复（用户未保存的输入），否则从服务器加载
+        if (savedInstanceState != null) {
+            restoreFromState(savedInstanceState)
+        } else {
+            loadConfig()
+        }
 
         // 按钮事件
         binding.btnTestConnection.setOnClickListener { testConnection() }
@@ -57,6 +62,28 @@ class D1SyncFragment : Fragment() {
         super.onResume()
         // 每次回到页面刷新状态
         refreshStatus()
+    }
+
+    /**
+     * 视图销毁时把当前字段值保存到实例状态 Bundle（内存），
+     * 这样导航离开 / 配置变更 / 进程被杀后重建时，用户未保存的输入不会丢失。
+     */
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(KEY_ACCOUNT_ID, binding.inputAccountId.text?.toString()?.trim() ?: "")
+        outState.putString(KEY_DATABASE_ID, binding.inputDatabaseId.text?.toString()?.trim() ?: "")
+        outState.putString(KEY_API_TOKEN, binding.inputApiToken.text?.toString()?.trim() ?: "")
+        outState.putString(KEY_SYNC_INTERVAL, binding.inputSyncInterval.text?.toString()?.trim() ?: "")
+        outState.putBoolean(KEY_D1_ENABLED, binding.switchD1Enabled.isChecked)
+    }
+
+    /** 从保存的状态恢复字段（用户未保存的输入优先于服务器配置） */
+    private fun restoreFromState(state: Bundle) {
+        binding.switchD1Enabled.isChecked = state.getBoolean(KEY_D1_ENABLED, false)
+        binding.inputAccountId.setText(state.getString(KEY_ACCOUNT_ID, ""))
+        binding.inputDatabaseId.setText(state.getString(KEY_DATABASE_ID, ""))
+        binding.inputApiToken.setText(state.getString(KEY_API_TOKEN, ""))
+        binding.inputSyncInterval.setText(state.getString(KEY_SYNC_INTERVAL, "300"))
     }
 
     private fun loadConfig() {
@@ -99,15 +126,31 @@ class D1SyncFragment : Fragment() {
         binding.btnTestConnection.text = "测试中..."
 
         lifecycleScope.launch {
-            repo.call { repo.api.d1Test() }.fold(
-                onSuccess = {
-                    if (it.ok) {
-                        showMsg("✅ D1 连接成功")
-                    } else {
-                        showError("连接失败: ${it.message}")
-                    }
+            val result = try {
+                val resp = repo.api.d1Test()
+                if (resp.ok) {
+                    Result.success("✅ D1 连接成功\n\nAccount: ${binding.inputAccountId.text}\nDatabase: ${binding.inputDatabaseId.text}")
+                } else {
+                    Result.success("❌ 连接失败\n\n${resp.message}")
+                }
+            } catch (e: Exception) {
+                Result.success("❌ 请求异常\n\n${e.message ?: e.toString()}")
+            }
+            result.fold(
+                onSuccess = { msg ->
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("D1 连接测试")
+                        .setMessage(msg)
+                        .setPositiveButton("确定", null)
+                        .show()
                 },
-                onFailure = { showError("连接失败: ${it.message}") }
+                onFailure = {
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("D1 连接测试")
+                        .setMessage("❌ 请求失败\n\n${it.message ?: it.toString()}")
+                        .setPositiveButton("确定", null)
+                        .show()
+                }
             )
             binding.btnTestConnection.isEnabled = true
             binding.btnTestConnection.text = "测试连接"
@@ -209,5 +252,13 @@ class D1SyncFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+    companion object {
+        private const val KEY_ACCOUNT_ID = "d1_account_id"
+        private const val KEY_DATABASE_ID = "d1_database_id"
+        private const val KEY_API_TOKEN = "d1_api_token"
+        private const val KEY_SYNC_INTERVAL = "d1_sync_interval"
+        private const val KEY_D1_ENABLED = "d1_enabled"
     }
 }
