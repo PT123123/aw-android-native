@@ -34,6 +34,7 @@ import net.activitywatch.android.inbox.TrashFragment
 import net.activitywatch.android.sync.SyncFragment
 import net.activitywatch.android.sync.SyncDetailsFragment
 import net.activitywatch.android.sync.cloud.S3Fragment
+import net.activitywatch.android.sync.D1SyncFragment
 import net.activitywatch.android.sync.cloud.WebDavFragment
 import net.activitywatch.android.todo.TodoFragment
 import net.activitywatch.android.watcher.UsageStatsWatcher
@@ -346,6 +347,12 @@ class MainActivity : AppCompatActivity() {
                 ContextCompat.getDrawable(this, R.drawable.ic_cloud_s3)!!,
                 "S3（实验性）",
                 S3Fragment::class.java
+            ),
+            NavRow(
+                R.id.nav_d1,
+                ContextCompat.getDrawable(this, R.drawable.ic_cloud_d1)!!,
+                "CF同步设置 (D1)",
+                D1SyncFragment::class.java
             )
         ))
     )
