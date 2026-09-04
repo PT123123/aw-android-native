@@ -100,4 +100,18 @@ interface SyncApi {
     // Rust 侧调试日志（环形缓冲）增量拉取，after = 上次收到的最大 seq
     @GET("api/0/sync/debuglog")
     suspend fun getDebugLog(@Query("after") after: Int): List<DebugEntry>
+
+    // ---- Cloudflare D1 云同步 ----
+
+    /** 触发一次 D1 云同步 */
+    @POST("api/0/sync/d1/sync")
+    suspend fun d1SyncNow(): D1SyncResult
+
+    /** 获取 D1 同步状态 */
+    @GET("api/0/sync/d1/status")
+    suspend fun d1Status(): D1Status
+
+    /** 测试 D1 连接 */
+    @POST("api/0/sync/d1/test")
+    suspend fun d1Test(): D1TestResult
 }

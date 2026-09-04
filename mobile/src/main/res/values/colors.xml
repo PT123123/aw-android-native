@@ -42,6 +42,8 @@
     <color name="aw_success">#1E8E5A</color>
     <color name="aw_warning">#B47400</color>
     <color name="aw_danger">#C62828</color>
+    <color name="aw_error">#C62828</color>
+    <color name="aw_divider">#1F000000</color>
     <color name="aw_chip_bg">#E9EBEF</color>
     <color name="aw_chip_text">#1B1F24</color>
     <color name="aw_scrim">#1A000000</color>
