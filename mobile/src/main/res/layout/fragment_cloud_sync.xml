@@ -20,6 +20,16 @@
             app:navigationIconTint="@color/aw_text_primary"
             app:titleTextColor="@color/aw_text_primary" />
 
+        <!-- Tab 切换：WebDAV / S3 -->
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/aw_bg"
+            app:tabIndicatorColor="@color/aw_accent"
+            app:tabSelectedTextColor="@color/aw_text_primary"
+            app:tabTextColor="@color/aw_text_secondary" />
+
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -325,6 +335,71 @@
                             android:layout_marginTop="8dp"
                             android:text="⚠️ 恢复会用云端数据覆盖本机同名内容；Todo 恢复后需重启应用生效。备份/恢复均按对象整体覆盖，请确认文件名。"
                             android:textColor="@color/aw_warning"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 冷备设置 -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/AwCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="冷备设置"
+                            android:textColor="@color/aw_text_secondary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchAutoBackup"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="自动冷备"
+                            android:textColor="@color/aw_text_primary" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="定期将数据备份到云端，低频写入、低成本存储。"
+                            android:textColor="@color/aw_text_secondary"
+                            android:textSize="12sp" />
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:hint="备份间隔（小时，最小 1）"
+                            app:boxStrokeColor="@color/aw_accent"
+                            app:hintTextColor="@color/aw_accent">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/tetBackupInterval"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:text="24"
+                                android:textColor="@color/aw_text_primary" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <TextView
+                            android:id="@+id/tvLastBackup"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="上次备份：从未"
+                            android:textColor="@color/aw_text_secondary"
                             android:textSize="12sp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>

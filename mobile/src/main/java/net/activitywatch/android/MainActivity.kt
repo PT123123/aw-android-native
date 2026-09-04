@@ -32,6 +32,7 @@ import net.activitywatch.android.inbox.InboxPrefs
 import net.activitywatch.android.inbox.InboxSettingsFragment
 import net.activitywatch.android.inbox.TrashFragment
 import net.activitywatch.android.sync.SyncFragment
+import net.activitywatch.android.sync.SyncSettingsFragment
 import net.activitywatch.android.sync.SyncDetailsFragment
 import net.activitywatch.android.sync.cloud.S3Fragment
 import net.activitywatch.android.sync.D1SyncFragment
@@ -317,22 +318,10 @@ class MainActivity : AppCompatActivity() {
                 SyncFragment::class.java
             ),
             NavRow(
-                R.id.nav_sync_details,
-                ContextCompat.getDrawable(this, R.drawable.ic_menu_manage)!!,
-                "同步详情",
-                SyncDetailsFragment::class.java
-            ),
-            NavRow(
-                R.id.nav_webdav,
+                R.id.nav_cloud_backup,
                 ContextCompat.getDrawable(this, R.drawable.ic_cloud_webdav)!!,
-                "WebDAV（实验性）",
+                "云备份（冷备）",
                 WebDavFragment::class.java
-            ),
-            NavRow(
-                R.id.nav_s3,
-                ContextCompat.getDrawable(this, R.drawable.ic_cloud_s3)!!,
-                "S3（实验性）",
-                S3Fragment::class.java
             ),
             NavRow(
                 R.id.nav_d1,

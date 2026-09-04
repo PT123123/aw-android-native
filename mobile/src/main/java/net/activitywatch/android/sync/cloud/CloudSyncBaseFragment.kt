@@ -55,19 +55,21 @@ abstract class CloudSyncBaseFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        binding.toolbar.title = toolbarTitle
+        binding.toolbar.title = "云备份（冷备）"
         binding.toolbar.setNavigationOnClickListener {
-            requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
-                ?.openDrawer(GravityCompat.START)
+            parentFragmentManager.popBackStack()
         }
 
-        binding.sectionWebdav.visibility = if (isWebDav) View.VISIBLE else View.GONE
-        binding.sectionS3.visibility = if (isWebDav) View.GONE else View.VISIBLE
+        // Tab 切换
+        setupTabs()
 
         loadFields()
         binding.tetFileName.setText(
             prefs.getString("${prefPrefix}file", CloudBackup.DEFAULT_FILE_NAME)
         )
+
+        // 冷备设置
+        setupColdBackupSettings()
 
         binding.btnTest.setOnClickListener {
             runOp("测试连接") {
@@ -82,6 +84,7 @@ abstract class CloudSyncBaseFragment : Fragment() {
                 val name = fileName()
                 val data = CloudBackup.build(requireContext())
                 client.upload(name, data)
+                saveLastBackupTime()
                 "备份完成：$name（${data.length / 1024} KB），已上传到云端"
             }
         }
@@ -99,6 +102,63 @@ abstract class CloudSyncBaseFragment : Fragment() {
                 }
             }
         }
+    }
+
+    private fun setupTabs() {
+        val tabLayout = binding.tabLayout
+        tabLayout.addTab(tabLayout.newTab().setText("WebDAV"))
+        tabLayout.addTab(tabLayout.newTab().setText("S3"))
+
+        // 根据当前协议选中对应 Tab
+        tabLayout.getTabAt(if (isWebDav) 0 else 1)?.select()
+
+        tabLayout.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: com.google.android.material.tabs.TabLayout.Tab) {
+                val webdav = tab.position == 0
+                binding.sectionWebdav.visibility = if (webdav) View.VISIBLE else View.GONE
+                binding.sectionS3.visibility = if (webdav) View.GONE else View.VISIBLE
+            }
+            override fun onTabUnselected(tab: com.google.android.material.tabs.TabLayout.Tab) {}
+            override fun onTabReselected(tab: com.google.android.material.tabs.TabLayout.Tab) {}
+        })
+
+        // 初始显示
+        binding.sectionWebdav.visibility = if (isWebDav) View.VISIBLE else View.GONE
+        binding.sectionS3.visibility = if (isWebDav) View.GONE else View.VISIBLE
+    }
+
+    private fun setupColdBackupSettings() {
+        val switchAuto = binding.switchAutoBackup
+        val tetInterval = binding.tetBackupInterval
+        val tvLast = binding.tvLastBackup
+
+        // 加载保存的设置
+        switchAuto.isChecked = prefs.getBoolean("auto_backup", false)
+        tetInterval.setText(prefs.getInt("backup_interval_hours", 24).toString())
+        val lastBackup = prefs.getLong("last_backup_time", 0)
+        tvLast.text = if (lastBackup > 0) {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+            "上次备份：${sdf.format(java.util.Date(lastBackup))}"
+        } else {
+            "上次备份：从未"
+        }
+
+        // 保存设置
+        switchAuto.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean("auto_backup", checked).apply()
+        }
+        tetInterval.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                val hours = tetInterval.text?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 24
+                prefs.edit().putInt("backup_interval_hours", hours).apply()
+            }
+        }
+    }
+
+    private fun saveLastBackupTime() {
+        prefs.edit().putLong("last_backup_time", System.currentTimeMillis()).apply()
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+        binding.tvLastBackup.text = "上次备份：${sdf.format(java.util.Date())}"
     }
 
     protected fun fileName(): String {
