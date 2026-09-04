@@ -43,6 +43,14 @@ class InboxSettingsFragment : Fragment() {
 
         setupDrawerEdgeSlider()
         setupAutoInputSwitch()
+
+        // 应用图标设置
+        binding.rowIconSettings.setOnClickListener {
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, IconSettingsFragment())
+                .addToBackStack(null)
+                .commit()
+        }
     }
 
     /** 进入 Inbox 时是否直接弹出记录输入框 */
