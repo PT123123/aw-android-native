@@ -113,7 +113,23 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
     // ==================== 设置面板 ====================
 
     private fun setupSettingsControls() {
-        binding.btnSaveConfig.setOnClickListener { saveConfigFromInputs() }
+        // 总开关：开启/关闭局域网同步
+        binding.cfgEnabled.setOnCheckedChangeListener { _, checked ->
+            lifecycleScope.launch {
+                val current = try { viewModel.state.value.config } catch (_: Exception) { null }
+                val base = current ?: SyncConfig()
+                viewModel.saveConfig(base.copy(enabled = checked))
+            }
+        }
+
+        // 进入详细设置页
+        binding.btnSyncSettings.setOnClickListener {
+            requireActivity().supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, SyncSettingsFragment())
+                .addToBackStack(null)
+                .commit()
+        }
+
         binding.btnClearAll.setOnClickListener {
             MaterialAlertDialogBuilder(requireContext())
                 .setTitle("清空所有配对信息")
@@ -124,53 +140,7 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
         }
     }
 
-    private fun setupDiscoveryDropdown(current: String) {
-        val entries = mutableListOf(
-            "broadcast" to "广播 / mDNS + UDP（已实现）",
-            "poll" to "轮询遍历（待实现）"
-        )
-        // 服务端若返回未列出的方式（如 mdns），补一个条目避免下拉断言
-        if (entries.none { it.first == current }) entries.add(current to current)
-        discoveryMethod = current
-        val labels = entries.map { it.second }
-        binding.cfgDiscoveryMethod.setAdapter(
-            ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, labels)
-        )
-        val index = entries.indexOfFirst { it.first == current }.coerceAtLeast(0)
-        binding.cfgDiscoveryMethod.setText(labels[index], false)
-        binding.cfgDiscoveryMethod.setOnItemClickListener { _, _, position, _ ->
-            discoveryMethod = entries[position].first
-        }
-    }
-
-    private fun saveConfigFromInputs() {
-        val udp = binding.cfgUdpPort.text.toString().toIntOrNull()
-        if (udp == null || udp < 10000 || udp > 65535) {
-            binding.tilUdpPort.error = "端口需在 10000 ~ 65535 之间"
-            return
-        }
-        binding.tilUdpPort.error = null
-        val probe = binding.cfgProbeInterval.text.toString().toIntOrNull()
-        if (probe == null || probe < 2 || probe > 3600) {
-            binding.tilProbeInterval.error = "间隔需在 2 ~ 3600 秒之间"
-            return
-        }
-        binding.tilProbeInterval.error = null
-        viewModel.saveConfig(
-            SyncConfig(
-                enabled = binding.cfgEnabled.isChecked,
-                httpEnabled = binding.cfgHttp.isChecked,
-                discoveryMethod = discoveryMethod,
-                listenPort = viewModel.state.value.config?.listenPort ?: 5600,
-                udpPort = udp,
-                syncInbox = binding.cfgSyncInbox.isChecked,
-                syncActivity = binding.cfgSyncActivity.isChecked,
-                syncTodo = binding.cfgSyncTodo.isChecked,
-                selfAlias = binding.cfgSelfAlias.text.toString().trim(),
-                probeInterval = probe
-            )
-        )
-    }
+    // 详细设置已迁移至 SyncSettingsFragment
 
     // ==================== 渲染 ====================
 
@@ -182,7 +152,6 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
 
         renderDevices(s)
         renderSettings(s)
-        binding.btnSaveConfig.isEnabled = !s.savingConfig
     }
 
     private fun renderDevices(s: SyncUiState) {
@@ -224,15 +193,6 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
         if (!settingsHydrated) {
             settingsHydrated = true
             binding.cfgEnabled.isChecked = cfg.enabled
-            binding.cfgHttp.isChecked = cfg.httpEnabled
-            setupDiscoveryDropdown(cfg.discoveryMethod)
-            binding.cfgListenPort.setText(cfg.listenPort.toString())
-            binding.cfgUdpPort.setText(cfg.udpPort.toString())
-            binding.cfgProbeInterval.setText(cfg.probeInterval.toString())
-            binding.cfgSyncInbox.isChecked = cfg.syncInbox
-            binding.cfgSyncActivity.isChecked = cfg.syncActivity
-            binding.cfgSyncTodo.isChecked = cfg.syncTodo
-            binding.cfgSelfAlias.setText(cfg.selfAlias)
         }
     }
 

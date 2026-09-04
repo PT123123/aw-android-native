@@ -189,210 +189,22 @@
                                     android:text="开启局域网同步"
                                     android:textColor="@color/inbox_text" />
 
-                                <com.google.android.material.switchmaterial.SwitchMaterial
-                                    android:id="@+id/cfgHttp"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:text="使用 HTTP 同步"
-                                    android:textColor="@color/inbox_text" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="14dp"
-                                    android:layout_marginBottom="6dp"
-                                    android:text="设备发现方式"
-                                    android:textColor="@color/inbox_text"
-                                    android:textStyle="bold" />
-
-                                <com.google.android.material.textfield.TextInputLayout
-                                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content">
-
-                                    <AutoCompleteTextView
-                                        android:id="@+id/cfgDiscoveryMethod"
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:inputType="none"
-                                        android:textColor="@color/inbox_text"
-                                        android:textSize="14sp" />
-                                </com.google.android.material.textfield.TextInputLayout>
-
                                 <TextView
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:layout_marginTop="4dp"
-                                    android:text="已实现「广播 / mDNS+UDP」自动发现；「轮询遍历」功能待后续迭代。"
-                                    android:textColor="@color/inbox_sub"
-                                    android:textSize="12sp" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="14dp"
-                                    android:layout_marginBottom="6dp"
-                                    android:text="同步端口 (HTTP)"
-                                    android:textColor="@color/inbox_text"
-                                    android:textStyle="bold" />
-
-                                <com.google.android.material.textfield.TextInputLayout
-                                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content">
-
-                                    <com.google.android.material.textfield.TextInputEditText
-                                        android:id="@+id/cfgListenPort"
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:enabled="false"
-                                        android:inputType="number"
-                                        android:textColor="@color/inbox_sub"
-                                        android:textSize="14sp" />
-                                </com.google.android.material.textfield.TextInputLayout>
-
-                                <TextView
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="4dp"
-                                    android:text="设备间同步 HTTP 端口，与服务器端口一致（固定 5600）。"
-                                    android:textColor="@color/inbox_sub"
-                                    android:textSize="12sp" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="14dp"
-                                    android:layout_marginBottom="6dp"
-                                    android:text="UDP 发现端口"
-                                    android:textColor="@color/inbox_text"
-                                    android:textStyle="bold" />
-
-                                <com.google.android.material.textfield.TextInputLayout
-                                    android:id="@+id/tilUdpPort"
-                                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content">
-
-                                    <com.google.android.material.textfield.TextInputEditText
-                                        android:id="@+id/cfgUdpPort"
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:inputType="number"
-                                        android:textColor="@color/inbox_text"
-                                        android:textSize="14sp" />
-                                </com.google.android.material.textfield.TextInputLayout>
-
-                                <TextView
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="4dp"
-                                    android:text="广播 / mDNS+UDP 自动发现固定端口（默认 46000）。"
-                                    android:textColor="@color/inbox_sub"
-                                    android:textSize="12sp" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="14dp"
-                                    android:layout_marginBottom="6dp"
-                                    android:text="在线探测间隔 (秒)"
-                                    android:textColor="@color/inbox_text"
-                                    android:textStyle="bold" />
-
-                                <com.google.android.material.textfield.TextInputLayout
-                                    android:id="@+id/tilProbeInterval"
-                                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content">
-
-                                    <com.google.android.material.textfield.TextInputEditText
-                                        android:id="@+id/cfgProbeInterval"
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:inputType="number"
-                                        android:textColor="@color/inbox_text"
-                                        android:textSize="14sp" />
-                                </com.google.android.material.textfield.TextInputLayout>
-
-                                <TextView
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="4dp"
-                                    android:text="已配对设备定时间隔探测在线状态（默认 10s）。"
-                                    android:textColor="@color/inbox_sub"
-                                    android:textSize="12sp" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="14dp"
-                                    android:layout_marginBottom="6dp"
-                                    android:text="同步目标"
-                                    android:textColor="@color/inbox_text"
-                                    android:textStyle="bold" />
-
-                                <com.google.android.material.checkbox.MaterialCheckBox
-                                    android:id="@+id/cfgSyncInbox"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:text="Inbox 数据 (inbox.db)"
-                                    android:textColor="@color/inbox_text" />
-
-                                <com.google.android.material.checkbox.MaterialCheckBox
-                                    android:id="@+id/cfgSyncActivity"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:text="ActivityWatch 数据 (sqlite.db)"
-                                    android:textColor="@color/inbox_text" />
-
-                                <com.google.android.material.checkbox.MaterialCheckBox
-                                    android:id="@+id/cfgSyncTodo"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:text="Todo 数据 (todo.db)"
-                                    android:textColor="@color/inbox_text" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="14dp"
-                                    android:layout_marginBottom="6dp"
-                                    android:text="本机别名"
-                                    android:textColor="@color/inbox_text"
-                                    android:textStyle="bold" />
-
-                                <com.google.android.material.textfield.TextInputLayout
-                                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content">
-
-                                    <com.google.android.material.textfield.TextInputEditText
-                                        android:id="@+id/cfgSelfAlias"
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:hint="设置本机别名（为空则使用主机名）"
-                                        android:maxLength="20"
-                                        android:textColor="@color/inbox_text"
-                                        android:textColorHint="@color/inbox_sub"
-                                        android:textSize="14sp" />
-                                </com.google.android.material.textfield.TextInputLayout>
-
-                                <TextView
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginTop="4dp"
-                                    android:text="广播时显示在对方设备列表中。"
+                                    android:layout_marginTop="8dp"
+                                    android:text="同步 ActivityWatch 数据 (sqlite.db)。Inbox / TODO 请通过 CF D1 云端同步。"
                                     android:textColor="@color/inbox_sub"
                                     android:textSize="12sp" />
 
                                 <com.google.android.material.button.MaterialButton
-                                    android:id="@+id/btnSaveConfig"
+                                    android:id="@+id/btnSyncSettings"
+                                    style="@style/Widget.MaterialComponents.Button.TextButton"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_marginTop="12dp"
-                                    android:text="保存同步设置"
-                                    app:backgroundTint="@color/sync_link" />
+                                    android:layout_marginTop="8dp"
+                                    android:text="局域网同步详细设置"
+                                    android:textColor="@color/sync_link" />
 
                                 <View
                                     android:layout_width="match_parent"
