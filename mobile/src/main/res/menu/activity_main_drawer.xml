@@ -25,17 +25,9 @@
             android:icon="@drawable/ic_focus_records"
             android:title="专注记录" />
         <item
-            android:id="@+id/nav_focus_timeline"
+            android:id="@+id/nav_focus_analytics"
             android:icon="@drawable/ic_focus_timeline"
-            android:title="专注时间线" />
-        <item
-            android:id="@+id/nav_focus_heatmap"
-            android:icon="@drawable/ic_focus_heatmap"
-            android:title="热力图" />
-        <item
-            android:id="@+id/nav_focus_best"
-            android:icon="@drawable/ic_focus_best"
-            android:title="最佳专注时间" />
+            android:title="专注分析" />
         <item
             android:id="@+id/nav_focus_calendar"
             android:icon="@drawable/ic_focus_calendar"
