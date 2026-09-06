@@ -659,6 +659,8 @@ class InboxFragment : Fragment() {
         val input = android.widget.EditText(themedCtx).apply {
             hint = "记录点什么… 使用 #标签 标记"
             setMinLines(3)
+            // 按内容生长：3 行起步，最多 8 行，超出后输入框内部滚动
+            maxLines = 8
             gravity = Gravity.TOP or Gravity.START
             setPadding(dp(16), dp(12), dp(16), 0)
             setTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_text))
@@ -714,6 +716,14 @@ class InboxFragment : Fragment() {
             )
             addView(
                 input,
+                android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+            // 输入框按内容生长，剩余空间留白，把工具栏+发送行压到弹层底部
+            addView(
+                android.view.View(themedCtx),
                 android.widget.LinearLayout.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     0,
