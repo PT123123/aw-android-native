@@ -18,6 +18,9 @@ data class SyncConfig(
     @SerializedName("sync_todo") val syncTodo: Boolean = true,
     @SerializedName("self_alias") val selfAlias: String = "",
     @SerializedName("probe_interval") val probeInterval: Int = 10,
+    // 局域网自动同步（拉取）间隔（秒）。三档模式即该值的预设：狂暴 10 / 平和 300 / 静默 1800。
+    // Wi-Fi 连接时由 Rust 侧 spawn_auto_sync 按此间隔自动同步，离开 Wi-Fi 自动停。
+    @SerializedName("sync_interval") val syncInterval: Long = 10,
     // Cloudflare D1 云同步
     @SerializedName("d1_enabled") val d1Enabled: Boolean = false,
     @SerializedName("d1_account_id") val d1AccountId: String = "",

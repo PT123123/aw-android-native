@@ -20,7 +20,7 @@
             android:theme="@style/ThemeOverlay.MaterialComponents.Dark"
             app:title="同步详情"
             app:titleTextColor="@color/aw_text_primary"
-            app:navigationIcon="@drawable/ic_menu"
+            app:navigationIcon="@drawable/ic_back"
             app:navigationIconTint="@color/aw_text_primary" />
 
         <FrameLayout

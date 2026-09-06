@@ -355,14 +355,29 @@ class SyncViewModel : ViewModel() {
                     refreshStatus()
                     toast(
                         if (saved.enabled) {
-                            "同步设置已保存：局域网同步已开启，UDP 广播发现已启动（同网段设备将自动互相发现）"
+                            "同步设置已保存：Wi-Fi 连接期间按当前频率自动同步"
                         } else {
-                            "同步设置已保存（局域网同步处于关闭状态）"
+                            "同步设置已保存（当前不在 Wi-Fi，自动同步处于暂停状态）"
                         }
                     )
                 }
                 .onFailure { e -> toast("保存失败: ${e.message}") }
             _state.update { it.copy(savingConfig = false) }
+        }
+    }
+
+    // 进入局域网同步界面：开始发现广播（离开即停，不进界面绝不广播）
+    fun startDiscovery() {
+        viewModelScope.launch {
+            repo.call { api.startDiscovery() }
+                .onFailure { e -> Log.w(TAG, "启动发现广播失败: ${e.message}") }
+        }
+    }
+
+    fun stopDiscovery() {
+        viewModelScope.launch {
+            repo.call { api.stopDiscovery() }
+                .onFailure { e -> Log.w(TAG, "停止发现广播失败: ${e.message}") }
         }
     }
 

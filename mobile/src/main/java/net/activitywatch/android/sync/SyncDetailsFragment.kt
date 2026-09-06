@@ -62,8 +62,11 @@ class SyncDetailsFragment : Fragment() {
         viewModel = ViewModelProvider(requireActivity())[SyncViewModel::class.java]
 
         binding.toolbar.setNavigationOnClickListener {
-            requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
-                ?.openDrawer(GravityCompat.START)
+            // 从「局域网同步」页进入：返回上一页；无回退栈时（历史入口）退回打开抽屉
+            if (!parentFragmentManager.popBackStackImmediate()) {
+                requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
+                    ?.openDrawer(GravityCompat.START)
+            }
         }
 
         setupControls()
