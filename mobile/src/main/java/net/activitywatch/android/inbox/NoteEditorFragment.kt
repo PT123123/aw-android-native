@@ -76,11 +76,11 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
 
         if (note != null) {
             binding.editor.setText(note!!.content)
-            binding.toolbar.menu.add(Menu.NONE, MENU_HISTORY, Menu.NONE, "历史版本").apply {
-                setIcon(R.drawable.ic_history)
+            binding.toolbar.menu.add(Menu.NONE, MENU_HISTORY, Menu.NONE, "详细信息").apply {
+                setIcon(R.drawable.ic_info)
                 setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
                 setOnMenuItemClickListener {
-                    openHistory()
+                    openDetail()
                     true
                 }
             }
@@ -93,12 +93,12 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
         binding.mdBullet.setOnClickListener { MarkdownTextActions.toggleBullet(binding.editor) }
         binding.mdOrdered.setOnClickListener { MarkdownTextActions.toggleOrdered(binding.editor) }
 
-        // 历史面板恢复版本后，把恢复的内容回填到编辑框
+        // 详情面板恢复版本后，把恢复的内容回填到编辑框
         parentFragmentManager.setFragmentResultListener(
-            NoteHistoryFragment.RESULT_KEY, viewLifecycleOwner
+            NoteDetailFragment.RESULT_KEY, viewLifecycleOwner
         ) { _, bundle ->
-            if (bundle.getLong(NoteHistoryFragment.KEY_NOTE_ID) == note?.id) {
-                bundle.getString(NoteHistoryFragment.KEY_CONTENT)?.let {
+            if (bundle.getLong(NoteDetailFragment.KEY_NOTE_ID) == note?.id) {
+                bundle.getString(NoteDetailFragment.KEY_CONTENT)?.let {
                     binding.editor.setText(it)
                 }
             }
@@ -145,10 +145,10 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
         }
     }
 
-    private fun openHistory() {
+    private fun openDetail() {
         val n = note ?: return
-        NoteHistoryFragment.newInstance(n.id)
-            .show(parentFragmentManager, "note_history")
+        NoteDetailFragment.newInstance(n.id)
+            .show(parentFragmentManager, "note_detail")
     }
 
     companion object {

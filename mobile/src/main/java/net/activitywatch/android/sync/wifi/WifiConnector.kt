@@ -21,7 +21,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * 「传送方」连接对端热点：
+ * 「被传送方」（扫码方）连接对端热点：
  * - API 29+：WifiNetworkSpecifier + requestNetwork（系统弹窗确认后建立「仅本应用可见」
  *   的连接，不抢占系统默认网络，需持回调保持连接）；
  * - API 26~28：退回旧版 addNetwork / enableNetwork（该时代无限制，网络成为系统默认）。
@@ -32,13 +32,29 @@ object WifiConnector {
 
     class ConnectException(message: String) : Exception(message)
 
+    /** 部分 ROM 在 Wi-Fi 直连时要求「附近的设备」+「精确定位」二者齐备，缺一即抛 SecurityException。 */
+    internal const val MISSING_PERMISSION_MSG =
+        "缺少 Wi-Fi 权限：请在系统设置中为应用同时授予「附近的设备」和「精确定位」权限"
+
     private var activeCallback: ConnectivityManager.NetworkCallback? = null
 
     /**
      * 连接到二维码里的热点。[timeoutMs] 覆盖「等用户在系统弹窗里点确认」的时间。
      * WPA2 失败自动尝试一次 WPA3（部分机型本地热点默认 SAE）。
      */
-    suspend fun connect(context: Context, payload: QrPayload, timeoutMs: Long = 120_000): Network? {
+    suspend fun connect(context: Context, payload: QrPayload, timeoutMs: Long = 120_000): Network? =
+        try {
+            connectInternal(context, payload, timeoutMs)
+        } catch (e: SecurityException) {
+            // 权限缺失时系统同步抛 SecurityException，翻译成可读提示并保留原始报错便于诊断
+            throw ConnectException("$MISSING_PERMISSION_MSG（系统原始报错：${e.message}）")
+        }
+
+    private suspend fun connectInternal(
+        context: Context,
+        payload: QrPayload,
+        timeoutMs: Long
+    ): Network? {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             return withTimeout(timeoutMs) {
                 try {

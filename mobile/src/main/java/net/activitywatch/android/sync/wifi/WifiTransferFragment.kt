@@ -26,18 +26,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.FragmentWifiTransferBinding
 import net.activitywatch.android.sync.SyncApiClient
+import net.activitywatch.android.sync.SyncFormatters
 import net.activitywatch.android.sync.SyncSnapshot
 
 /**
  * WiFi 热点传输（实验性）：无需路由器 / 局域网的两台设备点对点同步。
  *
  * 流程：
- * - 被传送方：开启 Local-only Hotspot → 出示二维码（SSID / 密码 / 服务器地址）；
- * - 传送方：扫码 → WifiNetworkSpecifier 连接对端热点 →
+ * - 传送方（数据源）：开启 Local-only Hotspot → 出示二维码（SSID / 密码 / 服务器地址）；
+ * - 被传送方（接收方）：扫码 → WifiNetworkSpecifier 连接对端热点 →
  *   拉对端 /snapshot → 本机 /apply（合并入本机）→ 导出本机 /snapshot → 推对端 /push，
  *   双向都收敛到并集；合并 / 冲突处理复用局域网同步的服务端逻辑
  *   （inbox / activity 幂等 upsert，todo 按 updated_at 新者胜，本地优先保留）。
@@ -52,7 +52,7 @@ class WifiTransferFragment : Fragment() {
     private lateinit var hotspot: HotspotHelper
 
     private var transferJob: Job? = null
-    private var receiverJob: Job? = null
+    private var monitorJob: Job? = null
     private var lastIncomingMsg: String? = null
 
     // ==================== 结果契约 ====================
@@ -78,15 +78,15 @@ class WifiTransferFragment : Fragment() {
                 ?.openDrawer(GravityCompat.START)
         }
 
-        binding.btnRoleSender.setOnClickListener { launchScanner() }
-        binding.btnRoleReceiver.setOnClickListener { ensureLocationThenStartHotspot() }
+        binding.btnRoleSender.setOnClickListener { startHostFlow() }
+        binding.btnRoleReceiver.setOnClickListener { launchScanner() }
         binding.btnStop.setOnClickListener { reset() }
         binding.btnBack.setOnClickListener { reset() }
     }
 
     override fun onDestroyView() {
         transferJob?.cancel()
-        receiverJob?.cancel()
+        monitorJob?.cancel()
         hotspot.stop()
         WifiConnector.release(requireContext())
         _binding = null
@@ -97,53 +97,97 @@ class WifiTransferFragment : Fragment() {
 
     private fun showRoleChoice() {
         binding.sectionRole.visibility = View.VISIBLE
-        binding.sectionReceiver.visibility = View.GONE
-        binding.sectionSender.visibility = View.GONE
+        binding.sectionQr.visibility = View.GONE
+        binding.sectionTransfer.visibility = View.GONE
     }
 
     private fun reset() {
         transferJob?.cancel()
         transferJob = null
-        receiverJob?.cancel()
-        receiverJob = null
+        monitorJob?.cancel()
+        monitorJob = null
         hotspot.stop()
         WifiConnector.release(requireContext())
         lastIncomingMsg = null
         binding.tvLog.text = ""
-        binding.tvIncoming.text = "等待传送方扫码连接…"
+        binding.tvIncoming.text = "等待被传送方扫码连接…"
         binding.qrImage.visibility = View.GONE
         binding.qrProgress.visibility = View.VISIBLE
         showRoleChoice()
     }
 
-    // ==================== 被传送方（开热点 / 出码） ====================
+    // ==================== 运行时权限 ====================
 
-    private val locationLauncher =
+    // RequestPermission 一次只能申请一个权限且回调不带参数：用队列依次申请，
+    // 全部授予后经 pendingPermAction 继续被拦截的动作
+    private var pendingPermQueue: List<String> = emptyList()
+    private var pendingPermAction: (() -> Unit)? = null
+    private var lastRequestedPerm: String = ""
+
+    private val permLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
-                startHotspot()
+                requestNextPendingPermission()
             } else {
-                showErrorUi("未授予「精确位置」权限，系统不允许应用开启热点")
+                val denied = lastRequestedPerm
+                pendingPermQueue = emptyList()
+                pendingPermAction = null
+                showErrorUi("未授予「${permDisplayName(denied)}」权限，系统不允许开启 / 连接热点")
             }
         }
 
-    private fun ensureLocationThenStartHotspot() {
+    /**
+     * Wi-Fi 直连类 API 的统一权限门槛：Android 13+ 申请 NEARBY_WIFI_DEVICES +
+     * ACCESS_FINE_LOCATION（部分 ROM 的 WifiNetworkSpecifier 连接仍要求精确定位，
+     * 缺一会被系统拒绝），旧版本仅 ACCESS_FINE_LOCATION。开热点与扫码连接一致。
+     */
+    private fun ensureWifiPermission(action: () -> Unit) {
+        val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            listOf(Manifest.permission.NEARBY_WIFI_DEVICES, Manifest.permission.ACCESS_FINE_LOCATION)
+        } else {
+            listOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        val missing = perms.filter {
+            ContextCompat.checkSelfPermission(requireContext(), it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) {
+            action()
+        } else {
+            pendingPermQueue = missing
+            pendingPermAction = action
+            requestNextPendingPermission()
+        }
+    }
+
+    private fun requestNextPendingPermission() {
+        val next = pendingPermQueue.firstOrNull()
+        if (next == null) {
+            val action = pendingPermAction
+            pendingPermAction = null
+            action?.invoke()
+        } else {
+            pendingPermQueue = pendingPermQueue.drop(1)
+            lastRequestedPerm = next
+            permLauncher.launch(next)
+        }
+    }
+
+    private fun permDisplayName(perm: String): String =
+        if (perm == Manifest.permission.NEARBY_WIFI_DEVICES) "附近的设备" else "精确定位"
+
+    // ==================== 传送方（开热点 / 出码） ====================
+
+    private fun startHostFlow() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             showErrorUi("系统版本过低（需 Android 8.0+）")
             return
         }
-        if (!isLocationServiceOn()) {
+        // 旧版本系统开热点依赖精确定位 + 位置服务；13+ 凭「附近的设备」即可
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU && !isLocationServiceOn()) {
             showErrorUi("请先开启系统「位置服务」后再试（开启热点的前提条件）")
             return
         }
-        if (ContextCompat.checkSelfPermission(
-                requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            startHotspot()
-        } else {
-            locationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
+        ensureWifiPermission { startHotspot() }
     }
 
     private fun isLocationServiceOn(): Boolean {
@@ -160,9 +204,9 @@ class WifiTransferFragment : Fragment() {
 
     private fun startHotspot() {
         binding.sectionRole.visibility = View.GONE
-        binding.sectionSender.visibility = View.GONE
-        binding.sectionReceiver.visibility = View.VISIBLE
-        binding.tvReceiverTitle.text = "正在开启热点…"
+        binding.sectionTransfer.visibility = View.GONE
+        binding.sectionQr.visibility = View.VISIBLE
+        binding.tvQrTitle.text = "正在开启热点…"
         binding.qrImage.visibility = View.GONE
         binding.qrProgress.visibility = View.VISIBLE
 
@@ -188,10 +232,10 @@ class WifiTransferFragment : Fragment() {
                 throw e
             } catch (e: Exception) {
                 hotspot.stop()
-                binding.tvReceiverTitle.text = "热点开启失败"
+                binding.tvQrTitle.text = "热点开启失败"
                 binding.qrProgress.visibility = View.GONE
-                binding.tvReceiverInfo.text = e.message ?: e.javaClass.simpleName
-                binding.tvReceiverInfo.setTextColor(
+                binding.tvQrInfo.text = e.message ?: e.javaClass.simpleName
+                binding.tvQrInfo.setTextColor(
                     ContextCompat.getColor(requireContext(), R.color.aw_danger)
                 )
             }
@@ -200,31 +244,31 @@ class WifiTransferFragment : Fragment() {
 
     private fun showQr(payload: QrPayload, info: HotspotHelper.HotspotInfo) {
         if (_binding == null) return
-        binding.tvReceiverTitle.text = "等待传送方扫码…"
+        binding.tvQrTitle.text = "等待被传送方扫码…"
         val size = (300 * resources.displayMetrics.density).toInt().coerceAtMost(1080)
         val bmp = QrBitmaps.encode(payload.toJson(), size)
         binding.qrImage.setImageBitmap(bmp)
         binding.qrImage.visibility = View.VISIBLE
         binding.qrProgress.visibility = View.GONE
-        binding.tvReceiverInfo.setTextColor(
+        binding.tvQrInfo.setTextColor(
             ContextCompat.getColor(requireContext(), R.color.aw_text_secondary)
         )
-        binding.tvReceiverInfo.text =
-            "热点：${info.ssid}\n本机地址：${info.serverIp}:${payload.port}（ID: ${payload.id.ifEmpty { "-" }}）\n传送方扫码连接后数据将自动合并，请保持本页在前台"
+        binding.tvQrInfo.text =
+            "热点：${info.ssid}\n本机地址：${info.serverIp}:${payload.port}（ID: ${payload.id.ifEmpty { "-" }}）\n被传送方扫码连接后数据将自动合并，请保持本页在前台"
     }
 
     /** 轮询本机同步日志，展示收到的数据（复用局域网同步「显示报文」的数据源）。 */
     private fun startIncomingMonitor() {
-        receiverJob = viewLifecycleOwner.lifecycleScope.launch {
+        monitorJob = viewLifecycleOwner.lifecycleScope.launch {
+            var baselineSet = false
             while (isActive && _binding != null && hotspot.isRunning) {
                 try {
-                    val page = withContext(Dispatchers.IO) {
-                        localApi.getLogs(direction = "in", eventType = "sync", protocol = null, limit = 3, offset = 0)
-                    }
-                    val latest = page.logs.firstOrNull()?.let { log ->
-                        "✓ ${log.message ?: "收到同步数据"}（${net.activitywatch.android.sync.SyncFormatters.formatTime(log.timestamp)}）"
-                    }
-                    if (latest != null && latest != lastIncomingMsg && _binding != null) {
+                    val latest = fetchLatestIncomingLine()
+                    if (!baselineSet) {
+                        // 首次轮询只记录基线，避免把监视启动前的旧日志（如更早的局域网同步）当作本次收到
+                        lastIncomingMsg = latest
+                        baselineSet = true
+                    } else if (latest != null && latest != lastIncomingMsg && _binding != null) {
                         lastIncomingMsg = latest
                         binding.tvIncoming.text = latest
                         binding.tvIncoming.setTextColor(
@@ -239,34 +283,43 @@ class WifiTransferFragment : Fragment() {
         }
     }
 
-    // ==================== 传送方（扫码 / 连接 / 传输） ====================
+    private suspend fun fetchLatestIncomingLine(): String? =
+        withContext(Dispatchers.IO) {
+            localApi.getLogs(direction = "in", eventType = "sync", protocol = null, limit = 3, offset = 0)
+        }.logs.firstOrNull()?.let { log ->
+            "✓ ${log.message ?: "收到同步数据"}（${SyncFormatters.formatTime(log.timestamp)}）"
+        }
+
+    // ==================== 被传送方（扫码 / 连接 / 传输） ====================
 
     private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
         val contents = result.contents
         if (contents.isNullOrBlank()) return@registerForActivityResult
         val payload = QrPayload.fromJson(contents)
         if (payload == null) {
-            showErrorUi("二维码内容不是有效的 AW WiFi 传输码（需在被传送方的「WiFi 传输」页面生成）")
+            showErrorUi("二维码内容不是有效的 AW WiFi 传输码（需在传送方的「WiFi 传输」页面生成）")
             return@registerForActivityResult
         }
-        senderConnectAndTransfer(payload)
+        connectAndTransfer(payload)
     }
 
     private fun launchScanner() {
-        val options = ScanOptions().apply {
-            setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-            setPrompt("对准被传送方出示的二维码")
-            setBeepEnabled(false)
-            setOrientationLocked(true)
+        ensureWifiPermission {
+            val options = ScanOptions().apply {
+                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                setPrompt("对准传送方出示的二维码")
+                setBeepEnabled(false)
+                setOrientationLocked(true)
+            }
+            scanLauncher.launch(options)
         }
-        scanLauncher.launch(options)
     }
 
-    private fun senderConnectAndTransfer(payload: QrPayload) {
+    private fun connectAndTransfer(payload: QrPayload) {
         binding.sectionRole.visibility = View.GONE
-        binding.sectionReceiver.visibility = View.GONE
-        binding.sectionSender.visibility = View.VISIBLE
-        binding.tvSenderTitle.text = "连接中…"
+        binding.sectionQr.visibility = View.GONE
+        binding.sectionTransfer.visibility = View.VISIBLE
+        binding.tvTransferTitle.text = "连接中…"
         binding.senderProgress.visibility = View.VISIBLE
         binding.btnBack.visibility = View.GONE
         binding.tvLog.text = ""
@@ -281,11 +334,11 @@ class WifiTransferFragment : Fragment() {
                     WifiConnector.connect(requireContext(), payload)
                 }
                 log("已连接热点，开始传输…")
-                binding.tvSenderTitle.text = "传输中…"
+                binding.tvTransferTitle.text = "传输中…"
                 val result = withContext(Dispatchers.IO) { doTransfer(network, payload) }
                 WifiConnector.release(requireContext())
-                binding.tvSenderTitle.text = "传输完成"
-                binding.tvSenderTitle.setTextColor(
+                binding.tvTransferTitle.text = "传输完成"
+                binding.tvTransferTitle.setTextColor(
                     ContextCompat.getColor(requireContext(), R.color.aw_success)
                 )
                 log("✓ 已合并对端数据 ${result.appliedLocal} 条到本机")
@@ -297,8 +350,8 @@ class WifiTransferFragment : Fragment() {
                 throw e
             } catch (e: Exception) {
                 WifiConnector.release(requireContext())
-                binding.tvSenderTitle.text = "传输失败"
-                binding.tvSenderTitle.setTextColor(
+                binding.tvTransferTitle.text = "传输失败"
+                binding.tvTransferTitle.setTextColor(
                     ContextCompat.getColor(requireContext(), R.color.aw_danger)
                 )
                 log("✗ ${e.message ?: e.javaClass.simpleName}")
@@ -358,7 +411,7 @@ class WifiTransferFragment : Fragment() {
 
     // ==================== 工具 ====================
 
-    /** IO 线程安全的日志（追加到传送方进度区）。 */
+    /** IO 线程安全的日志（追加到扫码方进度区）。 */
     private fun log(msg: String) {
         val act = activity ?: return
         act.runOnUiThread {

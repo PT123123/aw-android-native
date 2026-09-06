@@ -245,6 +245,24 @@
                             android:text="立即同步"
                             android:textColor="@color/aw_text_primary" />
 
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnFullSync"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="全量同步（忽略 checkpoint）"
+                            android:textColor="@color/aw_text_primary" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnResetSync"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="重置同步状态"
+                            android:textColor="@color/aw_danger" />
+
                         <!-- 同步状态 -->
                         <LinearLayout
                             android:id="@+id/layoutSyncStatus"
@@ -266,11 +284,113 @@
                                 android:layout_height="wrap_content"
                                 android:textColor="@color/aw_text_secondary"
                                 android:textSize="13sp" />
-                        </LinearLayout>
+
+                        <!-- 同步详情日志入口 -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSyncDetails"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:minWidth="0dp"
+                            android:minHeight="0dp"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="4dp"
+                            android:text="查看同步详情 ▶"
+                            android:textColor="@color/aw_accent"
+                            android:textSize="13sp"
+                            android:visibility="gone" />
+
                     </LinearLayout>
+                </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
             </LinearLayout>
         </ScrollView>
     </LinearLayout>
+
+    <!-- 同步详情悬浮层（BottomSheet 替代：半屏覆盖） -->
+    <FrameLayout
+        android:id="@+id/layoutSyncDetails"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#88000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="bottom"
+            android:background="@color/aw_surface"
+            android:orientation="vertical">
+
+            <!-- 头部 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="12dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="同步详情"
+                    android:textColor="@color/aw_text_primary"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCloseDetails"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="关闭"
+                    android:textColor="@color/aw_text_secondary" />
+
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/aw_divider" />
+
+            <!-- 日志列表 -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvSyncLogs"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingBottom="16dp" />
+
+            <!-- 空状态 -->
+            <TextView
+                android:id="@+id/tvLogsEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:padding="32dp"
+                android:text="暂无同步记录"
+                android:textColor="@color/aw_text_secondary"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <!-- 加载更多 -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnLoadMoreLogs"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="加载更多"
+                android:textColor="@color/aw_accent"
+                android:visibility="gone" />
+
+        </LinearLayout>
+
+    </FrameLayout>
 </FrameLayout>
