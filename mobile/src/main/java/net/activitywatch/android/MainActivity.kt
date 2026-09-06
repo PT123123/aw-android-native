@@ -30,7 +30,6 @@ import net.activitywatch.android.focus.FocusTimerFragment
 import net.activitywatch.android.inbox.InboxFragment
 import net.activitywatch.android.inbox.InboxPrefs
 import net.activitywatch.android.inbox.InboxSettingsFragment
-import net.activitywatch.android.inbox.TrashFragment
 import net.activitywatch.android.sync.SyncFragment
 import net.activitywatch.android.sync.SyncSettingsFragment
 import net.activitywatch.android.sync.SyncDetailsFragment
@@ -51,9 +50,9 @@ private const val TAG = "MainActivity"
 
 /**
  * 抽屉导航的可折叠分组。
- * - Inbox：默认展开
- * - ActivityWatch（活动 / 秒表 / Query Explorer）：默认折叠
- * - 同步（Sync LAN / WebDAV / S3）：默认展开
+ * - Inbox（笔记 / To Do）：默认展开
+ * - 专注 / ActivityWatch / 同步：默认折叠
+ * - 抽屉最底部固定一行「笔记设置」，回收站入口在设置页内（见 InboxSettingsFragment）
  */
 private data class NavRow(
     val id: Int,
@@ -221,8 +220,31 @@ class MainActivity : AppCompatActivity() {
             navList.addView(header)
             navList.addView(children)
         }
+        // 抽屉最底部固定一行「笔记设置」（回收站入口在设置页内）
+        val settingsRow = buildRow(NavRow(
+            R.id.nav_inbox_settings,
+            ContextCompat.getDrawable(this, android.R.drawable.ic_menu_preferences)!!,
+            "笔记设置",
+            InboxSettingsFragment::class.java
+        ))
+        (settingsRow.container.layoutParams as LinearLayout.LayoutParams).topMargin = dp(8)
+        // 与分组标题对齐（组内行由 children 容器统一缩进，独立行需自行加内边距）
+        settingsRow.container.setPaddingRelative(dp(16), 0, dp(16), 0)
+        navList.addView(bottomDivider())
+        rowUIs.add(settingsRow)
+        navList.addView(settingsRow.container)
         // 初始页是 Inbox，高亮对应项
         selectRow(R.id.nav_inbox)
+    }
+
+    /** 底部固定入口与上方分组之间的分隔线 */
+    private fun bottomDivider(): View = View(this).apply {
+        layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(1)
+        ).apply {
+            setMargins(dp(16), dp(8), dp(16), 0)
+        }
+        setBackgroundColor(color(R.color.aw_divider))
     }
 
     private fun buildNavGroups(): List<NavGroup> = listOf(
@@ -230,34 +252,19 @@ class MainActivity : AppCompatActivity() {
             NavRow(
                 R.id.nav_inbox,
                 ContextCompat.getDrawable(this, android.R.drawable.ic_menu_edit)!!,
-                "Inbox",
+                "笔记",
                 InboxFragment::class.java
             ),
             NavRow(
-                R.id.nav_inbox_settings,
-                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_preferences)!!,
-                "Inbox 设置",
-                InboxSettingsFragment::class.java
-            ),
-            NavRow(
-                R.id.nav_trash,
-                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_delete)!!,
-                "回收站",
-                TrashFragment::class.java
-            )
-        )),
-        // 任务（契约 §5.1 左栏）：侧边栏仅保留收集箱入口，其余视图由页面内 chips 切换
-        NavGroup("任务", true, listOf(
-            NavRow(
                 R.id.nav_todo_inbox,
                 ContextCompat.getDrawable(this, android.R.drawable.ic_menu_agenda)!!,
-                "收集箱",
+                "To Do",
                 TodoFragment::class.java,
                 todoArgs("inbox")
             )
         )),
         // 专注模块（契约 §5.8）：8 个模块，记录详情由点记录弹窗承载
-        NavGroup("专注", true, listOf(
+        NavGroup("专注", false, listOf(
             NavRow(
                 R.id.nav_focus_timer,
                 ContextCompat.getDrawable(this, R.drawable.ic_focus_timer)!!,
@@ -310,7 +317,7 @@ class MainActivity : AppCompatActivity() {
                 QueryFragment::class.java
             )
         )),
-        NavGroup("同步", true, listOf(
+        NavGroup("同步", false, listOf(
             NavRow(
                 R.id.nav_sync,
                 ContextCompat.getDrawable(this, R.drawable.ic_menu_manage)!!,
