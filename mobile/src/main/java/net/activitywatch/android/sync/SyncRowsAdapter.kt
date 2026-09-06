@@ -101,7 +101,7 @@ class SyncRowsAdapter(private val actions: Actions) :
             text.text = if (row.running) {
                 "UDP 广播发现运行中，同网段设备将自动互相发现（UDP ${row.udpPort ?: "-"} / HTTP ${row.listenPort ?: "-"}）"
             } else {
-                "局域网同步未开启 —— 请先在下方「设置」中打开开关并保存"
+                "发现广播未运行 —— 停留在本页面即自动广播，离开自动停止"
             }
         }
     }
