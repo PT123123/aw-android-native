@@ -96,6 +96,15 @@ object MarkdownTextActions {
         editor.setSelection(selStart + marker.length, selEnd + marker.length)
     }
 
+    /** 在光标处插入字面文本（有选区则替换），光标移到插入内容之后。井号/斜杠键用：插入 # / 本身 */
+    fun insert(editor: EditText, text: String) {
+        val editable = editor.text
+        val selStart = editor.selectionStart.coerceAtLeast(0)
+        val selEnd = editor.selectionEnd.coerceAtLeast(selStart)
+        editable.replace(selStart, selEnd, text)
+        editor.setSelection(selStart + text.length)
+    }
+
     /** 对选区（或光标所在行）覆盖的所有行应用变换，一次性替换并保持选区合理 */
     private fun applyToLines(editor: EditText, transform: (List<String>) -> List<String>) {
         val text = editor.text.toString()
