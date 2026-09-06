@@ -26,12 +26,16 @@ import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.InboxFragmentBinding
 import net.activitywatch.android.sync.LanPull
+import net.activitywatch.android.todo.TodoApi
 
 class InboxFragment : Fragment() {
 
     companion object {
         /** 撤销浮条显示时长：3 秒 */
         private const val UNDO_DURATION_MS = 3000
+
+        /** savedInstanceState 里保存的当前标签筛选路径（配置变更/进程重建恢复；离开页面不持久化） */
+        private const val STATE_TAG = "inbox_current_tag"
     }
 
     private var _binding: InboxFragmentBinding? = null
@@ -53,6 +57,9 @@ class InboxFragment : Fragment() {
     private var searchQuery: String? = null
     private var sortByUpdated = false
     private var retryCount = 0
+
+    /** 层级标签树（GET /inbox/tags/tree），驱动标签 chips 行 */
+    private var tagTree: List<TagNodeResponse> = emptyList()
 
     /** 局域网拉取：笔记页每次刷新逻辑顺带触发一次，拉完重载列表让远端变更即刷即现 */
     private var lanPullJob: Job? = null
@@ -107,6 +114,8 @@ class InboxFragment : Fragment() {
         binding.swipe.setOnRefreshListener { loadInitial() }
         binding.fab.setOnClickListener { showQuickNoteDialog() }
         binding.filterClear.setOnClickListener { toggleTagFilter(currentTag) }
+        // 筛选条上的 ↑：回到上一级标签路径（项目/工作/xx → 项目/工作 → 项目 → 顶层）
+        binding.filterUp.setOnClickListener { applyTagFilterPath(tagParentPath(currentTag.orEmpty())) }
 
         binding.searchInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
@@ -145,11 +154,22 @@ class InboxFragment : Fragment() {
             }
         }
 
+        // 恢复标签筛选路径（仅限配置变更/进程重建；离开页面重新进入时从顶层开始）
+        savedInstanceState?.getString(STATE_TAG)?.takeIf { it.isNotBlank() }?.let {
+            currentTag = it
+            updateFilterBar()
+        }
+
         loadInitial()
         // 设置项：进入页面即弹出输入框（等首帧渲染完再弹，避免 BottomSheet 抢焦点失败）
         if (InboxPrefs.autoInputOnStart(requireContext())) {
             view.post { if (isAdded) showQuickNoteDialog() }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        currentTag?.let { outState.putString(STATE_TAG, it) }
     }
 
     /**
@@ -343,6 +363,18 @@ class InboxFragment : Fragment() {
         if (tag.isNullOrEmpty()) return
         currentTag = if (currentTag == tag) null else tag
         updateFilterBar()
+        renderTagChips()
+        loadInitial()
+    }
+
+    /**
+     * 直接进入某标签路径（null = 顶层）的筛选，不做切换。
+     * 供筛选条 ↑（返回上级）、标签 chips、详情页标签面包屑跳转共用。
+     */
+    fun applyTagFilterPath(tag: String?) {
+        currentTag = tag?.takeIf { it.isNotBlank() }
+        updateFilterBar()
+        renderTagChips()
         loadInitial()
     }
 
@@ -352,13 +384,68 @@ class InboxFragment : Fragment() {
             binding.filterBar.visibility = View.GONE
         } else {
             binding.filterBar.visibility = View.VISIBLE
-            binding.filterText.text = "仅显示 #$tag"
+            // 层级 tag 用面包屑展示：项目/工作 → 项目 / 工作
+            binding.filterText.text = "仅显示 #${formatTagBreadcrumb(tag)}"
+            binding.filterUp.visibility =
+                if (tagParentPath(tag) != null) View.VISIBLE else View.GONE
+        }
+    }
+
+    // ==== 层级标签 chips 行 ====
+
+    /** 拉取标签树并刷新 chips（失败静默：不影响列表，chips 维持上次内容） */
+    private fun loadTagTree() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            runCatching { LocalInboxApi.service.getTagTree() }.onSuccess { tree ->
+                tagTree = tree.tags
+                renderTagChips()
+            }
+        }
+    }
+
+    private fun treeNodeFor(path: String, nodes: List<TagNodeResponse> = tagTree): TagNodeResponse? {
+        for (node in nodes) {
+            if (node.path == path) return node
+            treeNodeFor(path, node.children)?.let { return it }
+        }
+        return null
+    }
+
+    /** chips 行：未筛选时展示顶层标签，筛选中展示当前路径的直接子标签；点击进入该路径筛选 */
+    private fun renderTagChips() {
+        val nodes = currentTag?.let { p -> treeNodeFor(p)?.children.orEmpty() } ?: tagTree
+        if (nodes.isEmpty()) {
+            binding.tagChipsBar.visibility = View.GONE
+            return
+        }
+        binding.tagChipsBar.visibility = View.VISIBLE
+        val ctx = binding.tagChipsRow.context
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+        binding.tagChipsRow.removeAllViews()
+        nodes.forEach { node ->
+            val chip = android.widget.TextView(ctx).apply {
+                text = "${tagLastSegment(node.path)} ${node.count}"
+                setTextColor(ContextCompat.getColor(ctx, R.color.inbox_text))
+                textSize = 13f
+                background = ContextCompat.getDrawable(ctx, R.drawable.inbox_tag_chip_bg)
+                setPadding(dp(12), dp(5), dp(12), dp(5))
+                gravity = Gravity.CENTER
+                setOnClickListener { applyTagFilterPath(node.path) }
+            }
+            val lp = android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            lp.marginEnd = dp(8)
+            binding.tagChipsRow.addView(chip, lp)
         }
     }
 
     private fun loadInitial() {
         hasMore = true
         triggerLanPull()
+        loadTagTree()
         fetch(append = false)
     }
 
@@ -479,11 +566,51 @@ class InboxFragment : Fragment() {
                     .show(parentFragmentManager, "note_detail")
                 true
             }
+            menu.add("转为待办").setOnMenuItemClickListener {
+                confirmConvertToTodo(note)
+                true
+            }
             menu.add("删除").setOnMenuItemClickListener {
                 deleteNote(note)
                 true
             }
             show()
+        }
+    }
+
+    // ==== 笔记转待办（⑦-C） ====
+
+    /** 转待办是「建 Todo + 删原笔记」的组合动作，二次确认防误操作 */
+    private fun confirmConvertToTodo(note: NoteResponse) {
+        val themedCtx = ContextThemeWrapper(requireContext(), R.style.InboxPopupMenu)
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(themedCtx)
+            .setTitle("转为待办")
+            .setMessage("把该笔记原样转为一条待办，并删除原笔记？")
+            .setPositiveButton("转为待办") { _, _ -> convertNoteToTodo(note) }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    /**
+     * 顺序调用：先 POST /inbox/todos 再 DELETE /inbox/notes/<id>，失败按约定兜底（见 NoteTodoConverter）。
+     * 完成后整页重载，fetch 自带 currentTag —— 转换不会丢失筛选上下文。
+     */
+    private fun convertNoteToTodo(note: NoteResponse) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            TodoApi.init(requireContext())
+            when (val result = NoteTodoConverter.convert(note)) {
+                is NoteTodoConverter.Result.Success -> {
+                    Toast.makeText(requireContext(), "已转为待办", Toast.LENGTH_SHORT).show()
+                    loadInitial()
+                }
+                is NoteTodoConverter.Result.TodoCreatedButDeleteFailed -> {
+                    Toast.makeText(requireContext(), "已转为待办，原笔记删除失败", Toast.LENGTH_LONG).show()
+                    loadInitial()
+                }
+                is NoteTodoConverter.Result.CreateFailed -> {
+                    Toast.makeText(requireContext(), "转换失败：${result.reason}", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
@@ -543,30 +670,42 @@ class InboxFragment : Fragment() {
 
         val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(themedCtx)
 
-        // 底部一行：发送按钮靠右下角（无取消按钮，下滑即可关闭）
-        val buttonRow = android.widget.FrameLayout(themedCtx).apply {
-            setPadding(dp(16), dp(8), dp(16), dp(12))
+        // 底部同一行：Markdown 工具栏在左、发送按钮在右、垂直居中对齐（与编辑面板一致；无取消按钮，下滑即可关闭）
+        val sendButton = com.google.android.material.button.MaterialButton(
+            themedCtx, null, com.google.android.material.R.attr.materialButtonStyle,
+        ).apply {
+            text = "➤"
+            contentDescription = "发送"
+            setOnClickListener {
+                val text = input.text?.toString()?.trim() ?: ""
+                if (text.isNotEmpty()) {
+                    createQuickNote(text)
+                    dialog.dismiss()
+                }
+            }
+        }
+        val bottomRow = android.widget.LinearLayout(themedCtx).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(4), dp(12), 0)
             addView(
-                com.google.android.material.button.MaterialButton(themedCtx, null, com.google.android.material.R.attr.materialButtonStyle).apply {
-                    text = "➤"
-                    contentDescription = "发送"
-                    setOnClickListener {
-                        val text = input.text?.toString()?.trim() ?: ""
-                        if (text.isNotEmpty()) {
-                            createQuickNote(text)
-                            dialog.dismiss()
-                        }
-                    }
-                },
-                android.widget.FrameLayout.LayoutParams(
+                buildMarkdownToolbar(themedCtx, dp, input),
+                android.widget.LinearLayout.LayoutParams(
+                    0,
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                    Gravity.END or Gravity.BOTTOM,
+                    1f,
                 ),
+            )
+            addView(
+                sendButton,
+                android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { marginStart = dp(4) },
             )
         }
 
-        // 垂直布局：输入框占主要空间，按钮行固定在底部，整体占半屏高度
+        // 垂直布局：输入框占主要空间，工具栏+发送按钮一行贴底，整体占半屏高度
         val container = android.widget.LinearLayout(themedCtx).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             layoutParams = android.widget.FrameLayout.LayoutParams(
@@ -581,16 +720,8 @@ class InboxFragment : Fragment() {
                     1f,
                 ),
             )
-            // 与编辑笔记面板一致的 Markdown 工具栏
             addView(
-                buildMarkdownToolbar(themedCtx, dp, input),
-                android.widget.LinearLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                ),
-            )
-            addView(
-                buttonRow,
+                bottomRow,
                 android.widget.LinearLayout.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
