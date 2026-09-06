@@ -298,7 +298,8 @@ class TodoFragment : Fragment() {
 
         val input = EditText(themedCtx).apply {
             hint = "添加任务…"
-            setMinLines(3)
+            // 单行输入（任务标题不换行），紧凑样式与笔记页快速输入一致
+            setMinLines(1)
             gravity = Gravity.TOP or Gravity.START
             setPadding(dp(16), dp(12), dp(16), 0)
             setTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_text))
@@ -344,19 +345,18 @@ class TodoFragment : Fragment() {
             )
         }
 
-        // 垂直布局：输入框占主要空间，按钮行固定在底部，整体占半屏高度
+        // 垂直布局：单行输入框在上、按钮行紧随其下，弹层整体包裹内容（紧凑输入条）
         val container = LinearLayout(themedCtx).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = android.widget.FrameLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                halfScreenHeight,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
             )
             addView(
                 input,
                 LinearLayout.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    0,
-                    1f,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
                 ),
             )
             addView(
@@ -366,17 +366,6 @@ class TodoFragment : Fragment() {
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
                 ),
             )
-        }
-
-        // 键盘弹出后可用高度可能小于半屏（如横屏），动态收缩容器高度防止被裁剪
-        container.viewTreeObserver.addOnGlobalLayoutListener {
-            val available = dialog.window?.decorView?.height ?: return@addOnGlobalLayoutListener
-            val target = minOf(halfScreenHeight, available)
-            val lp = container.layoutParams
-            if (lp.height != target) {
-                lp.height = target
-                container.layoutParams = lp
-            }
         }
 
         dialog.setContentView(container)
