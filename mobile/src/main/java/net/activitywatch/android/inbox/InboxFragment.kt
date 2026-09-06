@@ -185,6 +185,13 @@ class InboxFragment : Fragment() {
                 loadInitial()
                 return@launch
             }
+            // 不属于当前标签筛选/搜索结果的笔记不强行插入列表，退回整页刷新
+            val matchesFilter = (currentTag == null || note.tags.contains(currentTag)) &&
+                (searchQuery == null || note.content.contains(searchQuery!!))
+            if (!matchesFilter) {
+                loadInitial()
+                return@launch
+            }
             val existingIdx = items.indexOfFirst { it.id == noteId }
             if (existingIdx >= 0) {
                 // 原位替换保留已解析的关联预览（新对象的 parentId 为空，直接放会丢灰色预览）
@@ -707,27 +714,18 @@ class InboxFragment : Fragment() {
             )
         }
 
-        // 垂直布局：输入框占主要空间，工具栏+发送按钮一行贴底，整体占半屏高度
+        // 垂直布局：输入框按内容生长、工具栏+发送行紧随其下，弹层整体包裹内容（紧凑输入条）
         val container = android.widget.LinearLayout(themedCtx).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             layoutParams = android.widget.FrameLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                halfScreenHeight,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
             )
             addView(
                 input,
                 android.widget.LinearLayout.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                ),
-            )
-            // 输入框按内容生长，剩余空间留白，把工具栏+发送行压到弹层底部
-            addView(
-                android.view.View(themedCtx),
-                android.widget.LinearLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    0,
-                    1f,
                 ),
             )
             addView(
@@ -737,17 +735,6 @@ class InboxFragment : Fragment() {
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
                 ),
             )
-        }
-
-        // 键盘弹出后可用高度可能小于半屏（如横屏），动态收缩容器高度防止被裁剪
-        container.viewTreeObserver.addOnGlobalLayoutListener {
-            val available = dialog.window?.decorView?.height ?: return@addOnGlobalLayoutListener
-            val target = minOf(halfScreenHeight, available)
-            val lp = container.layoutParams
-            if (lp.height != target) {
-                lp.height = target
-                container.layoutParams = lp
-            }
         }
 
         dialog.setContentView(container)
@@ -832,8 +819,11 @@ class InboxFragment : Fragment() {
     private fun createQuickNote(content: String) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                LocalInboxApi.service.createNote(UpsertNotePayload(content = content, tags = parseTags(content)))
-                loadInitial()
+                val saved = LocalInboxApi.service.createNote(
+                    UpsertNotePayload(content = content, tags = parseTags(content)),
+                )
+                // 跳转定位到新笔记并高亮（不属于当前筛选/搜索时退回整页刷新）
+                refreshAndScrollToNote(saved.id)
                 Toast.makeText(requireContext(), "已发送", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "发送失败：${e.message}", Toast.LENGTH_SHORT).show()
