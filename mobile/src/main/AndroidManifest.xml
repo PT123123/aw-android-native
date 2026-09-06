@@ -13,7 +13,13 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+    <!-- ConnectivityManager.requestNetwork（扫码方连接对端热点）的强制要求 -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+    <!-- Android 13+ 上 startLocalOnlyHotspot / WifiNetworkSpecifier 的强制运行时权限；
+         neverForLocation 表示不用于位置推导，可免精确定位。API < 33 自动忽略本声明。 -->
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
+            android:usesPermissionFlags="neverForLocation"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.CAMERA"/>

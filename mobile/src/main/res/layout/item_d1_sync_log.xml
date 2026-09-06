@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- D1 同步日志条目 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="10dp"
+    android:gravity="center_vertical"
+    android:background="?attr/selectableItemBackground">
+
+    <!-- 状态图标 -->
+    <View
+        android:id="@+id/statusDot"
+        android:layout_width="8dp"
+        android:layout_height="8dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/sync_rounded_6"
+        android:contentDescription="status" />
+
+    <!-- 内容区 -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- 第一行：时间 + 摘要 -->
+        <TextView
+            android:id="@+id/tvLogSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="同步完成"
+            android:textColor="@color/aw_text_primary"
+            android:textSize="14sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <!-- 第二行：时间戳 + 数据量 -->
+        <TextView
+            android:id="@+id/tvLogMeta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="2026-09-05 14:30 · 12.3 KB"
+            android:textColor="@color/aw_text_secondary"
+            android:textSize="12sp" />
+
+        <!-- 错误/详情展开 -->
+        <TextView
+            android:id="@+id/tvLogDetail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/aw_danger"
+            android:textSize="12sp"
+            android:visibility="gone"
+            android:textIsSelectable="true" />
+
+    </LinearLayout>
+
+</LinearLayout>

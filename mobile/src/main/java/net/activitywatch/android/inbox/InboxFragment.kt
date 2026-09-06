@@ -126,9 +126,9 @@ class InboxFragment : Fragment() {
         }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, selectionBackCallback)
 
-        // 历史面板恢复版本后刷新列表，让卡片正文与更新时间同步变化
+        // 详情面板恢复版本后刷新列表，让卡片正文与更新时间同步变化
         parentFragmentManager.setFragmentResultListener(
-            NoteHistoryFragment.RESULT_KEY, viewLifecycleOwner
+            NoteDetailFragment.RESULT_KEY, viewLifecycleOwner
         ) { _, _ -> loadInitial() }
 
         loadInitial()
@@ -431,9 +431,9 @@ class InboxFragment : Fragment() {
                 togglePin(note)
                 true
             }
-            menu.add("历史版本").setOnMenuItemClickListener {
-                NoteHistoryFragment.newInstance(note.id)
-                    .show(parentFragmentManager, "note_history")
+            menu.add("详细信息").setOnMenuItemClickListener {
+                NoteDetailFragment.newInstance(note.id)
+                    .show(parentFragmentManager, "note_detail")
                 true
             }
             menu.add("删除").setOnMenuItemClickListener {

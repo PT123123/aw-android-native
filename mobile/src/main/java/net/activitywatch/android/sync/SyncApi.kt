@@ -107,6 +107,14 @@ interface SyncApi {
     @POST("api/0/sync/d1/sync")
     suspend fun d1SyncNow(): D1SyncResult
 
+    /** 强制全量同步（清空 checkpoint 后全量推拉，桌面端同名端点） */
+    @POST("api/0/sync/d1/full_sync")
+    suspend fun d1SyncFull(): D1SyncResult
+
+    /** 清除 D1 checkpoint（重置同步状态） */
+    @POST("api/0/sync/d1/reset")
+    suspend fun d1Reset(): OpResult
+
     /** 获取 D1 同步状态 */
     @GET("api/0/sync/d1/status")
     suspend fun d1Status(): D1Status
@@ -114,4 +122,11 @@ interface SyncApi {
     /** 测试 D1 连接 */
     @POST("api/0/sync/d1/test")
     suspend fun d1Test(): D1TestResult
+
+    /** 查询 D1 同步历史日志 */
+    @GET("api/0/sync/d1/logs")
+    suspend fun getD1Logs(
+        @Query("limit") limit: Int = 20,
+        @Query("offset") offset: Int = 0
+    ): D1SyncLogPage
 }

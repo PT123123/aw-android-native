@@ -17,11 +17,12 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * 「被传送方」的本地热点（Local-only Hotspot）封装：
+ * 「传送方」（出码方）的本地热点（Local-only Hotspot）封装：
  * 开启热点 → 取 SSID / 密码 → 解析本机在热点网络上的地址（同步服务可达地址）。
  *
  * 注意：
- * - 需要 ACCESS_FINE_LOCATION 运行时授权，且多数设备要求「位置服务」处于开启状态；
+ * - 需要「附近的设备」和「精确定位」权限（Android 13+ 缺一会被部分 ROM 拒绝；
+ *   旧版本仅 ACCESS_FINE_LOCATION，且多数旧设备要求「位置服务」处于开启状态）；
  * - 热点随应用退后台自动关闭，传输期间需保持应用在前台；
  * - [stop] 之后热点即刻关闭。
  */
@@ -37,8 +38,18 @@ class HotspotHelper(private val context: Context) {
      * 开启热点并解析信息。
      * [ipsBefore] 为调用方在开启前采集的本机 IPv4 集合（用于差分定位热点网关地址）。
      */
-    @SuppressLint("MissingPermission") // 调用方已确保定位权限
+    @SuppressLint("MissingPermission") // 调用方已确保 Wi-Fi 附近设备权限
     suspend fun start(ipsBefore: Set<String>, timeoutMs: Long = 30_000): HotspotInfo =
+        try {
+            startInternal(ipsBefore, timeoutMs)
+        } catch (e: SecurityException) {
+            // 权限缺失时系统同步抛 SecurityException，翻译成可读提示并保留原始报错便于诊断
+            throw IllegalStateException(
+                "${WifiConnector.MISSING_PERMISSION_MSG}（系统原始报错：${e.message}）", e
+            )
+        }
+
+    private suspend fun startInternal(ipsBefore: Set<String>, timeoutMs: Long): HotspotInfo =
         withTimeout(timeoutMs) {
             val started = suspendCancellableCoroutine<WifiManager.LocalOnlyHotspotReservation> { cont ->
                 val wm = context.applicationContext
@@ -58,7 +69,7 @@ class HotspotHelper(private val context: Context) {
                                         WifiManager.LocalOnlyHotspotCallback.ERROR_NO_CHANNEL ->
                                             "无可用信道，无法开启热点（可尝试关闭 Wi-Fi 后重试）"
                                         WifiManager.LocalOnlyHotspotCallback.ERROR_GENERIC ->
-                                            "开启热点失败（请确认已授予定位权限且位置服务已开启）"
+                                            "开启热点失败（请确认已授予「附近的设备」或「精确定位」权限）"
                                         WifiManager.LocalOnlyHotspotCallback.ERROR_INCOMPATIBLE_MODE ->
                                             "设备处于不兼容模式（如省电 / 飞行模式），无法开启热点"
                                         WifiManager.LocalOnlyHotspotCallback.ERROR_TETHERING_DISALLOWED ->

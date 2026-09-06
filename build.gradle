@@ -20,7 +20,8 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.1.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        classpath 'org.mozilla.rust-android-gradle:plugin:0.9.3'
+        // 0.9.5 起 linker-wrapper 不再使用 Python 3.13 移除的 pipes 模块
+        classpath 'org.mozilla.rust-android-gradle:plugin:0.9.6'
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files

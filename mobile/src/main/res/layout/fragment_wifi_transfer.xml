@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- WiFi 热点传输（实验性）：角色选择 → 被传送方出二维码 / 传送方扫码连接并双向同步 -->
+<!-- WiFi 热点传输（实验性）：角色选择 → 传送方出二维码 / 被传送方扫码连接并双向同步 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -62,7 +62,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
-                        android:text="我是传送方（扫码）"
+                        android:text="我是传送方（开热点 / 出示二维码）"
                         app:backgroundTint="@color/aw_accent" />
 
                     <com.google.android.material.button.MaterialButton
@@ -71,7 +71,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="我是被传送方（开热点 / 出示二维码）"
+                        android:text="我是被传送方（扫码接收）"
                         android:textColor="@color/aw_accent"
                         app:strokeColor="@color/aw_accent" />
 
@@ -79,15 +79,15 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:text="提示：被传送方需授予「精确位置」权限并保持应用在前台（系统限制：热点会随应用退后台关闭）；传送方连接时系统会提示「该网络无法访问互联网」，属正常现象。"
+                        android:text="提示：两台设备都需授予「附近的设备」和「精确定位」权限（首次使用会弹出授权，缺一会被系统拒绝）；出码方需保持应用在前台（系统限制：热点会随应用退后台关闭）；扫码方连接时系统会提示「该网络无法访问互联网」，属正常现象。"
                         android:textColor="@color/aw_text_disabled"
                         android:textSize="12sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ========== 接收方（出码） ========== -->
+            <!-- ========== 出码（传送方） ========== -->
             <com.google.android.material.card.MaterialCardView
-                android:id="@+id/sectionReceiver"
+                android:id="@+id/sectionQr"
                 style="@style/AwCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -102,7 +102,7 @@
                     android:padding="16dp">
 
                     <TextView
-                        android:id="@+id/tvReceiverTitle"
+                        android:id="@+id/tvQrTitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="正在开启热点…"
@@ -135,7 +135,7 @@
                     </com.google.android.material.card.MaterialCardView>
 
                     <TextView
-                        android:id="@+id/tvReceiverInfo"
+                        android:id="@+id/tvQrInfo"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
@@ -149,7 +149,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:gravity="center"
-                        android:text="等待传送方扫码连接…"
+                        android:text="等待被传送方扫码连接…"
                         android:textColor="@color/aw_text_disabled"
                         android:textSize="12sp" />
 
@@ -165,9 +165,9 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ========== 传送方（扫码 / 传输进度） ========== -->
+            <!-- ========== 扫码 / 传输进度（被传送方） ========== -->
             <com.google.android.material.card.MaterialCardView
-                android:id="@+id/sectionSender"
+                android:id="@+id/sectionTransfer"
                 style="@style/AwCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -181,7 +181,7 @@
                     android:padding="16dp">
 
                     <TextView
-                        android:id="@+id/tvSenderTitle"
+                        android:id="@+id/tvTransferTitle"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="连接中…"
