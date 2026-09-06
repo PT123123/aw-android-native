@@ -277,7 +277,12 @@ cd C:\Users\ted\Desktop\aw-android
 - `NoteDetailFragment.kt`（⑦-A）：详情页标签以面包屑（`项目 / 工作`）展示，每段可点 → 跳列表筛选并关闭详情。
 - `InboxFragment.kt`（⑦-B）：顶部新增**标签 chips 行**（未筛选=顶层标签，筛选中=当前路径子标签，带计数）；筛选条显示面包屑 + **↑ 返回上级**（`项目/工作/xx → 项目/工作 → 项目 → 顶层`）+ ✕ 清除；筛选路径存 `savedInstanceState`（配置变更/进程重建恢复，不持久化 prefs）。
 - `NoteTodoConverter.kt`（⑦-C，新文件）+ 入口两处（`InboxFragment` 长按菜单、`NoteDetailFragment` 工具栏溢出菜单）：二次确认后**先 `POST /inbox/todos` 再 `DELETE /inbox/notes/<id>`**，按规划兜底（建失败不删 / 删失败提示「已转为待办，原笔记删除失败」）；title 取正文首行剥 markdown 标记（截 50 字），content 原文不截断，tags 原样，priority=中，不设期限；完成后整页重载，**自带 currentTag 保留筛选上下文**。
-- ⑦-D：`note_editor.xml` 底部改为**单行**（Markdown 工具栏左 + 发送按钮右、垂直居中），快速笔记弹层（`InboxFragment` 程序化布局）同步对齐；工具按钮文案与点击逻辑未动（现状无 `/` 键，`/` 本就按普通字符输入，无需改动）。
+- ⑦-D：`note_editor.xml` 底部改为**单行**（Markdown 工具栏左 + 发送按钮右、垂直居中），快速笔记弹层（`InboxFragment` 程序化布局）同步对齐。
+- **后续调整（2026-09-06 用户反馈，均已实现）**：
+  - 工具栏键语义修正（推翻本节「点击行为保持现状不变」的旧约束）：**井号键插入字面 `#`、斜杠键插入字面 `/`**（配合 `#标签` 与层级 tag 的 `a/b` 输入），原斜体键（`I`，插 `*` 包裹）移除，标题循环（cycleHeading）不再挂键；B/•/1. 等 Markdown 键保留。涉及 `note_editor.xml`（id 改 `mdHash`/`mdSlash`）、`NoteEditorFragment`、`InboxFragment.buildMarkdownToolbar`、`MarkdownTextActions.insert()`（新增）。
+  - 输入框按内容生长：编辑面板 min 4 / max 10 行、快速弹层 min 3 / max 8 行，超限内部滚动；随后按反馈**去掉输入框与工具栏间的弹性留白**，工具栏行紧跟输入框，弹层高度改 wrap_content 紧凑包裹。
+  - 快速发送后走 `refreshAndScrollToNote` 跳转定位并高亮新笔记（不属于当前筛选/搜索时退回整页刷新）。
+  - TODO 快速添加弹层同步紧凑化：单行输入 + 按钮行紧随其下，弹层 wrap_content（不再固定半屏）。
 - 规划中「基于标签树的段级输入自动补全」为可选项，本次未实现。
 
 **验证**：`cargo check -p aw-inbox-rust` 通过；`cargo test --test tag_tree_test` 3/3 通过；`gradlew :mobile:compileDebugKotlin` BUILD SUCCESSFUL；随后重跑 `cargoBuildArm + cargoBuildArm64 + assembleDebug` 产出含修复的 .so 与 APK。

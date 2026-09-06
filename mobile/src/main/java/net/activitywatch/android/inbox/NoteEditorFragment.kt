@@ -87,9 +87,10 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
         }
         binding.save.setOnClickListener { save() }
 
-        binding.mdHeading.setOnClickListener { MarkdownTextActions.cycleHeading(binding.editor) }
+        // 井号/斜杠键插入字面字符（打 #标签 与层级 tag 的 a/b 分隔），不是 Markdown 语法
+        binding.mdHash.setOnClickListener { MarkdownTextActions.insert(binding.editor, "#") }
         binding.mdBold.setOnClickListener { MarkdownTextActions.toggleWrap(binding.editor, "**") }
-        binding.mdItalic.setOnClickListener { MarkdownTextActions.toggleWrap(binding.editor, "*") }
+        binding.mdSlash.setOnClickListener { MarkdownTextActions.insert(binding.editor, "/") }
         binding.mdBullet.setOnClickListener { MarkdownTextActions.toggleBullet(binding.editor) }
         binding.mdOrdered.setOnClickListener { MarkdownTextActions.toggleOrdered(binding.editor) }
 

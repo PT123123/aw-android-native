@@ -771,7 +771,8 @@ class InboxFragment : Fragment() {
 
         val row = android.widget.LinearLayout(ctx).apply { orientation = android.widget.LinearLayout.HORIZONTAL }
         val items = listOf(
-            item("#", "标题") { MarkdownTextActions.cycleHeading(input) }.apply {
+            // 井号/斜杠键插入字面字符（打 #标签 与层级 tag 的 a/b 分隔），不是 Markdown 语法
+            item("#", "井号") { MarkdownTextActions.insert(input, "#") }.apply {
                 textSize = 17f
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
             },
@@ -779,10 +780,7 @@ class InboxFragment : Fragment() {
                 textSize = 16f
                 typeface = android.graphics.Typeface.DEFAULT_BOLD
             },
-            item("I", "斜体") { MarkdownTextActions.toggleWrap(input, "*") }.apply {
-                textSize = 16f
-                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.ITALIC)
-            },
+            item("/", "斜杠") { MarkdownTextActions.insert(input, "/") }.apply { textSize = 18f },
             item("•", "无序列表") { MarkdownTextActions.toggleBullet(input) }.apply { textSize = 18f },
             item("1.", "有序列表") { MarkdownTextActions.toggleOrdered(input) }.apply { textSize = 15f },
         )
