@@ -2,10 +2,35 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 数据源固定为服务器（/inbox/todos），本地仅做缓冲，不再提供切换入口 -->
     <item
         android:id="@+id/action_new_list"
-        android:icon="@drawable/ic_add"
         android:title="新建清单"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="never" />
+
+    <!-- 排序选项收进子菜单；两项均为 never，由工具栏右侧系统 ⋮ 溢出菜单承载 -->
+    <item
+        android:id="@+id/action_sort"
+        android:title="排序"
+        app:showAsAction="never">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item
+                    android:id="@+id/action_sort_default"
+                    android:checked="true"
+                    android:title="默认排序" />
+                <item
+                    android:id="@+id/action_sort_recent"
+                    android:title="最近添加" />
+                <item
+                    android:id="@+id/action_sort_reverse"
+                    android:title="反向" />
+                <item
+                    android:id="@+id/action_sort_priority"
+                    android:title="按优先级" />
+                <item
+                    android:id="@+id/action_sort_due"
+                    android:title="按截止日期" />
+            </group>
+        </menu>
+    </item>
 </menu>

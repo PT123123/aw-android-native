@@ -89,19 +89,20 @@ fun filterTasks(
 }
 
 /**
- * 排序（契约 §5.2 taskLessThan）：
- * - 未完成组：优先级降序 → 有期限优先于无期限 → 期限升序 → sortOrder 升序 → id 升序
- * - 已完成组：completedAt 降序
+ * 排序（契约 §5.2 taskLessThan + 右上角选项菜单可选模式）：
+ * - 未完成组按 [mode] 对应的 Comparator 排序
+ * - 已完成组：completedAt 降序，不受排序模式影响
  * - 未完成组整体排在已完成组之前
  */
-fun sortTasks(tasks: List<TodoTask>): List<TodoTask> {
-    val open = tasks.filter { !it.completed }.sortedWith(
-        compareByDescending<TodoTask> { it.priority }
-            .thenBy { it.dueDate.isEmpty() }
-            .thenBy { it.dueDate }
-            .thenBy { it.sortOrder }
-            .thenBy { it.id }
-    )
+fun sortTasks(tasks: List<TodoTask>, mode: TodoSortMode = TodoSortMode.DEFAULT): List<TodoTask> {
+    val openComparator = when (mode) {
+        TodoSortMode.DEFAULT -> DEFAULT_OPEN_COMPARATOR
+        TodoSortMode.RECENTLY_ADDED -> RECENTLY_ADDED_COMPARATOR
+        TodoSortMode.REVERSED -> REVERSED_COMPARATOR
+        TodoSortMode.BY_PRIORITY -> BY_PRIORITY_COMPARATOR
+        TodoSortMode.BY_DUE_DATE -> BY_DUE_COMPARATOR
+    }
+    val open = tasks.filter { !it.completed }.sortedWith(openComparator)
     val done = tasks.filter { it.completed }.sortedByDescending { it.completedAt }
     return open + done
 }
@@ -111,8 +112,9 @@ fun visibleTasks(
     tasks: List<TodoTask>,
     view: TodoView,
     listId: Long = 0L,
+    sortMode: TodoSortMode = TodoSortMode.DEFAULT,
 ): Pair<List<TodoTask>, List<TodoTask>> {
-    val filtered = sortTasks(filterTasks(tasks, view, listId))
+    val filtered = sortTasks(filterTasks(tasks, view, listId), sortMode)
     val open = filtered.filter { !it.completed }
     val done = filtered.filter { it.completed }
     return open to done

@@ -4,10 +4,12 @@ import android.content.Context
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
+import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
@@ -45,6 +47,7 @@ class TodoFragment : Fragment() {
     private var currentView = TodoView.INBOX
     private var currentListId = 0L
     private var showCompleted = false
+    private var currentSortMode = TodoSortMode.DEFAULT
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,12 +83,18 @@ class TodoFragment : Fragment() {
             requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
                 ?.openDrawer(GravityCompat.START)
         }
+        // 右上角 ⋮ 菜单：新建清单 + 排序子菜单
         binding.toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.action_new_list -> {
                     showNewListDialog()
                     true
                 }
+                R.id.action_sort_default -> { setSortMode(TodoSortMode.DEFAULT); true }
+                R.id.action_sort_recent -> { setSortMode(TodoSortMode.RECENTLY_ADDED); true }
+                R.id.action_sort_reverse -> { setSortMode(TodoSortMode.REVERSED); true }
+                R.id.action_sort_priority -> { setSortMode(TodoSortMode.BY_PRIORITY); true }
+                R.id.action_sort_due -> { setSortMode(TodoSortMode.BY_DUE_DATE); true }
                 else -> false
             }
         }
@@ -103,15 +112,10 @@ class TodoFragment : Fragment() {
         binding.list.adapter = adapter
 
         binding.swipe.setOnRefreshListener { source.load() }
-        binding.quickAdd.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_DONE) {
-                addTask()
-                true
-            } else false
-        }
-        binding.addBtn.setOnClickListener { addTask() }
-        // 右下角按钮 = 跳转到上方输入框并弹出键盘（新建清单移到标题栏菜单）
-        binding.fab.setOnClickListener { focusQuickAdd() }
+        // 右下角按钮 = 从底部展开快速添加输入层（同笔记页快速输入）
+        binding.fab.setOnClickListener { showQuickAddDialog() }
+
+        currentSortMode = loadSortMode()
 
         TodoRepository.addErrorListener(errorToast)
         TodoRepository.addListener(dataChanged)
@@ -161,10 +165,9 @@ class TodoFragment : Fragment() {
 
         adapter.setListColors(mLists.associate { it.id to it.argb })
         rebuildChips()
+        updateSortMenuChecks()
 
-        binding.quickAdd.hint = "添加任务到「${viewTitle()}」…"
-
-        val (open, done) = visibleTasks(mTasks, currentView, currentListId)
+        val (open, done) = visibleTasks(mTasks, currentView, currentListId, currentSortMode)
         binding.toolbar.subtitle = "${viewTitle()} · ${open.size} 项待办"
         adapter.submit(open, done, showCompleted)
         updateEmptyState()
@@ -176,7 +179,7 @@ class TodoFragment : Fragment() {
         val nothing = open.isEmpty() && (done.isEmpty() || !showCompleted)
         binding.empty.visibility = if (nothing) View.VISIBLE else View.GONE
         binding.empty.text = if (open.isEmpty() && done.isEmpty()) {
-            "暂无任务\n在上方输入框回车即可添加"
+            "暂无任务\n点右下角 ＋ 添加任务"
         } else {
             "该视图下的任务已全部完成"
         }
@@ -282,19 +285,119 @@ class TodoFragment : Fragment() {
         return tv
     }
 
-    // ── 快速添加（契约 §5.5） ────────────────────────────
+    // ── 快速添加（契约 §5.5；底部弹层样式与笔记页快速输入一致） ──
 
-    /** 跳到顶部快速添加输入框：聚焦 + 弹出软键盘 */
-    private fun focusQuickAdd() {
-        binding.quickAdd.requestFocus()
-        binding.quickAdd.post {
-            val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-            imm?.showSoftInput(binding.quickAdd, InputMethodManager.SHOW_IMPLICIT)
+    /** FAB：从底部展开快速添加输入层（BottomSheetDialog，发送后关闭，下滑可关） */
+    private fun showQuickAddDialog() {
+        val themedCtx = ContextThemeWrapper(requireContext(), R.style.InboxPopupMenu)
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+        val halfScreenHeight = resources.displayMetrics.heightPixels / 2
+
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(themedCtx)
+
+        val input = EditText(themedCtx).apply {
+            hint = "添加任务…"
+            setMinLines(3)
+            gravity = Gravity.TOP or Gravity.START
+            setPadding(dp(16), dp(12), dp(16), 0)
+            setTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_text))
+            setHintTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_sub))
+            backgroundTintList = android.content.res.ColorStateList.valueOf(
+                ContextCompat.getColor(requireContext(), R.color.inbox_accent),
+            )
         }
+
+        fun submit() {
+            // 任务标题不换行：把换行/连续空白压成单个空格
+            val text = input.text?.toString()?.replace(Regex("\\s+"), " ")?.trim() ?: ""
+            if (text.isNotEmpty()) {
+                addTask(text)
+                dialog.dismiss()
+            }
+        }
+
+        input.imeOptions = EditorInfo.IME_ACTION_DONE
+        input.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                submit()
+                true
+            } else false
+        }
+
+        // 底部一行：发送按钮靠右下角（无取消按钮，下滑即可关闭）
+        val buttonRow = android.widget.FrameLayout(themedCtx).apply {
+            setPadding(dp(16), dp(8), dp(16), dp(12))
+            addView(
+                com.google.android.material.button.MaterialButton(
+                    themedCtx, null, com.google.android.material.R.attr.materialButtonStyle,
+                ).apply {
+                    text = "➤"
+                    contentDescription = "添加任务"
+                    setOnClickListener { submit() }
+                },
+                android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.END or Gravity.BOTTOM,
+                ),
+            )
+        }
+
+        // 垂直布局：输入框占主要空间，按钮行固定在底部，整体占半屏高度
+        val container = LinearLayout(themedCtx).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                halfScreenHeight,
+            )
+            addView(
+                input,
+                LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    0,
+                    1f,
+                ),
+            )
+            addView(
+                buttonRow,
+                LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
+
+        // 键盘弹出后可用高度可能小于半屏（如横屏），动态收缩容器高度防止被裁剪
+        container.viewTreeObserver.addOnGlobalLayoutListener {
+            val available = dialog.window?.decorView?.height ?: return@addOnGlobalLayoutListener
+            val target = minOf(halfScreenHeight, available)
+            val lp = container.layoutParams
+            if (lp.height != target) {
+                lp.height = target
+                container.layoutParams = lp
+            }
+        }
+
+        dialog.setContentView(container)
+        dialog.behavior.peekHeight = halfScreenHeight
+        // 键盘弹出时窗口要收缩，让输入区整体抬到键盘上方，不能盖住发送按钮
+        dialog.window?.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        )
+        dialog.show()
+        dialog.behavior.state =
+            com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED
+        input.requestFocus()
+        input.postDelayed({
+            val imm =
+                requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+        }, 100)
     }
 
-    private fun addTask() {
-        val title = binding.quickAdd.text?.toString()?.trim().orEmpty()
+    private fun addTask(title: String) {
         if (title.isEmpty()) return
         // 归属规则：清单视图 → 该清单；今天视图 → 收集箱 + 今天到期；其它 → 收集箱无期限
         val (listId, due) = when (currentView) {
@@ -302,8 +405,45 @@ class TodoFragment : Fragment() {
             TodoView.TODAY -> 0L to todayStr()
             else -> 0L to ""
         }
-        binding.quickAdd.text?.clear()
         source.createTask(title, listId, due)
+    }
+
+    // ── 排序（右上角 ⋮ 菜单的「排序」子菜单） ────────────
+
+    private fun setSortMode(mode: TodoSortMode) {
+        if (currentSortMode == mode) return
+        currentSortMode = mode
+        saveSortMode(mode)
+        render()
+    }
+
+    /** 同步「排序」子菜单的勾选标记到当前排序模式 */
+    private fun updateSortMenuChecks() {
+        val checkedId = when (currentSortMode) {
+            TodoSortMode.DEFAULT -> R.id.action_sort_default
+            TodoSortMode.RECENTLY_ADDED -> R.id.action_sort_recent
+            TodoSortMode.REVERSED -> R.id.action_sort_reverse
+            TodoSortMode.BY_PRIORITY -> R.id.action_sort_priority
+            TodoSortMode.BY_DUE_DATE -> R.id.action_sort_due
+        }
+        for (id in intArrayOf(
+            R.id.action_sort_default, R.id.action_sort_recent, R.id.action_sort_reverse,
+            R.id.action_sort_priority, R.id.action_sort_due,
+        )) {
+            binding.toolbar.menu.findItem(id)?.isChecked = (id == checkedId)
+        }
+    }
+
+    /** 排序模式持久化：切出再回来 / 旋转屏幕保留 */
+    private fun saveSortMode(mode: TodoSortMode) {
+        requireContext().getSharedPreferences("todo_prefs", Context.MODE_PRIVATE)
+            .edit().putString("sort_mode", mode.name).apply()
+    }
+
+    private fun loadSortMode(): TodoSortMode {
+        val name = requireContext().getSharedPreferences("todo_prefs", Context.MODE_PRIVATE)
+            .getString("sort_mode", TodoSortMode.DEFAULT.name)
+        return TodoSortMode.entries.firstOrNull { it.name == name } ?: TodoSortMode.DEFAULT
     }
 
     // ── 清单管理（契约 §5.7） ────────────────────────────
