@@ -74,6 +74,45 @@ data class TodoList(
 /** 侧栏视图（契约 §5.2） */
 enum class TodoView { INBOX, TODAY, NEXT7, ALL, LIST }
 
+/** 排序模式（右上角选项菜单选择，持久化到 todo_prefs/sort_mode） */
+enum class TodoSortMode {
+    DEFAULT,        // 优先级降序 → 有期限优先 → 期限升序 → sortOrder 升序 → id 升序
+    RECENTLY_ADDED, // 按创建时间降序
+    REVERSED,       // 默认排序的倒置
+    BY_PRIORITY,    // 按优先级降序
+    BY_DUE_DATE,    // 按截止日期升序（有期限在前，无期限在后）
+}
+
+// 各模式的未完成组 Comparator（已完成组始终按 completedAt 降序，见 TodoSource.sortTasks）
+internal val DEFAULT_OPEN_COMPARATOR = compareByDescending<TodoTask> { it.priority }
+    .thenBy { it.dueDate.isEmpty() }
+    .thenBy { it.dueDate }
+    .thenBy { it.sortOrder }
+    .thenBy { it.id }
+
+internal val RECENTLY_ADDED_COMPARATOR = compareByDescending<TodoTask> { it.createdAt }
+    .thenByDescending { it.priority }
+    .thenBy { it.dueDate.isEmpty() }
+    .thenBy { it.dueDate }
+
+internal val REVERSED_COMPARATOR = compareBy<TodoTask> { it.priority }
+    .thenByDescending { it.dueDate.isEmpty() }
+    .thenByDescending { it.dueDate }
+    .thenByDescending { it.sortOrder }
+    .thenByDescending { it.id }
+
+internal val BY_DUE_COMPARATOR = compareBy<TodoTask> { it.dueDate.isEmpty() }
+    .thenBy { it.dueDate }
+    .thenByDescending { it.priority }
+    .thenBy { it.sortOrder }
+    .thenBy { it.id }
+
+internal val BY_PRIORITY_COMPARATOR = compareByDescending<TodoTask> { it.priority }
+    .thenBy { it.dueDate.isEmpty() }
+    .thenBy { it.dueDate }
+    .thenBy { it.sortOrder }
+    .thenBy { it.id }
+
 // ===================== 本地持久化文件结构 =====================
 
 /** todo_local.json 的根结构（契约 §4）；键名 next_id 已经是 snake_case */
