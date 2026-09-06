@@ -41,6 +41,16 @@ object LanSyncNetworkMonitor {
     private var pendingWifi: Boolean? = null
     private var debounceJob: Job? = null
 
+    /**
+     * 当前 Wi-Fi 状态（含去抖中）：已生效或正在去抖确认均视为 Wi-Fi；
+     * 首个网络回调到达前（状态未知）也放行——否则冷启动前 2 秒窗口内的
+     * 首次笔记页拉取会被误跳过。代价仅为极少数场景下多一次有界超时的空尝试。
+     */
+    fun isWifiNow(): Boolean = synchronized(this) {
+        lastApplied == true || pendingWifi == true ||
+            (lastApplied == null && pendingWifi == null)
+    }
+
     fun register(context: Context, rust: RustInterface) {
         if (registered) return
         registered = true
