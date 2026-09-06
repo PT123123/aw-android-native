@@ -57,36 +57,7 @@
                 android:orientation="horizontal" />
         </HorizontalScrollView>
 
-        <!-- 快速添加 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingEnd="8dp"
-            android:paddingBottom="6dp">
-
-            <EditText
-                android:id="@+id/quickAdd"
-                style="@style/AwEditText"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="添加任务…"
-                android:imeOptions="actionDone"
-                android:inputType="text"
-                android:maxLines="1" />
-
-            <ImageButton
-                android:id="@+id/addBtn"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="添加任务"
-                android:src="@android:drawable/ic_input_add"
-                app:tint="@color/aw_accent" />
-        </LinearLayout>
+        <!-- 快速添加输入框已移除：点右下角 FAB 从底部展开输入层（同笔记页） -->
 
         <FrameLayout
             android:layout_width="match_parent"
@@ -114,7 +85,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:gravity="center"
-                android:text="暂无任务\n在上方输入框回车即可添加"
+                android:text="暂无任务\n点右下角 ＋ 添加任务"
                 android:textColor="@color/aw_text_disabled"
                 android:textSize="14sp"
                 android:visibility="gone" />
