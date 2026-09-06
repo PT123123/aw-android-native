@@ -17,7 +17,7 @@
             android:layout_height="?attr/actionBarSize"
             android:background="@color/inbox_bg"
             android:theme="@style/ThemeOverlay.MaterialComponents.Dark"
-            app:title="Inbox 设置"
+            app:title="笔记设置"
             app:titleTextColor="@color/inbox_text"
             app:navigationIcon="@drawable/ic_menu"
             app:navigationIconTint="@color/inbox_text" />
@@ -213,6 +213,42 @@
                             app:tickColorInactive="@color/inbox_bg"
                             app:trackColorActive="@color/inbox_accent"
                             app:trackColorInactive="@color/inbox_sub" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 回收站入口（笔记回收站 / 冲突归档） -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/rowTrash"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="@color/inbox_card"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="14dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="回收站"
+                            android:textColor="@color/inbox_text"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="›"
+                            android:textColor="@color/inbox_sub"
+                            android:textSize="20sp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 

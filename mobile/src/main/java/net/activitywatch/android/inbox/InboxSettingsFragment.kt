@@ -14,7 +14,8 @@ import net.activitywatch.android.R
 import net.activitywatch.android.databinding.InboxSettingsFragmentBinding
 
 /**
- * Inbox 设置页：为单击/双击/长按分别选择执行的动作（编辑/评论/置顶/删除等）。
+ * 笔记设置页（原 Inbox 设置）：为单击/双击/长按分别选择执行的动作（编辑/评论/置顶/删除等），
+ * 并提供回收站（笔记回收站 / 冲突归档）入口。
  */
 class InboxSettingsFragment : Fragment() {
 
@@ -43,6 +44,14 @@ class InboxSettingsFragment : Fragment() {
 
         setupDrawerEdgeSlider()
         setupAutoInputSwitch()
+
+        // 回收站（笔记回收站 + 同步冲突归档）
+        binding.rowTrash.setOnClickListener {
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, TrashFragment())
+                .addToBackStack(null)
+                .commit()
+        }
 
         // 应用图标设置
         binding.rowIconSettings.setOnClickListener {
