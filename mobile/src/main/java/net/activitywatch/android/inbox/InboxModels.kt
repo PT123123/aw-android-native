@@ -57,6 +57,33 @@ data class DetailedTag(
     val last_modified: String? = null,
 )
 
+/** 层级标签树节点（GET /inbox/tags/tree）：path 为完整路径（如 项目/工作），count 含子孙笔记数 */
+data class TagNodeResponse(
+    val path: String,
+    val count: Long = 0,
+    val children: List<TagNodeResponse> = emptyList(),
+)
+
+data class TagTreeResponse(
+    val tags: List<TagNodeResponse> = emptyList(),
+)
+
+/** 把层级 tag 按段拆分（`项目/工作` → [项目, 工作]），空段跳过；单段 tag 返回单元素列表 */
+fun tagSegments(tag: String): List<String> =
+    tag.split('/').map { it.trim() }.filter { it.isNotEmpty() }
+
+/** 层级 tag 的父路径（`项目/工作/xx` → `项目/工作`；单段返回 null） */
+fun tagParentPath(tag: String): String? {
+    val segs = tagSegments(tag)
+    return if (segs.size <= 1) null else segs.dropLast(1).joinToString("/")
+}
+
+/** tag 的最后一段（`项目/工作` → `工作`），用于 chips 等紧凑展示 */
+fun tagLastSegment(tag: String): String = tagSegments(tag).lastOrNull() ?: tag
+
+/** 面包屑展示：`项目/工作/xx` → `项目 / 工作 / xx` */
+fun formatTagBreadcrumb(tag: String): String = tagSegments(tag).joinToString(" / ")
+
 fun parseTags(content: String): List<String> {
     if (content.isBlank()) return emptyList()
     return Regex("#[^#\\s,，。.！!？?；;：:+]+\\.?").findAll(content)

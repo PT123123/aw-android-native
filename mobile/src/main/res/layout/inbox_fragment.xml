@@ -40,7 +40,25 @@
                 android:textColorHint="@color/inbox_sub" />
         </LinearLayout>
 
-        <!-- 标签筛选条：点正文里的 #标签 后出现，✕ 清除筛选 -->
+        <!-- 标签 chips 行：显示当前层级下的子标签（未筛选时为顶层标签），点击进入该前缀筛选 -->
+        <HorizontalScrollView
+            android:id="@+id/tagChipsBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="6dp"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/tagChipsRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+        </HorizontalScrollView>
+
+        <!-- 标签筛选条：点正文里的 #标签 后出现，↑ 返回上级、✕ 清除筛选 -->
         <LinearLayout
             android:id="@+id/filterBar"
             android:layout_width="match_parent"
@@ -52,10 +70,21 @@
             android:paddingBottom="6dp"
             android:visibility="gone">
 
+            <ImageButton
+                android:id="@+id/filterUp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="返回上级标签"
+                android:src="@drawable/ic_arrow_up"
+                android:visibility="gone"
+                app:tint="@color/inbox_accent" />
+
             <TextView
                 android:id="@+id/filterText"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
