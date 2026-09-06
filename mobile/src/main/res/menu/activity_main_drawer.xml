@@ -11,11 +11,11 @@
         <item
             android:id="@+id/nav_inbox"
             android:icon="?attr/actionModeCopyDrawable"
-            android:title="Inbox" />
+            android:title="笔记" />
         <item
             android:id="@+id/nav_todo_inbox"
             android:icon="@android:drawable/ic_menu_agenda"
-            android:title="收集箱" />
+            android:title="To Do" />
         <item
             android:id="@+id/nav_focus_timer"
             android:icon="@drawable/ic_focus_timer"
@@ -39,11 +39,7 @@
         <item
             android:id="@+id/nav_inbox_settings"
             android:icon="@android:drawable/ic_menu_preferences"
-            android:title="Inbox 设置" />
-        <item
-            android:id="@+id/nav_trash"
-            android:icon="@android:drawable/ic_menu_delete"
-            android:title="回收站" />
+            android:title="笔记设置" />
         <item
             android:id="@+id/nav_stopwatch"
             android:icon="@android:drawable/ic_menu_today"
