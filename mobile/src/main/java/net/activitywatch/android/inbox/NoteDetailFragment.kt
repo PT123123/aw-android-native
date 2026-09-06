@@ -3,8 +3,15 @@ package net.activitywatch.android.inbox
 import android.app.Dialog
 import android.graphics.Color
 import android.os.Bundle
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.TextPaint
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ScrollView
@@ -25,6 +32,7 @@ import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.NoteDetailBinding
 import net.activitywatch.android.databinding.NoteHistoryItemBinding
+import net.activitywatch.android.todo.TodoApi
 
 /**
  * 笔记详情面板：展示元数据 + 嵌入式历史版本列表。
@@ -33,6 +41,7 @@ class NoteDetailFragment : BottomSheetDialogFragment() {
 
     companion object {
         private const val ARG_NOTE_ID = "arg_note_id"
+        private const val MENU_CONVERT = 1001
         const val RESULT_KEY = "note_detail_restored"
         const val KEY_NOTE_ID = "note_id"
         const val KEY_CONTENT = "content"
@@ -48,6 +57,10 @@ class NoteDetailFragment : BottomSheetDialogFragment() {
     private val binding get() = _binding!!
 
     private var noteId: Long = 0
+
+    /** loadNoteDetail 拉到的当前笔记，供「转为待办」使用 */
+    private var currentNote: NoteResponse? = null
+
     private lateinit var historyAdapter: HistoryAdapter
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -86,6 +99,14 @@ class NoteDetailFragment : BottomSheetDialogFragment() {
         binding.toolbar.setNavigationOnClickListener { dismiss() }
         binding.btnClose.setOnClickListener { dismiss() }
 
+        // 溢出菜单：把该笔记转为待办并删除原笔记
+        binding.toolbar.menu.add(Menu.NONE, MENU_CONVERT, Menu.NONE, "转为待办").apply {
+            setOnMenuItemClickListener {
+                currentNote?.let { confirmConvertToTodo(it) }
+                true
+            }
+        }
+
         historyAdapter = HistoryAdapter { item -> showHistoryDetail(item) }
         binding.listHistory.layoutManager = LinearLayoutManager(requireContext())
         binding.listHistory.adapter = historyAdapter
@@ -102,6 +123,7 @@ class NoteDetailFragment : BottomSheetDialogFragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val note = LocalInboxApi.service.getNote(noteId)
+                currentNote = note
 
                 binding.tvDevice.text = DeviceNameResolver.resolve(requireContext(), note.device_id)
                 binding.tvCreatedAt.text = formatDateTime(note.created_at)
@@ -111,8 +133,11 @@ class NoteDetailFragment : BottomSheetDialogFragment() {
                 binding.tvSyncedAt.text = if (note.synced_at.isNullOrEmpty())
                     "未同步"
                 else formatDateTime(note.synced_at)
+                // 层级 tag 面包屑：项目/工作 → 项目 / 工作，每段可点，点击按该段路径筛选笔记列表
                 binding.tvTags.text = if (note.tags.isEmpty()) "—"
-                else note.tags.joinToString(" ") { "#$it" }
+                else buildTagSpannable(note.tags)
+                binding.tvTags.movementMethod = LinkMovementMethod.getInstance()
+                binding.tvTags.highlightColor = Color.TRANSPARENT
                 binding.tvNoteId.text = note.id.toString()
 
                 binding.layoutConflict.visibility = if (note.conflict) View.VISIBLE else View.GONE
@@ -132,6 +157,81 @@ class NoteDetailFragment : BottomSheetDialogFragment() {
                 Toast.makeText(requireContext(), "加载详情失败：${e.message}", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    /** 层级 tag 面包屑 spannable：`项目/工作` → `项目 / 工作`，每段独立可点（回调到该段为止的路径） */
+    private fun buildTagSpannable(tags: List<String>): CharSequence {
+        val color = ContextCompat.getColor(requireContext(), R.color.inbox_accent)
+        fun span(path: String) = object : ClickableSpan() {
+            override fun onClick(widget: View) = onTagSegmentClick(path)
+            override fun updateDrawState(ds: TextPaint) {
+                ds.color = color
+                ds.isUnderlineText = false
+            }
+        }
+        val ssb = SpannableStringBuilder()
+        tags.forEachIndexed { index, tag ->
+            if (index > 0) ssb.append("  ")
+            val segs = tagSegments(tag)
+            if (segs.size <= 1) {
+                val start = ssb.length
+                ssb.append("#$tag")
+                ssb.setSpan(span(tag), start, ssb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            } else {
+                var acc = ""
+                segs.forEachIndexed { k, seg ->
+                    if (k > 0) ssb.append(" / ")
+                    val start = ssb.length
+                    ssb.append(seg)
+                    acc = if (k == 0) seg else "$acc/$seg"
+                    ssb.setSpan(span(acc), start, ssb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+            }
+        }
+        return ssb
+    }
+
+    /** 点详情页标签的某一段 → 笔记列表按该段路径筛选，并关闭详情面板 */
+    private fun onTagSegmentClick(path: String) {
+        (parentFragmentManager.findFragmentById(R.id.fragment_container) as? InboxFragment)
+            ?.applyTagFilterPath(path)
+        dismiss()
+    }
+
+    // ==== 笔记转待办（⑦-C，与 InboxFragment 共用 NoteTodoConverter） ====
+
+    private fun confirmConvertToTodo(note: NoteResponse) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("转为待办")
+            .setMessage("把该笔记原样转为一条待办，并删除原笔记？")
+            .setPositiveButton("转为待办") { _, _ -> convertNoteToTodo(note) }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun convertNoteToTodo(note: NoteResponse) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            TodoApi.init(requireContext())
+            when (val result = NoteTodoConverter.convert(note)) {
+                is NoteTodoConverter.Result.Success -> {
+                    Toast.makeText(requireContext(), "已转为待办", Toast.LENGTH_SHORT).show()
+                    notifyListConverted()
+                    dismiss()
+                }
+                is NoteTodoConverter.Result.TodoCreatedButDeleteFailed -> {
+                    Toast.makeText(requireContext(), "已转为待办，原笔记删除失败", Toast.LENGTH_LONG).show()
+                    notifyListConverted()
+                }
+                is NoteTodoConverter.Result.CreateFailed -> {
+                    Toast.makeText(requireContext(), "转换失败：${result.reason}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    /** KEY_NOTE_ID=0 走 InboxFragment 监听里的 else 分支 → 整页重载（自带筛选上下文） */
+    private fun notifyListConverted() {
+        parentFragmentManager.setFragmentResult(RESULT_KEY, bundleOf(KEY_NOTE_ID to 0L))
     }
 
     private fun showHistoryDetail(item: NoteHistoryItem) {

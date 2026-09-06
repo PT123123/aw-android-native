@@ -89,4 +89,8 @@ interface InboxService {
 
     @GET("inbox/tags/detailed")
     suspend fun getDetailedTags(): List<DetailedTag>
+
+    /** 层级标签树：tag 按 `/` 分段，count 为前缀匹配（含子孙）笔记数 */
+    @GET("inbox/tags/tree")
+    suspend fun getTagTree(): TagTreeResponse
 }

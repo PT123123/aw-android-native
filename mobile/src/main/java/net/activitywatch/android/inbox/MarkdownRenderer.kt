@@ -56,17 +56,46 @@ object MarkdownRenderer {
         val color = ContextCompat.getColor(context, R.color.inbox_accent)
         TAG_RE.findAll(ssb).forEach { match ->
             val tag = match.value.removePrefix("#")
-            val span = if (onTagClick == null) {
-                ForegroundColorSpan(color)
+            if (onTagClick == null) {
+                ssb.setSpan(
+                    ForegroundColorSpan(color),
+                    match.range.first,
+                    match.range.last + 1,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+            } else if (!tag.contains('/')) {
+                ssb.setSpan(
+                    TagSpan(tag, color, onTagClick),
+                    match.range.first,
+                    match.range.last + 1,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
             } else {
-                TagSpan(tag, color, onTagClick)
+                // 层级 tag（#项目/工作/xx）：整段保持高亮色，同时每个段独立可点，
+                // 点击回调「到该段为止的路径」（如点 工作 → 项目/工作），配合服务端段边界前缀匹配筛选。
+                // 标签字符集不含空白，段与原文位置一一对应；分隔符 # / 不在 span 内，点上去走普通单击。
+                ssb.setSpan(
+                    ForegroundColorSpan(color),
+                    match.range.first,
+                    match.range.last + 1,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+                var off = 0
+                var acc = ""
+                for (seg in tag.split('/')) {
+                    val start = match.range.first + 1 + off
+                    acc = if (acc.isEmpty()) seg else "$acc/$seg"
+                    if (seg.isNotEmpty()) {
+                        ssb.setSpan(
+                            TagSpan(acc, color, onTagClick),
+                            start,
+                            start + seg.length,
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                        )
+                    }
+                    off += seg.length + 1
+                }
             }
-            ssb.setSpan(
-                span,
-                match.range.first,
-                match.range.last + 1,
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-            )
         }
         return ssb
     }

@@ -153,6 +153,8 @@ cd C:\Users\ted\Desktop\aw-android
 
 ## 七、笔记（Inbox）功能增强规划（仅规划，不改代码）
 
+> **状态更新（2026-09-06）：本节 ⑦-A / ⑦-B / ⑦-C / ⑦-D 已全部实现**，实现与下述规划一致，差异与补充见本节末尾「实现记录」。
+
 > 状态：**纯文档**。下述所有条目均为待实现需求，**不会在本次落盘时改动任何代码**。涉及模块：`mobile/src/main/java/net/activitywatch/android/inbox/`（UI 层）+ `aw-server-rust/aw-inbox-rust`（服务端，`/inbox/*` 路由）。
 > 与现有 `todo/` 模块的关系：⑦ 会把笔记转成待办，因此需对接 `TodoSource / TodoApi` 的创建接口。
 
@@ -260,6 +262,26 @@ cd C:\Users\ted\Desktop\aw-android
 - ⑦-A 与 ⑦-D 互相独立，可并行开工。
 - ⑦-C 必须等 ⑦-B 完成「筛选态刷新」之后做，因为转换后需保留 `?tag=` 上下文，复用同一刷新路径最省事。
 - 全部功能在落盘前**再次明确：本次只写本规划到文档，不改动任何代码**。
+
+### ⑦ 实现记录（2026-09-06，全部四项已实现）
+
+**服务端（aw-inbox-rust，submodule 工作区修改，未 commit）**：
+- `db.rs::get_notes_db`：`?tag=` 由精确匹配改为**段边界前缀匹配**（`tags LIKE %"t"%` OR `tags LIKE %"t/%`，LIKE 通配符转义），`项目` 命中 `项目` 与 `项目/...` 全部子孙、不命中 `项目2`。
+- `db.rs::get_tag_tree_db` + `models.rs::TagNode/TagTreeResponse` + `lib.rs` 新路由 **`GET /inbox/tags/tree`**：按 `/` 分段建树，count 为含子孙的前缀匹配计数；只统计未删除笔记；children 按路径排序。既有 `/tags`、`/tags/detailed` 保持原样（兼容桌面端）。
+- 新增 `tests/tag_tree_test.rs`（内存库直打 db 层，Windows 可跑）：覆盖前缀匹配、树结构计数、删除排除。**测试抓出并修复了一个 bug**：树根若只从「被精确打过的 tag」取，`项目` 这类纯中间节点会从树里消失——根节点已改为从全部前缀路径中取无 `/` 者。
+- 旧测试 `integration_test.rs`/`integration_http_test.rs`（引用已移除的 axum/reqwest）、`note_crud_test.rs`（Unix shell 专用）在 Windows 上本就无法编译/运行，与本次改动无关。
+
+**Android 端（mobile/）**：
+- `InboxModels.kt`：`TagNodeResponse/TagTreeResponse` + `tagSegments/tagParentPath/tagLastSegment/formatTagBreadcrumb` 工具；`LocalInboxApi.kt` 加 `getTagTree()`。
+- `MarkdownRenderer.kt`（⑦-A）：层级 tag 渲染为**每段独立可点**的 span，点击按「到该段为止的路径」筛选（配合服务端前缀匹配）；正文文字不变、整段保持高亮色。
+- `NoteDetailFragment.kt`（⑦-A）：详情页标签以面包屑（`项目 / 工作`）展示，每段可点 → 跳列表筛选并关闭详情。
+- `InboxFragment.kt`（⑦-B）：顶部新增**标签 chips 行**（未筛选=顶层标签，筛选中=当前路径子标签，带计数）；筛选条显示面包屑 + **↑ 返回上级**（`项目/工作/xx → 项目/工作 → 项目 → 顶层`）+ ✕ 清除；筛选路径存 `savedInstanceState`（配置变更/进程重建恢复，不持久化 prefs）。
+- `NoteTodoConverter.kt`（⑦-C，新文件）+ 入口两处（`InboxFragment` 长按菜单、`NoteDetailFragment` 工具栏溢出菜单）：二次确认后**先 `POST /inbox/todos` 再 `DELETE /inbox/notes/<id>`**，按规划兜底（建失败不删 / 删失败提示「已转为待办，原笔记删除失败」）；title 取正文首行剥 markdown 标记（截 50 字），content 原文不截断，tags 原样，priority=中，不设期限；完成后整页重载，**自带 currentTag 保留筛选上下文**。
+- ⑦-D：`note_editor.xml` 底部改为**单行**（Markdown 工具栏左 + 发送按钮右、垂直居中），快速笔记弹层（`InboxFragment` 程序化布局）同步对齐；工具按钮文案与点击逻辑未动（现状无 `/` 键，`/` 本就按普通字符输入，无需改动）。
+- 规划中「基于标签树的段级输入自动补全」为可选项，本次未实现。
+
+**验证**：`cargo check -p aw-inbox-rust` 通过；`cargo test --test tag_tree_test` 3/3 通过；`gradlew :mobile:compileDebugKotlin` BUILD SUCCESSFUL；随后重跑 `cargoBuildArm + cargoBuildArm64 + assembleDebug` 产出含修复的 .so 与 APK。
+> ⚠️ 新坑：rustJniLibs 里换了新 .so 后，AGP 的 merge/strip native libs 任务可能仍报 UP-TO-DATE（输入快照未失效），**APK 打进的是旧库**。验证方法：`sha1sum build/rustJniLibs/android/<abi>/libaw_server.so` 对比 `build/intermediates/stripped_native_libs/.../libaw_server.so`，不一致即中招；解法：删 `build/intermediates/{merged_jni_libs,merged_native_libs,stripped_native_libs}` 后重新 `assembleDebug`。
 
 ---
 
