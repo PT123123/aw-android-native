@@ -21,10 +21,20 @@ import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.FragmentSyncBinding
 import net.activitywatch.android.sync.wifi.WifiTransferFragment
+import net.activitywatch.android.sync.SyncDetailsFragment
 
 // 局域网同步页：
-// 配对与设备 / 设置 两个可折叠面板，数据来自本机 Rust server 的 /api/0/sync
+// 配对与设备 / 设置 两个可折叠面板，数据来自本机 Rust server 的 /api/0/sync。
+// 同步由 Wi-Fi 状态自动开关（LanSyncNetworkMonitor），三档模式=自动同步频率预设。
 class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
+
+    companion object {
+        // 三档模式的间隔预设（秒），与 Rust 侧 sync_interval 对应
+        private const val INTERVAL_BERSERK = 10L   // 狂暴
+        private const val INTERVAL_CALM = 300L     // 平和
+        private const val INTERVAL_SILENT = 1800L  // 静默
+        private const val INTERVAL_MIN = 5L
+    }
 
     private var _binding: FragmentSyncBinding? = null
     private val binding get() = _binding!!
@@ -33,6 +43,9 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
     private lateinit var rowsAdapter: SyncRowsAdapter
 
     private var settingsHydrated = false
+
+    // 水合期间程序化 check 档位时抑制监听回调，避免打开页面就触发一次冗余保存
+    private var hydrating = false
     private var discoveryMethod = "broadcast"
 
     override fun onCreateView(
@@ -98,6 +111,17 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
         super.onDestroyView()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 进入局域网同步界面：开始发现广播（离开即停，不进界面绝不广播）
+        viewModel.startDiscovery()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        viewModel.stopDiscovery()
+    }
+
     // ==================== 面板折叠 ====================
 
     private fun setupPanel(header: View, content: View, chevron: ImageView, initiallyExpanded: Boolean) {
@@ -113,13 +137,36 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
     // ==================== 设置面板 ====================
 
     private fun setupSettingsControls() {
-        // 总开关：开启/关闭局域网同步
-        binding.cfgEnabled.setOnCheckedChangeListener { _, checked ->
-            lifecycleScope.launch {
-                val current = try { viewModel.state.value.config } catch (_: Exception) { null }
-                val base = current ?: SyncConfig()
-                viewModel.saveConfig(base.copy(enabled = checked))
+        // 三档模式 = 自动同步（拉取）频率预设：狂暴 10 秒 / 平和 300 秒 / 静默 1800 秒。
+        // Wi-Fi 连接时由 Rust 侧自动同步循环按此间隔执行，离开 Wi-Fi 自动停止。
+        binding.modeGroup.addOnButtonCheckedListener { _, _, isChecked ->
+            if (!isChecked || hydrating || !settingsHydrated) return@addOnButtonCheckedListener
+            val preset = when (binding.modeGroup.checkedButtonId) {
+                R.id.modeBerserk -> INTERVAL_BERSERK
+                R.id.modeCalm -> INTERVAL_CALM
+                R.id.modeSilent -> INTERVAL_SILENT
+                else -> return@addOnButtonCheckedListener
             }
+            binding.inputInterval.setText(preset.toString())
+            applySyncInterval(preset)
+        }
+
+        // 手动输入间隔 = 自定义频率
+        binding.btnApplyInterval.setOnClickListener {
+            val seconds = binding.inputInterval.text?.toString()?.trim()?.toLongOrNull()
+            if (seconds == null || seconds < INTERVAL_MIN) {
+                Snackbar.make(binding.root, "请输入不小于 ${INTERVAL_MIN} 的秒数", Snackbar.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            applySyncInterval(seconds)
+        }
+
+        // 同步详情（报文日志）页：代码一直都在，此前入口丢失，这里恢复
+        binding.btnSyncLogs.setOnClickListener {
+            requireActivity().supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, SyncDetailsFragment())
+                .addToBackStack(null)
+                .commit()
         }
 
         // 进入详细设置页
@@ -137,6 +184,14 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
                 .setNegativeButton("取消", null)
                 .setPositiveButton("确定清空") { _, _ -> viewModel.clearAllDevices() }
                 .show()
+        }
+    }
+
+    private fun applySyncInterval(seconds: Long) {
+        lifecycleScope.launch {
+            val current = try { viewModel.state.value.config } catch (_: Exception) { null }
+            val base = current ?: SyncConfig()
+            viewModel.saveConfig(base.copy(syncInterval = seconds))
         }
     }
 
@@ -192,7 +247,16 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
         val cfg = s.config ?: return
         if (!settingsHydrated) {
             settingsHydrated = true
-            binding.cfgEnabled.isChecked = cfg.enabled
+            binding.inputInterval.setText(cfg.syncInterval.toString())
+            // 当前间隔恰为预设时高亮对应档位；自定义值不选中任何档
+            hydrating = true
+            when (cfg.syncInterval) {
+                INTERVAL_BERSERK -> binding.modeGroup.check(R.id.modeBerserk)
+                INTERVAL_CALM -> binding.modeGroup.check(R.id.modeCalm)
+                INTERVAL_SILENT -> binding.modeGroup.check(R.id.modeSilent)
+                else -> binding.modeGroup.clearChecked()
+            }
+            hydrating = false
         }
     }
 

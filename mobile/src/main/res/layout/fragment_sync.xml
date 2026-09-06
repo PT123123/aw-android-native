@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 局域网同步页：两个可折叠面板（配对与设备 / 设置）；「显示报文」已拆为独立「同步详情」页 -->
+<!-- 局域网同步页：两个可折叠面板（配对与设备 / 设置）。
+     Wi-Fi 连接时自动开启同步（无需手动开关），同步详情（报文日志）经「查看同步日志」进入 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -182,12 +183,101 @@
                                 android:paddingBottom="16dp"
                                 android:visibility="gone">
 
-                                <com.google.android.material.switchmaterial.SwitchMaterial
-                                    android:id="@+id/cfgEnabled"
+                                <TextView
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:text="开启局域网同步"
-                                    android:textColor="@color/inbox_text" />
+                                    android:text="Wi-Fi 连接时自动开启同步，离开 Wi-Fi 自动关闭，无需手动开关。"
+                                    android:textColor="@color/inbox_text"
+                                    android:textSize="13sp" />
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="6dp"
+                                    android:text="同步模式（自动同步频率，Wi-Fi 连接期间生效）："
+                                    android:textColor="@color/inbox_sub"
+                                    android:textSize="12sp" />
+
+                                <com.google.android.material.button.MaterialButtonToggleGroup
+                                    android:id="@+id/modeGroup"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="6dp"
+                                    app:selectionRequired="false"
+                                    app:singleSelection="true">
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/modeBerserk"
+                                        style="?attr/materialButtonOutlinedStyle"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:insetLeft="0dp"
+                                        android:insetRight="0dp"
+                                        android:text="狂暴 10秒"
+                                        android:textSize="12sp" />
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/modeCalm"
+                                        style="?attr/materialButtonOutlinedStyle"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:insetLeft="0dp"
+                                        android:insetRight="0dp"
+                                        android:text="平和 5分"
+                                        android:textSize="12sp" />
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/modeSilent"
+                                        style="?attr/materialButtonOutlinedStyle"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:insetLeft="0dp"
+                                        android:insetRight="0dp"
+                                        android:text="静默 30分"
+                                        android:textSize="12sp" />
+                                </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="10dp"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
+
+                                    <com.google.android.material.textfield.TextInputLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:hint="拉取频率：自动同步间隔（秒）">
+
+                                        <com.google.android.material.textfield.TextInputEditText
+                                            android:id="@+id/inputInterval"
+                                            android:layout_width="match_parent"
+                                            android:layout_height="wrap_content"
+                                            android:inputType="number"
+                                            android:textSize="13sp" />
+                                    </com.google.android.material.textfield.TextInputLayout>
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/btnApplyInterval"
+                                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="8dp"
+                                        android:text="应用"
+                                        android:textColor="@color/sync_link" />
+                                </LinearLayout>
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="点档位直接应用预设；手动输入秒数后点「应用」即为自定义频率（最小 5 秒）。"
+                                    android:textColor="@color/inbox_sub"
+                                    android:textSize="12sp" />
 
                                 <TextView
                                     android:layout_width="match_parent"
@@ -196,6 +286,15 @@
                                     android:text="同步 ActivityWatch 数据 (sqlite.db)。Inbox / TODO 请通过 CF D1 云端同步。"
                                     android:textColor="@color/inbox_sub"
                                     android:textSize="12sp" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btnSyncLogs"
+                                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="查看同步日志 ▶"
+                                    android:textColor="@color/sync_link" />
 
                                 <com.google.android.material.button.MaterialButton
                                     android:id="@+id/btnSyncSettings"
