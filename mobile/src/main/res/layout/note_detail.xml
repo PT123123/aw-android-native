@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/inbox_bg"
+    android:orientation="vertical"
+    android:theme="@style/Theme.MaterialComponents">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/inbox_bg"
+        android:theme="@style/ThemeOverlay.MaterialComponents.Dark"
+        app:navigationIcon="@drawable/ic_close"
+        app:navigationIconTint="@color/inbox_text"
+        app:title="详细信息"
+        app:titleTextColor="@color/inbox_text" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="12dp"
+            android:paddingBottom="16dp">
+
+            <!-- 元数据卡片 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="@color/inbox_card"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="元数据"
+                        android:textColor="@color/inbox_sub"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <!-- 来自设备 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="100dp"
+                            android:layout_height="wrap_content"
+                            android:text="来自设备"
+                            android:textColor="@color/inbox_sub"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tv_device"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="@color/inbox_text"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <!-- 创建时间 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="100dp"
+                            android:layout_height="wrap_content"
+                            android:text="创建时间"
+                            android:textColor="@color/inbox_sub"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tv_created_at"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/inbox_text"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <!-- 修改时间 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="100dp"
+                            android:layout_height="wrap_content"
+                            android:text="修改时间"
+                            android:textColor="@color/inbox_sub"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tv_updated_at"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/inbox_text"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <!-- 版本号 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="100dp"
+                            android:layout_height="wrap_content"
+                            android:text="版本"
+                            android:textColor="@color/inbox_sub"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tv_version"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/inbox_text"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <!-- 字数统计 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="100dp"
+                            android:layout_height="wrap_content"
+                            android:text="字数"
+                            android:textColor="@color/inbox_sub"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tv_word_count"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/inbox_text"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <!-- 最后同步 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="100dp"
+                            android:layout_height="wrap_content"
+                            android:text="最后同步"
+                            android:textColor="@color/inbox_sub"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tv_synced_at"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/inbox_text"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <!-- 标签 -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="100dp"
+                            android:layout_height="wrap_content"
+                            android:text="标签"
+                            android:textColor="@color/inbox_sub"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tv_tags"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="@color/inbox_text"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <!-- 笔记 ID -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="100dp"
+                            android:layout_height="wrap_content"
+                            android:text="笔记 ID"
+                            android:textColor="@color/inbox_sub"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tv_note_id"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/inbox_sub"
+                            android:textSize="12sp"
+                            android:fontFamily="monospace" />
+                    </LinearLayout>
+
+                    <!-- 冲突警告 -->
+                    <LinearLayout
+                        android:id="@+id/layout_conflict"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/aw_field_bg"
+                        android:orientation="horizontal"
+                        android:padding="10dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⚠ 此笔记存在同步冲突，建议检查内容后手动解决"
+                            android:textColor="@color/inbox_sub"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 历史版本 -->
+            <TextView
+                android:id="@+id/tv_history_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="历史版本"
+                android:textColor="@color/inbox_sub"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tv_history_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:padding="16dp"
+                android:text="暂无历史版本"
+                android:textColor="@color/inbox_sub"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/list_history"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:nestedScrollingEnabled="false" />
+
+            <!-- 关闭 -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_close"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="关闭"
+                android:textColor="@color/inbox_sub" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

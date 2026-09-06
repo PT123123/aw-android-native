@@ -107,6 +107,12 @@ data class LogPage(
     @SerializedName("total") val total: Int = 0
 )
 
+/** D1 同步日志分页结果 */
+data class D1SyncLogPage(
+    @SerializedName("logs") val logs: List<SyncLogEntry> = emptyList(),
+    @SerializedName("total") val total: Int = 0
+)
+
 data class DeviceSyncStats(
     @SerializedName("device_id") val deviceId: String = "",
     @SerializedName("pending_push_count") val pendingPushCount: Int = 0,
