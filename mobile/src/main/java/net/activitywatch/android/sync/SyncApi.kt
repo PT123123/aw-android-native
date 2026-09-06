@@ -22,6 +22,14 @@ interface SyncApi {
     @GET("api/0/sync/info")
     suspend fun getInfo(): Device
 
+    // ---- 发现广播开关（进入/离开局域网同步界面时调用；不进界面绝不广播） ----
+
+    @POST("api/0/sync/discovery/start")
+    suspend fun startDiscovery(): Map<String, Boolean>
+
+    @POST("api/0/sync/discovery/stop")
+    suspend fun stopDiscovery(): Map<String, Boolean>
+
     // ---- 配对 ----
 
     @POST("api/0/sync/pair/initiate")

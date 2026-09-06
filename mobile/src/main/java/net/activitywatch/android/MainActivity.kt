@@ -30,6 +30,7 @@ import net.activitywatch.android.focus.FocusTimerFragment
 import net.activitywatch.android.inbox.InboxFragment
 import net.activitywatch.android.inbox.InboxPrefs
 import net.activitywatch.android.inbox.InboxSettingsFragment
+import net.activitywatch.android.sync.LanSyncNetworkMonitor
 import net.activitywatch.android.sync.SyncFragment
 import net.activitywatch.android.sync.SyncSettingsFragment
 import net.activitywatch.android.sync.SyncDetailsFragment
@@ -136,6 +137,9 @@ class MainActivity : AppCompatActivity() {
         // 启动服务器任务
         val ri = RustInterface(this)
         ri.startServerTask(this)
+
+        // Wi-Fi 自动开关：连上 Wi-Fi 自动开启局域网同步，离开自动关闭（无需人工开关）
+        LanSyncNetworkMonitor.register(this, ri)
 
         // 如果 savedInstanceState 不为 null，则跳过添加 Fragment
         if (savedInstanceState != null) {

@@ -127,6 +127,10 @@ class RustInterface constructor(context: Context? = null) {
             var wifiIp: String? = null
             for (net in cm.allNetworks) {
                 val caps = cm.getNetworkCapabilities(net) ?: continue
+                // 跳过 VPN 网络：Android 13+ 的 VPN 网络会携带底层网络传输标记
+                // （TRANSPORT_VPN + TRANSPORT_WIFI），其 LinkProperties 是 tun 地址，
+                // 先遍历到它会把 VPN 地址（如 172.19.0.1）误当成 Wi-Fi IP 注入
+                if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) continue
                 if (!caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) continue
                 val lp = cm.getLinkProperties(net) ?: continue
                 for (la in lp.linkAddresses) {
