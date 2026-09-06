@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
     android:background="@color/inbox_bg"
     android:orientation="vertical"
     android:padding="12dp"
@@ -31,12 +31,6 @@
         android:textColor="@color/inbox_text"
         android:textColorHint="@color/inbox_sub"
         android:textSize="16sp" />
-
-    <!-- 输入框按内容生长（minLines→maxLines，超出内部滚动），剩余空间留白把工具栏行压到 sheet 底部 -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
 
     <!-- 底部同一行：Markdown 工具栏在左、发送按钮在右，垂直居中对齐（键盘弹出时贴在输入法上方） -->
     <LinearLayout
