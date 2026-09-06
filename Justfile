@@ -3,8 +3,9 @@
 # 常用命令：
 #   just                列出全部命令
 #   just build          编译 debug APK（复用 jniLibs 里已编好的 libaw_server.so，跳过 Rust 重编）
-#   just install-phone  adb 安装 debug APK 到手机（按型号自动识别）
-#   just install-tab    adb 安装 debug APK 到平板（按型号自动识别）
+#   just install        adb 安装 debug APK（默认装手机，按型号自动识别）
+#   just install phone  指定装到手机
+#   just install tab    指定装到平板
 #   just install-all    两台都装
 #   just run            编译 + 安装 + 启动
 #   just kotlinc        只快速校验 Kotlin/资源改动（不重建 .so、离线）
@@ -40,27 +41,23 @@ default:
 build:
     {{GRADLE}} :mobile:assembleDebug -x cargoBuild
 
-# adb 安装 debug APK（-r 覆盖安装，动态识别设备：型号含 pad/tablet 或 TB 开头视为平板，Justfile 不写死序列号）
+# adb 安装 debug APK（-r 覆盖安装；默认装手机，`just install phone|tab` 指定设备）
+# 动态识别设备：型号含 pad/tablet 或 TB 开头视为平板，Justfile 不写死序列号
 # 顶层不执行反引号，避免 parse 时脚本 exit 1 炸掉所有命令
 export PHONE_SERIAL := ""
 export TAB_SERIAL := ""
 
-install-phone:
-    @serial=$(bash scripts/pick_device.sh phone); \
-    test -n "$serial" || (echo "未检测到手机设备（已按型号排除平板），请确认手机已连接 adb"; exit 1); \
-    {{ADB}} -s "$serial" install -r "{{DEBUG_APK}}"
-
-# adb 安装 debug APK 到平板
-install-tab:
-    @serial=$(bash scripts/pick_device.sh tab); \
-    test -n "$serial" || (echo "未检测到平板设备（按型号 pad/tablet/TB 识别），请确认平板已连接 adb"; exit 1); \
+install device="phone":
+    @case "{{device}}" in phone|tab) ;; *) echo "用法: just install [phone|tab]"; exit 1;; esac; \
+    serial=$(bash scripts/pick_device.sh {{device}}); \
+    test -n "$serial" || (echo "未检测到{{if device == "tab" { "平板" } else { "手机" } }}设备（按型号 pad/tablet/TB 识别平板），请确认已连接 adb"; exit 1); \
     {{ADB}} -s "$serial" install -r "{{DEBUG_APK}}"
 
 # 两台都装
-install-all: install-phone install-tab
+install-all: (install "phone") (install "tab")
 
 # 编译 + 安装 + 启动到红米手机
-run: build install-phone
+run: build (install "phone")
     @serial=$(bash scripts/pick_device.sh phone); \
     {{ADB}} -s "$serial" shell am start -n net.activitywatch.android.debug/net.activitywatch.android.MainActivity
 
