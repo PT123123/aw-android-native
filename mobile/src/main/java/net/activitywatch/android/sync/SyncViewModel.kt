@@ -3,6 +3,9 @@ package net.activitywatch.android.sync
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
@@ -375,7 +378,8 @@ class SyncViewModel : ViewModel() {
     }
 
     fun stopDiscovery() {
-        viewModelScope.launch {
+        // 用 detachedScope：onPause 后 viewModelScope 随页面销毁被取消，stop 必须独立发送
+        detachedScope.launch {
             repo.call { api.stopDiscovery() }
                 .onFailure { e -> Log.w(TAG, "停止发现广播失败: ${e.message}") }
         }
@@ -391,5 +395,9 @@ class SyncViewModel : ViewModel() {
 
     companion object {
         private const val TAG = "SyncViewModel"
+
+        // 离开页面后仍需完成的收尾请求用它：退出页面即 ViewModel 清理，
+        // viewModelScope 会取消在途请求，导致 stop 广播请求发不出去、广播状态残留
+        private val detachedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }

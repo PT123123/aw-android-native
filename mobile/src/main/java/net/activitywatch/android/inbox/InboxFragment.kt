@@ -21,9 +21,11 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.InboxFragmentBinding
+import net.activitywatch.android.sync.LanPull
 
 class InboxFragment : Fragment() {
 
@@ -51,6 +53,10 @@ class InboxFragment : Fragment() {
     private var searchQuery: String? = null
     private var sortByUpdated = false
     private var retryCount = 0
+
+    /** 局域网拉取：笔记页每次刷新逻辑顺带触发一次，拉完重载列表让远端变更即刷即现 */
+    private var lanPullJob: Job? = null
+    private var lanPullPending = false
 
     /** 是否处于多选模式 */
     private var selectionMode = false
@@ -126,10 +132,18 @@ class InboxFragment : Fragment() {
         }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, selectionBackCallback)
 
-        // 详情面板恢复版本后刷新列表，让卡片正文与更新时间同步变化
+        // 详情面板恢复版本后刷新列表并跳转到该笔记，让卡片正文与更新时间同步变化
         parentFragmentManager.setFragmentResultListener(
             NoteDetailFragment.RESULT_KEY, viewLifecycleOwner
-        ) { _, _ -> loadInitial() }
+        ) { _, bundle ->
+            val noteId = bundle.getLong(NoteDetailFragment.KEY_NOTE_ID)
+            if (noteId > 0) {
+                // 延迟等列表渲染完毕再定位
+                binding.list.postDelayed({ refreshAndScrollToNote(noteId) }, 400)
+            } else {
+                loadInitial()
+            }
+        }
 
         loadInitial()
         // 设置项：进入页面即弹出输入框（等首帧渲染完再弹，避免 BottomSheet 抢焦点失败）
@@ -139,37 +153,44 @@ class InboxFragment : Fragment() {
     }
 
     /**
-     * 保存/编辑笔记后调用：刷新列表并滚动到指定笔记。
+     * 保存/编辑笔记后调用：刷新该笔记并滚动定位（不整页重载）。
+     * 单条回源 getNote：已在列表 → 原位替换；不在（新建/被分页或筛选挡住）→ 加入列表重新排序。
+     * 单条拉取失败（笔记已被删 / 网络异常）→ 静默降级为完整 loadInitial()。
      * @param noteId 要定位的笔记 ID（新建/刚编辑的）
      */
     fun refreshAndScrollToNote(noteId: Long) {
         viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                // 重新加载第一页
-                val list = LocalInboxApi.service.getNotes(limit = limit, offset = 0, tag = currentTag, search = searchQuery)
-                val sorted = if (sortByUpdated) {
-                    list.sortedByDescending {
-                        InboxAdapter.parseTime(it.updated_at ?: it.created_at)?.time ?: 0L
-                    }
-                } else {
-                    list
-                }
-                items.clear()
-                queriedRelations.clear()
-                resolvedParent.clear()
-                items.addAll(sorted)
-                adapter.pinnedIds = PinStore.pinnedIdsSet(requireContext())
-                sortItems()
-                hydrateRelations()
+            val note = runCatching { LocalInboxApi.service.getNote(noteId) }.getOrNull()
+            if (note == null) {
+                loadInitial()
+                return@launch
+            }
+            val existingIdx = items.indexOfFirst { it.id == noteId }
+            if (existingIdx >= 0) {
+                // 原位替换保留已解析的关联预览（新对象的 parentId 为空，直接放会丢灰色预览）
+                note.parentId = items[existingIdx].parentId
+                note.parentPreview = items[existingIdx].parentPreview
+                items[existingIdx] = note
+            } else {
+                items.add(note)
+            }
+            adapter.pinnedIds = PinStore.pinnedIdsSet(requireContext())
+            sortItems()
+            hydrateRelations()
+            val idx = items.indexOfFirst { it.id == noteId }
+            if (idx >= 0) scrollToPositionWithHighlight(idx)
+        }
+    }
 
-                // 滚动到目标笔记
-                val idx = items.indexOfFirst { it.id == noteId }
-                if (idx >= 0) {
-                    (binding.list.layoutManager as LinearLayoutManager)
-                        .scrollToPositionWithOffset(idx, 0)
-                }
-            } catch (e: Exception) {
-                // 刷新失败不阻塞用户操作
+    /** 滚动到指定位置并让目标行背景闪烁 ~400ms，让用户一眼看到跳转到了哪里 */
+    private fun scrollToPositionWithHighlight(idx: Int) {
+        val lm = binding.list.layoutManager as? LinearLayoutManager ?: return
+        lm.scrollToPositionWithOffset(idx, 0)
+        binding.list.post {
+            binding.list.findViewHolderForAdapterPosition(idx)?.itemView?.let { view ->
+                val original = view.background
+                view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.aw_accent))
+                view.postDelayed({ view.background = original }, 400)
             }
         }
     }
@@ -337,7 +358,29 @@ class InboxFragment : Fragment() {
 
     private fun loadInitial() {
         hasMore = true
+        triggerLanPull()
         fetch(append = false)
+    }
+
+    /**
+     * 并行触发一次局域网拉取（不阻塞本地列表先渲染），拉完重载一次列表。
+     * 已有拉取在跑时不重复发起，只记 pending，结束后补一轮（合并连续触发，如搜索连续输入）。
+     * 全程静默：非 Wi-Fi / 无配对设备 / 失败都不打扰笔记页。
+     */
+    private fun triggerLanPull() {
+        if (lanPullJob?.isActive == true) {
+            lanPullPending = true
+            return
+        }
+        lanPullPending = false
+        lanPullJob = viewLifecycleOwner.lifecycleScope.launch {
+            val synced = runCatching { LanPull.syncAllPairedNow() }.getOrDefault(0)
+            if (synced > 0) fetch(append = false)
+            if (lanPullPending) {
+                lanPullPending = false
+                triggerLanPull()
+            }
+        }
     }
 
     private fun loadMore() {
