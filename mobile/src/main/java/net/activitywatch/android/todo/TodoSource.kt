@@ -34,7 +34,17 @@ abstract class TodoSource {
     abstract fun createList(name: String, color: String = "")
     abstract fun renameList(listId: Long, name: String)
     abstract fun deleteList(listId: Long)
-    abstract fun createTask(title: String, listId: Long, dueDate: String = "")
+    /**
+     * 新建任务。
+     * @param onCreated 创建成功后回调新任务 id（主线程），页面据此滚动定位到刚建的任务；
+     *                  数据源异步生效，回调只保证 id 可用，不保证快照已刷新
+     */
+    abstract fun createTask(
+        title: String,
+        listId: Long,
+        dueDate: String = "",
+        onCreated: ((Long) -> Unit)? = null,
+    )
     abstract fun updateTask(task: TodoTask)
     abstract fun setTaskCompleted(taskId: Long, completed: Boolean)
     abstract fun deleteTask(taskId: Long)
