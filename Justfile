@@ -37,8 +37,12 @@ RELEASE_APK := "mobile/build/outputs/apk/release/mobile-release.apk"
 default:
     @just --list
 
-# 编译 debug APK（跳过 Rust 重编，复用已有 .so）
+# 编译 debug APK（如果 .so 缺失则先编 Rust，否则跳过 Rust 重编）
 build:
+    @if [ ! -f mobile/build/rustJniLibs/android/arm64-v8a/libaw_server.so ]; then \
+        echo "==> .so 缺失，先编 Rust..."; \
+        {{GRADLE}} :mobile:cargoBuild; \
+    fi
     {{GRADLE}} :mobile:assembleDebug -x cargoBuild
 
 # adb 安装 debug APK（-r 覆盖安装；默认装手机，`just install phone|tab` 指定设备）
@@ -64,6 +68,10 @@ run: build (install "phone")
 # 只快速校验 Kotlin/资源改动（不重建 .so、离线，依赖已缓存）
 kotlinc:
     {{GRADLE}} :mobile:compileDebugKotlin -x cargoBuild --offline
+
+# 清理 Kotlin 构建产物（保留 Rust .so，避免 checkRequiredSoFiles 失败）
+clean:
+    {{GRADLE}} :mobile:clean
 
 # 编 release APK（versionName/versionCode 自动 +1，未签名）
 build-release:
