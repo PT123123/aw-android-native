@@ -177,6 +177,14 @@ class MainActivity : AppCompatActivity() {
 
         val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
 
+        // 让片段级返回回调优先处理（如多选模式、搜索栏等）
+        // 仅当当前片段不是 InboxFragment 时才先调用 super（InboxFragment 的逻辑在后面）
+        if (currentFragment !is InboxFragment) {
+            super.onBackPressed()
+            // 如果活动仍在运行，说明某个回调处理了返回事件
+            if (!isFinishing && !isDestroyed) return
+        }
+
         // 编辑器等子页面在返回栈中，正常弹出返回
         if (supportFragmentManager.backStackEntryCount > 0) {
             supportFragmentManager.popBackStackImmediate()

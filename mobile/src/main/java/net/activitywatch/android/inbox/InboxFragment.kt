@@ -3,7 +3,10 @@ package net.activitywatch.android.inbox
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MenuItem
@@ -36,6 +39,13 @@ class InboxFragment : Fragment() {
 
         /** savedInstanceState 里保存的当前标签筛选路径（配置变更/进程重建恢复；离开页面不持久化） */
         private const val STATE_TAG = "inbox_current_tag"
+
+        /** 输入缓存：快速发送 / 评论 对话框的已输入内容 */
+        private const val PREFS_QUICK_NOTE = "inbox_quick_note_draft"
+        private const val KEY_QUICK_NOTE_DRAFT = "quick_note_draft"
+
+        /** 最大建议数 */
+        private const val MAX_SUGGESTIONS = 10
     }
 
     private var _binding: InboxFragmentBinding? = null
@@ -215,13 +225,138 @@ class InboxFragment : Fragment() {
     /** 滚动到指定位置并让目标行背景闪烁 ~400ms，让用户一眼看到跳转到了哪里 */
     private fun scrollToPositionWithHighlight(idx: Int) {
         val lm = binding.list.layoutManager as? LinearLayoutManager ?: return
-        lm.scrollToPositionWithOffset(idx, 0)
+        // 先确保目标位置可见
+        lm.scrollToPosition(idx)
+        // 等布局完成后再精确滚动并高亮
         binding.list.post {
+            // 滚动到顶部对齐
+            lm.scrollToPositionWithOffset(idx, 0)
+            // 高亮闪烁
             binding.list.findViewHolderForAdapterPosition(idx)?.itemView?.let { view ->
                 val original = view.background
                 view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.aw_accent))
                 view.postDelayed({ view.background = original }, 400)
+            } ?: run {
+                // 如果 ViewHolder 还没绑定，再延迟重试
+                binding.list.postDelayed({
+                    binding.list.findViewHolderForAdapterPosition(idx)?.itemView?.let { view ->
+                        val original = view.background
+                        view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.aw_accent))
+                        view.postDelayed({ view.background = original }, 400)
+                    }
+                }, 200)
             }
+        }
+    }
+
+    // ==== 输入缓存（SharedPreferences） ====
+
+    /**
+     * 保存快速发送 / 评论 对话框的已输入内容。
+     * 优先级：用户输入的 draft > tag 筛选预填的 preset
+     */
+    private fun saveInputDraft(key: String, content: String) {
+        requireContext().getSharedPreferences(PREFS_QUICK_NOTE, Context.MODE_PRIVATE)
+            .edit()
+            .putString(key, content)
+            .apply()
+    }
+
+    private fun loadInputDraft(key: String): String {
+        return requireContext().getSharedPreferences(PREFS_QUICK_NOTE, Context.MODE_PRIVATE)
+            .getString(key, "") ?: ""
+    }
+
+    private fun clearInputDraft(key: String) {
+        requireContext().getSharedPreferences(PREFS_QUICK_NOTE, Context.MODE_PRIVATE)
+            .edit()
+            .remove(key)
+            .apply()
+    }
+
+    // ==== 标签自动提示 ====
+
+    private fun setupTagSuggestion(input: android.widget.EditText, suggestionView: TagSuggestionView) {
+        input.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                val text = s?.toString() ?: return
+                val cursorPos = input.selectionStart
+                if (cursorPos <= 0) {
+                    suggestionView.hide()
+                    return
+                }
+
+                val (prefix, tagStart) = extractTagPrefix(text, cursorPos)
+                // 如果 tagStart < 0，说明没找到 #，隐藏建议
+                if (tagStart < 0) {
+                    suggestionView.hide()
+                    return
+                }
+
+                // 找到 #，根据前缀搜索建议（前缀为空时也显示）
+                suggestTags(prefix, suggestionView)
+            }
+
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+    }
+
+    /**
+     * 从光标位置向左提取标签前缀。
+     * 例如："记录 #健身日记的内容"，光标在"记"位置 → 返回 ("健", 2)
+     */
+    private fun extractTagPrefix(text: String, cursorPos: Int): Pair<String, Int> {
+        var pos = cursorPos - 1
+        var start = -1
+
+        // 向左遍历，找到 '#' 起始的位置
+        while (pos >= 0) {
+            when (text[pos]) {
+                '#' -> {
+                    start = pos
+                    break
+                }
+                ' ', '\n', '\t', ',', '.', '!', '?', ';', ':', '+', '/' -> break
+                else -> pos--
+            }
+        }
+
+        if (start < 0) return "" to -1
+
+        val tagStart = start + 1 // 跳过 '#'
+        val prefix = text.substring(tagStart, cursorPos)
+        return prefix to tagStart
+    }
+
+    private fun suggestTags(prefix: String, suggestionView: TagSuggestionView) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val tree = tagTree.ifEmpty { runCatching { LocalInboxApi.service.getTagTree() }.getOrNull()?.tags ?: emptyList() }
+
+            // 根据前缀搜索标签（层级匹配：#健匹配 健身日记、健康饮食 等）
+            val matches = mutableListOf<String>()
+            fun collect(node: TagNodeResponse) {
+                if (node.path.startsWith(prefix)) {
+                    matches.add(node.path)
+                }
+                node.children.forEach { collect(it) }
+            }
+            tree.forEach { collect(it) }
+
+            if (matches.isEmpty()) {
+                suggestionView.hide()
+                return@launch
+            }
+
+            // 按匹配度（前缀位置）和字母排序，最多10个
+            val sorted = matches
+                .sortedWith(compareBy(
+                    { if (it.startsWith(prefix)) 0 else 1 },
+                    { it }
+                ))
+                .take(MAX_SUGGESTIONS)
+
+            suggestionView.show(prefix, sorted)
         }
     }
 
@@ -637,27 +772,71 @@ class InboxFragment : Fragment() {
 
     private fun showCommentDialog(note: NoteResponse) {
         val themedCtx = ContextThemeWrapper(requireContext(), R.style.InboxPopupMenu)
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
         val input = android.widget.EditText(themedCtx).apply {
             hint = "写点什么…"
             setMinLines(2)
-            setPadding(
-                (16 * resources.displayMetrics.density).toInt(),
-                (12 * resources.displayMetrics.density).toInt(),
-                (16 * resources.displayMetrics.density).toInt(),
-                0,
-            )
+            maxLines = 8
+            gravity = Gravity.TOP or Gravity.START
+            setPadding(dp(16), dp(12), dp(16), dp(8))
             setTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_text))
             setHintTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_sub))
             backgroundTintList = android.content.res.ColorStateList.valueOf(
                 ContextCompat.getColor(requireContext(), R.color.inbox_accent),
             )
         }
+
+        // 从缓存加载上次评论的输入内容（如果有）
+        val draftKey = "comment_${note.id}"
+        val draft = loadInputDraft(draftKey)
+        if (draft.isNotEmpty()) {
+            input.setText(draft)
+            input.setSelection(draft.length)
+        }
+
+        // 实时保存输入内容到缓存
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val text = s?.toString() ?: ""
+                if (text.isNotEmpty()) {
+                    saveInputDraft(draftKey, text)
+                } else {
+                    clearInputDraft(draftKey)
+                }
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
+        val suggestionView = TagSuggestionView(themedCtx).apply {
+            listener = { selectedTag ->
+                val cursorPos = input.selectionStart
+                val text = input.text?.toString() ?: ""
+                // 找到 # 起始位置，替换整个标签前缀
+                val (prefix, tagStart) = extractTagPrefix(text, cursorPos)
+                if (tagStart >= 0) {
+                    // tagStart 是 # 后面的位置，所以要从 tagStart-1（即 # 的位置）开始替换
+                    input.text.replace(tagStart - 1, cursorPos, "#$selectedTag")
+                    input.setSelection(tagStart + selectedTag.length)
+                } else {
+                    // 没找到 #，直接在光标位置插入
+                    input.text.insert(cursorPos, "#$selectedTag")
+                    input.setSelection(cursorPos + selectedTag.length + 1)
+                }
+            }
+        }
+        setupTagSuggestion(input, suggestionView)
+
         val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(themedCtx)
             .setTitle("评论")
             .setView(input)
             .setPositiveButton("发布") { _, _ ->
                 val text = input.text?.toString()?.trim() ?: ""
-                if (text.isNotEmpty()) postComment(note, text)
+                if (text.isNotEmpty()) {
+                    postComment(note, text)
+                    clearInputDraft(draftKey)
+                }
             }
             .setNegativeButton("取消", null)
             .create()
@@ -677,12 +856,14 @@ class InboxFragment : Fragment() {
         val dp = { v: Int -> (v * density).toInt() }
         val halfScreenHeight = resources.displayMetrics.heightPixels / 2
 
-        // 预填当前标签筛选路径（仅标签，不含搜索词），让新建笔记自动带上当前筛选上下文
+        // 优先级：缓存的 draft > 标签筛选预填的 preset
+        val draft = loadInputDraft(KEY_QUICK_NOTE_DRAFT)
         val preset = currentTag?.let { "#$it " } ?: ""
+        val textToSet = if (draft.isNotEmpty()) draft else preset
+
         val input = android.widget.EditText(themedCtx).apply {
             hint = "记录点什么… 使用 #标签 标记"
             setMinLines(3)
-            // 按内容生长：3 行起步，最多 8 行，超出后输入框内部滚动
             maxLines = 8
             gravity = Gravity.TOP or Gravity.START
             setPadding(dp(16), dp(12), dp(16), 0)
@@ -691,10 +872,42 @@ class InboxFragment : Fragment() {
             backgroundTintList = android.content.res.ColorStateList.valueOf(
                 ContextCompat.getColor(requireContext(), R.color.inbox_accent),
             )
-            // 尾部留一个空格方便续写，光标置于末尾，接着打字不会覆盖标签
-            setText(preset)
+            setText(textToSet)
             setSelection(text?.length ?: 0)
         }
+
+        // 实时保存输入内容到缓存
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val text = s?.toString() ?: ""
+                if (text.isNotEmpty()) {
+                    saveInputDraft(KEY_QUICK_NOTE_DRAFT, text)
+                } else {
+                    clearInputDraft(KEY_QUICK_NOTE_DRAFT)
+                }
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
+        val suggestionView = TagSuggestionView(themedCtx).apply {
+            listener = { selectedTag ->
+                val cursorPos = input.selectionStart
+                val text = input.text?.toString() ?: ""
+                // 找到 # 起始位置，替换整个标签前缀
+                val (prefix, tagStart) = extractTagPrefix(text, cursorPos)
+                if (tagStart >= 0) {
+                    // tagStart 是 # 后面的位置，所以要从 tagStart-1（即 # 的位置）开始替换
+                    input.text.replace(tagStart - 1, cursorPos, "#$selectedTag")
+                    input.setSelection(tagStart + selectedTag.length)
+                } else {
+                    // 没找到 #，直接在光标位置插入
+                    input.text.insert(cursorPos, "#$selectedTag")
+                    input.setSelection(cursorPos + selectedTag.length + 1)
+                }
+            }
+        }
+        setupTagSuggestion(input, suggestionView)
 
         val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(themedCtx)
 
@@ -708,6 +921,7 @@ class InboxFragment : Fragment() {
                 val text = input.text?.toString()?.trim() ?: ""
                 if (text.isNotEmpty()) {
                     createQuickNote(text)
+                    clearInputDraft(KEY_QUICK_NOTE_DRAFT)
                     dialog.dismiss()
                 }
             }
@@ -739,6 +953,13 @@ class InboxFragment : Fragment() {
             layoutParams = android.widget.FrameLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            addView(
+                suggestionView,
+                android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
             )
             addView(
                 input,
