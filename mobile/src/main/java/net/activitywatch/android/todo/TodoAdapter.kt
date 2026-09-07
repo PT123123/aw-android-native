@@ -31,6 +31,20 @@ class TodoAdapter(
     /** 清单 id → 颜色（行首色点用） */
     private var listColors: Map<Long, Int> = emptyMap()
 
+    /** 多选模式 */
+    var selectionMode = false
+        set(value) {
+            field = value
+            if (!value) selectedIds.clear()
+            notifyDataSetChanged()
+        }
+
+    /** 已选任务 id 集合 */
+    val selectedIds = mutableSetOf<Long>()
+
+    /** 选择变化回调 */
+    var onSelectionChanged: ((Int) -> Unit)? = null
+
     fun setListColors(colors: Map<Long, Int>) {
         listColors = colors
         notifyDataSetChanged()
@@ -38,6 +52,9 @@ class TodoAdapter(
 
     /** 任务在 ordered（含可选「显示已完成」折叠头）中的 adapter position；不在可见区返回 -1 */
     fun indexOfTask(taskId: Long): Int = ordered.indexOfFirst { it.id == taskId }
+
+    /** 获取所有可见任务的 id 列表（排除折叠头） */
+    fun getAllTaskIds(): List<Long> = ordered.filter { it.id != -1L }.map { it.id }
 
     fun submit(openItems: List<TodoTask>, doneItems: List<TodoTask>, showDone: Boolean) {
         open.clear(); open.addAll(openItems)
@@ -58,6 +75,23 @@ class TodoAdapter(
         if (showCompleted == show) return
         showCompleted = show
         rebuildOrder()
+    }
+
+    fun toggleSelection(taskId: Long) {
+        if (taskId in selectedIds) selectedIds.remove(taskId) else selectedIds.add(taskId)
+        onSelectionChanged?.invoke(selectedIds.size)
+        notifyDataSetChanged()
+    }
+
+    fun toggleSelectAll(allIds: List<Long>) {
+        if (selectedIds.size == allIds.size) {
+            selectedIds.clear()
+        } else {
+            selectedIds.clear()
+            selectedIds.addAll(allIds)
+        }
+        onSelectionChanged?.invoke(selectedIds.size)
+        notifyDataSetChanged()
     }
 
     override fun getItemViewType(position: Int): Int =
@@ -88,7 +122,10 @@ class TodoAdapter(
 
             b.check.setOnCheckedChangeListener(null)
             b.check.isChecked = task.completed
-            b.check.setOnCheckedChangeListener { _, checked -> onToggle(task, checked) }
+            // 多选模式下不设置 checkbox 监听，避免意外触发
+            if (!selectionMode) {
+                b.check.setOnCheckedChangeListener { _, checked -> onToggle(task, checked) }
+            }
 
             b.title.text = task.title
             if (task.completed) {
@@ -97,6 +134,28 @@ class TodoAdapter(
             } else {
                 b.title.paintFlags = b.title.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
                 b.title.setTextColor(ContextCompat.getColor(ctx, R.color.aw_text_primary))
+            }
+
+            // 多选模式：显示选中背景，隐藏复选框
+            if (selectionMode) {
+                b.root.setBackgroundColor(
+                    if (task.id in selectedIds) ContextCompat.getColor(ctx, R.color.aw_text_disabled)
+                    else ContextCompat.getColor(ctx, android.R.color.transparent)
+                )
+                b.check.visibility = View.GONE
+            } else {
+                b.root.setBackgroundColor(ContextCompat.getColor(ctx, android.R.color.transparent))
+                b.check.visibility = View.VISIBLE
+            }
+
+            // 统一点击监听器：点击时实时判断 selectionMode，避免绑定残留问题
+            b.root.setOnClickListener {
+                android.util.Log.d("TodoAdapter", "click task=${task.id}, selectionMode=$selectionMode, selectedIds=$selectedIds")
+                if (selectionMode) {
+                    toggleSelection(task.id)
+                } else {
+                    onClick(task)
+                }
             }
 
             // 清单色点（listId != 0 时显示）
@@ -157,8 +216,6 @@ class TodoAdapter(
             } else {
                 b.tags.visibility = View.GONE
             }
-
-            b.root.setOnClickListener { onClick(task) }
         }
     }
 
