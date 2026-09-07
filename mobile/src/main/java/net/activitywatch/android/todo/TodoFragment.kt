@@ -92,6 +92,10 @@ class TodoFragment : Fragment() {
         // 右上角 ⋮ 菜单：新建清单 + 排序子菜单
         binding.toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                R.id.action_multiselect -> {
+                    enterSelectionMode()
+                    true
+                }
                 R.id.action_new_list -> {
                     showNewListDialog()
                     true
@@ -101,6 +105,19 @@ class TodoFragment : Fragment() {
                 R.id.action_sort_reverse -> { setSortMode(TodoSortMode.REVERSED); true }
                 R.id.action_sort_priority -> { setSortMode(TodoSortMode.BY_PRIORITY); true }
                 R.id.action_sort_due -> { setSortMode(TodoSortMode.BY_DUE_DATE); true }
+                R.id.action_complete -> {
+                    completeSelectedTasks()
+                    true
+                }
+                R.id.action_delete -> {
+                    deleteSelectedTasks()
+                    true
+                }
+                R.id.action_select_all -> {
+                    val allIds = adapter.getAllTaskIds()
+                    adapter.toggleSelectAll(allIds)
+                    true
+                }
                 else -> false
             }
         }
@@ -114,12 +131,23 @@ class TodoFragment : Fragment() {
                 updateEmptyState()
             },
         )
+        adapter.onSelectionChanged = { count ->
+            updateSelectionTitle(count)
+        }
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         binding.list.adapter = adapter
 
         binding.swipe.setOnRefreshListener { source.load() }
         // 右下角按钮 = 从底部展开快速添加输入层（同笔记页快速输入）
         binding.fab.setOnClickListener { showQuickAddDialog() }
+
+        // 多选模式拦截返回键：退出多选模式
+        selectionBackCallback = object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                exitSelectionMode()
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, selectionBackCallback)
 
         currentSortMode = loadSortMode()
 
@@ -134,6 +162,71 @@ class TodoFragment : Fragment() {
         TodoRepository.removeErrorListener(errorToast)
         _binding = null
         super.onDestroyView()
+    }
+
+    // ── 多选模式 ────────────────────────────────────────
+
+    private var selectionMode = false
+    private lateinit var selectionBackCallback: androidx.activity.OnBackPressedCallback
+
+    private fun enterSelectionMode() {
+        selectionMode = true
+        selectionBackCallback.isEnabled = true
+        adapter.selectionMode = true
+        binding.fab.visibility = View.GONE
+        binding.toolbar.menu.clear()
+        binding.toolbar.inflateMenu(R.menu.todo_selection_menu)
+        updateSelectionTitle(0)
+        android.util.Log.d("TodoFragment", "enterSelectionMode called, adapter.selectionMode=${adapter.selectionMode}")
+    }
+
+    private fun exitSelectionMode() {
+        selectionMode = false
+        selectionBackCallback.isEnabled = false
+        adapter.selectionMode = false
+        binding.fab.visibility = View.VISIBLE
+        binding.toolbar.title = ""
+        binding.toolbar.menu.clear()
+        binding.toolbar.inflateMenu(R.menu.menu_todo)
+        // 重新勾选当前排序模式
+        updateSortMenuChecks()
+    }
+
+    private fun updateSelectionTitle(count: Int) {
+        binding.toolbar.title = if (count > 0) "已选 $count 项" else "选择任务"
+    }
+
+    private fun completeSelectedTasks() {
+        val ids = adapter.selectedIds.toList()
+        if (ids.isEmpty()) {
+            Toast.makeText(requireContext(), "请先选择任务", Toast.LENGTH_SHORT).show()
+            return
+        }
+        for (id in ids) {
+            source.setTaskCompleted(id, true)
+        }
+        Toast.makeText(requireContext(), "已完成 ${ids.size} 项", Toast.LENGTH_SHORT).show()
+        exitSelectionMode()
+    }
+
+    private fun deleteSelectedTasks() {
+        val ids = adapter.selectedIds.toList()
+        if (ids.isEmpty()) {
+            Toast.makeText(requireContext(), "请先选择任务", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle("删除任务")
+            .setMessage("确定删除选中的 ${ids.size} 项任务？")
+            .setPositiveButton("删除") { _, _ ->
+                for (id in ids) {
+                    source.deleteTask(id)
+                }
+                Toast.makeText(requireContext(), "已删除 ${ids.size} 项", Toast.LENGTH_SHORT).show()
+                exitSelectionMode()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun postRender() {

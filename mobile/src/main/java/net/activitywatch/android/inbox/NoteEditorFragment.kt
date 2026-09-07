@@ -1,8 +1,8 @@
 package net.activitywatch.android.inbox
 
 import android.app.Dialog
-import android.view.WindowManager
-import android.view.inputmethod.InputMethodManager
+import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -10,6 +10,8 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -26,28 +28,27 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
 
     private var note: NoteResponse? = null
 
+    /** 用于区分新建笔记和编辑笔记，缓存 key */
+    private var cacheKey: String = ""
+
+    companion object {
+        private const val ARG_NOTE = "arg_note"
+        private const val MENU_HISTORY = 1001
+        private const val PREFS_EDITOR = "inbox_editor_draft"
+        private const val KEY_EDITOR_DRAFT_PREFIX = "editor_draft_"
+
+        fun newInstance(note: NoteResponse?): NoteEditorFragment {
+            val f = NoteEditorFragment()
+            val args = Bundle()
+            if (note != null) args.putSerializable(ARG_NOTE, note)
+            f.arguments = args
+            return f
+        }
+    }
+
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         // MaterialComponents 主题的 BottomSheet，点外部/下拉即关闭
         return BottomSheetDialog(requireContext(), R.style.InboxBottomSheetDialogTheme)
-    }
-
-    override fun onStart() {
-        super.onStart()
-        val d = dialog as? BottomSheetDialog ?: return
-        // 全展开：键盘弹出时窗口随 adjustResize 缩小，内容完整显示在键盘上方
-        d.behavior.peekHeight = resources.displayMetrics.heightPixels / 2
-        d.behavior.state = BottomSheetBehavior.STATE_EXPANDED
-        d.behavior.skipCollapsed = true
-        d.behavior.isHideable = true
-        // 去掉 sheet 默认白色圆角背景，使用我们自己的深色布局背景
-        d.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
-            ?.setBackgroundColor(Color.TRANSPARENT)
-        // Dialog 有独立 window，Activity 的 adjustResize 不生效，必须在这里显式声明：
-        // 键盘弹出时缩小 window，保存按钮和 Markdown 工具栏才不会被输入法遮住
-        d.window?.setSoftInputMode(
-            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
-                WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
-        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,7 +66,6 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
         return binding.root
     }
 
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         LocalInboxApi.init(requireContext())
@@ -75,7 +75,9 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
         }
 
         if (note != null) {
-            binding.editor.setText(note!!.content)
+            cacheKey = KEY_EDITOR_DRAFT_PREFIX + note!!.id
+            val draft = loadDraft(cacheKey)
+            binding.editor.setText(if (draft.isNotEmpty()) draft else note!!.content)
             binding.toolbar.menu.add(Menu.NONE, MENU_HISTORY, Menu.NONE, "详细信息").apply {
                 setIcon(R.drawable.ic_info)
                 setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
@@ -83,6 +85,13 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
                     openDetail()
                     true
                 }
+            }
+        } else {
+            // 新建笔记：从缓存恢复上次未保存的内容
+            cacheKey = KEY_EDITOR_DRAFT_PREFIX + "new"
+            val draft = loadDraft(cacheKey)
+            if (draft.isNotEmpty()) {
+                binding.editor.setText(draft)
             }
         }
         binding.save.setOnClickListener { save() }
@@ -114,9 +123,42 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
         }, 200)
     }
 
+    override fun onStart() {
+        super.onStart()
+        setupDismissListener()
+        val d = dialog as? BottomSheetDialog ?: return
+        // 全展开：键盘弹出时窗口随 adjustResize 缩小，内容完整显示在键盘上方
+        d.behavior.peekHeight = resources.displayMetrics.heightPixels / 2
+        d.behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        d.behavior.skipCollapsed = true
+        d.behavior.isHideable = true
+        // 去掉 sheet 默认白色圆角背景，使用我们自己的深色布局背景
+        d.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+            ?.setBackgroundColor(Color.TRANSPARENT)
+        // Dialog 有独立 window，Activity 的 adjustResize 不生效，必须在这里显式声明：
+        // 键盘弹出时缩小 window，保存按钮和 Markdown 工具栏才不会被输入法遮住
+        d.window?.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+        )
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
+        if (note != null && _binding != null) {
+            // 编辑模式：保存当前输入作为下次打开的缓存
+            saveDraft(cacheKey, binding.editor.text?.toString() ?: "")
+        }
         _binding = null
+    }
+
+    private fun setupDismissListener() {
+        dialog?.setOnDismissListener {
+            if (note == null) {
+                // 新建笔记未保存：清除缓存
+                clearDraft(cacheKey)
+            }
+        }
     }
 
     private fun save() {
@@ -139,6 +181,8 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
                 if (inbox is InboxFragment) {
                     inbox.refreshAndScrollToNote(saved.id)
                 }
+                // 保存时清除缓存
+                clearDraft(cacheKey)
                 dismiss()
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "保存失败：${e.message}", Toast.LENGTH_LONG).show()
@@ -146,22 +190,28 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
         }
     }
 
+    private fun saveDraft(key: String, content: String) {
+        requireContext().getSharedPreferences(PREFS_EDITOR, Context.MODE_PRIVATE)
+            .edit()
+            .putString(key, content)
+            .apply()
+    }
+
+    private fun loadDraft(key: String): String {
+        return requireContext().getSharedPreferences(PREFS_EDITOR, Context.MODE_PRIVATE)
+            .getString(key, "") ?: ""
+    }
+
+    private fun clearDraft(key: String) {
+        requireContext().getSharedPreferences(PREFS_EDITOR, Context.MODE_PRIVATE)
+            .edit()
+            .remove(key)
+            .apply()
+    }
+
     private fun openDetail() {
         val n = note ?: return
         NoteDetailFragment.newInstance(n.id)
             .show(parentFragmentManager, "note_detail")
-    }
-
-    companion object {
-        private const val ARG_NOTE = "arg_note"
-        private const val MENU_HISTORY = 1001
-
-        fun newInstance(note: NoteResponse?): NoteEditorFragment {
-            val f = NoteEditorFragment()
-            val args = Bundle()
-            if (note != null) args.putSerializable(ARG_NOTE, note)
-            f.arguments = args
-            return f
-        }
     }
 }
