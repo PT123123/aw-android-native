@@ -186,9 +186,12 @@ class InboxFragment : Fragment() {
                 return@launch
             }
             // 不属于当前标签筛选/搜索结果的笔记不强行插入列表，退回整页刷新
-            val matchesFilter = (currentTag == null || note.tags.contains(currentTag)) &&
-                (searchQuery == null || note.content.contains(searchQuery!!))
-            if (!matchesFilter) {
+            // 标签匹配需与服务端一致：整元素相等 或 层级子孙（以 tag/ 开头）。
+            // 否则筛选「项目」时、新笔记 tag 为「项目/工作」会被误判不匹配，退化为整页刷新而丢失定位
+            val tagMatches = currentTag == null ||
+                note.tags.any { it == currentTag || it.startsWith("$currentTag/") }
+            val searchMatches = searchQuery == null || note.content.contains(searchQuery!!)
+            if (!(tagMatches && searchMatches)) {
                 loadInitial()
                 return@launch
             }
@@ -301,6 +304,13 @@ class InboxFragment : Fragment() {
         Toast.makeText(requireContext(), "已复制 ${selectedNotes.size} 条笔记", Toast.LENGTH_SHORT).show()
         exitSelectionMode()
         loadInitial()
+    }
+
+    /** 单条笔记复制：与批量复制取同一字段（正文原文，#标签 本身就在 content 里） */
+    private fun copySingleNote(note: NoteResponse) {
+        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("note", note.content))
+        Toast.makeText(requireContext(), "已复制笔记", Toast.LENGTH_SHORT).show()
     }
 
     private fun deleteSelectedNotes() {
@@ -573,6 +583,10 @@ class InboxFragment : Fragment() {
                     .show(parentFragmentManager, "note_detail")
                 true
             }
+            menu.add("复制").setOnMenuItemClickListener {
+                copySingleNote(note)
+                true
+            }
             menu.add("转为待办").setOnMenuItemClickListener {
                 confirmConvertToTodo(note)
                 true
@@ -663,6 +677,8 @@ class InboxFragment : Fragment() {
         val dp = { v: Int -> (v * density).toInt() }
         val halfScreenHeight = resources.displayMetrics.heightPixels / 2
 
+        // 预填当前标签筛选路径（仅标签，不含搜索词），让新建笔记自动带上当前筛选上下文
+        val preset = currentTag?.let { "#$it " } ?: ""
         val input = android.widget.EditText(themedCtx).apply {
             hint = "记录点什么… 使用 #标签 标记"
             setMinLines(3)
@@ -675,6 +691,9 @@ class InboxFragment : Fragment() {
             backgroundTintList = android.content.res.ColorStateList.valueOf(
                 ContextCompat.getColor(requireContext(), R.color.inbox_accent),
             )
+            // 尾部留一个空格方便续写，光标置于末尾，接着打字不会覆盖标签
+            setText(preset)
+            setSelection(text?.length ?: 0)
         }
 
         val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(themedCtx)

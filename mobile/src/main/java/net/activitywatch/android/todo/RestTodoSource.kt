@@ -140,7 +140,12 @@ class RestTodoSource(context: Context) : TodoSource() {
 
     // ── 任务 ────────────────────────────────────────────
 
-    override fun createTask(title: String, listId: Long, dueDate: String) {
+    override fun createTask(
+        title: String,
+        listId: Long,
+        dueDate: String,
+        onCreated: ((Long) -> Unit)?,
+    ) {
         val trimmed = title.trim()
         if (trimmed.isEmpty()) return
         val tag = listName(listId)
@@ -152,6 +157,8 @@ class RestTodoSource(context: Context) : TodoSource() {
                         tags = if (tag != null) listOf(tag) else null,
                     )
                 )
+                // 服务端分配的新任务 id 回传页面，用于创建后的滚动定位（load 是异步的，这里先给 id）
+                onCreated?.invoke(created.id)
                 if (dueDate.isNotBlank()) {
                     // 服务端 create 不支持 due_date：拿到 id 后补一次 PUT（契约 §3.8 缺口 5）
                     TodoApi.service.updateTodo(
