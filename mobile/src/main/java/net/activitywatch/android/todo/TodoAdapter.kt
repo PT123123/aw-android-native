@@ -36,6 +36,9 @@ class TodoAdapter(
         notifyDataSetChanged()
     }
 
+    /** 任务在 ordered（含可选「显示已完成」折叠头）中的 adapter position；不在可见区返回 -1 */
+    fun indexOfTask(taskId: Long): Int = ordered.indexOfFirst { it.id == taskId }
+
     fun submit(openItems: List<TodoTask>, doneItems: List<TodoTask>, showDone: Boolean) {
         open.clear(); open.addAll(openItems)
         done.clear(); done.addAll(doneItems)

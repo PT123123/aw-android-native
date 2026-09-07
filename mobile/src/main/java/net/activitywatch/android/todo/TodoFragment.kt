@@ -49,6 +49,12 @@ class TodoFragment : Fragment() {
     private var showCompleted = false
     private var currentSortMode = TodoSortMode.DEFAULT
 
+    /**
+     * 新建任务后要滚动定位的任务 id（-1 = 无待定位）。
+     * 由 [TodoSource.createTask] 的 onCreated 回调写入，下一次 render 时消费。
+     */
+    private var pendingScrollTaskId: Long = -1L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // 抽屉视图入口：nav_todo_inbox 通过参数落到收集箱；today/next7/all 已不再由侧边栏传入
@@ -172,6 +178,34 @@ class TodoFragment : Fragment() {
         adapter.submit(open, done, showCompleted)
         updateEmptyState()
         updateProgress()
+        consumePendingScroll()
+    }
+
+    /**
+     * 新建任务后的定位：数据源异步生效，等快照里出现该任务再滚动。
+     * 找不到（如「最近 7 天」视图下新建的无期限任务本就不属于该视图）时保留 pending，
+     * 由下一次 render 或切换视图清除，不强行跳转。
+     */
+    private fun consumePendingScroll() {
+        val id = pendingScrollTaskId
+        if (id == -1L) return
+        val pos = adapter.indexOfTask(id)
+        if (pos < 0) return
+        pendingScrollTaskId = -1L
+        scrollToTaskWithHighlight(pos)
+    }
+
+    /** 滚动到指定位置并让目标行背景闪烁 ~400ms，让用户一眼看到刚新建的任务 */
+    private fun scrollToTaskWithHighlight(pos: Int) {
+        val lm = binding.list.layoutManager as? LinearLayoutManager ?: return
+        lm.scrollToPositionWithOffset(pos, 0)
+        binding.list.post {
+            binding.list.findViewHolderForAdapterPosition(pos)?.itemView?.let { view ->
+                val original = view.background
+                view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.aw_accent))
+                view.postDelayed({ view.background = original }, 400)
+            }
+        }
     }
 
     private fun updateEmptyState() {
@@ -214,6 +248,7 @@ class TodoFragment : Fragment() {
                     currentView = v
                     currentListId = 0L
                     showCompleted = false           // 切换视图重置折叠（契约 §5.4）
+                    pendingScrollTaskId = -1L       // 切视图即放弃待定位，避免之后意外滚动
                     render()
                 }
             )
@@ -226,6 +261,7 @@ class TodoFragment : Fragment() {
                     currentView = TodoView.LIST
                     currentListId = l.id
                     showCompleted = false
+                    pendingScrollTaskId = -1L       // 同上：切换清单即放弃待定位
                     render()
                 }.apply {
                     // 长按管理清单：重命名 / 删除
@@ -394,7 +430,9 @@ class TodoFragment : Fragment() {
             TodoView.TODAY -> 0L to todayStr()
             else -> 0L to ""
         }
-        source.createTask(title, listId, due)
+        // 登记待定位 id：数据源异步生效，等快照里出现该任务时再滚动
+        pendingScrollTaskId = -1L
+        source.createTask(title, listId, due) { id -> pendingScrollTaskId = id }
     }
 
     // ── 排序（右上角 ⋮ 菜单的「排序」子菜单） ────────────

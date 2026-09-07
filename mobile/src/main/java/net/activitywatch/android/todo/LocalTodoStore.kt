@@ -127,23 +127,31 @@ class LocalTodoStore(private val context: Context) : TodoSource() {
 
     // ── 任务 ────────────────────────────────────────────
 
-    override fun createTask(title: String, listId: Long, dueDate: String) {
+    override fun createTask(
+        title: String,
+        listId: Long,
+        dueDate: String,
+        onCreated: ((Long) -> Unit)?,
+    ) {
         val trimmed = title.trim()
         if (trimmed.isEmpty()) return
+        var newId = -1L
         mutate {
             val now = nowIso()
-            mTasks.add(
-                TodoTask(
-                    id = nextIdLocked(),
-                    title = trimmed,
-                    listId = listId,
-                    dueDate = dueDate,
-                    createdAt = now,
-                    updatedAt = now,
-                    sortOrder = (mTasks.maxOfOrNull { it.sortOrder } ?: 0) + 1,
-                )
+            val task = TodoTask(
+                id = nextIdLocked(),
+                title = trimmed,
+                listId = listId,
+                dueDate = dueDate,
+                createdAt = now,
+                updatedAt = now,
+                sortOrder = (mTasks.maxOfOrNull { it.sortOrder } ?: 0) + 1,
             )
+            newId = task.id
+            mTasks.add(task)
         }
+        // mutate 内已同步落盘并 notifyChanged，回调仍在调用线程（主线程）
+        onCreated?.invoke(newId)
     }
 
     override fun updateTask(task: TodoTask) {
