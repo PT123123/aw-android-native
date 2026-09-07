@@ -410,6 +410,7 @@ class InboxFragment : Fragment() {
         binding.toolbar.inflateMenu(R.menu.inbox_selection_menu)
         adapter.selectionMode = true
         updateSelectionTitle(0)
+        loadInitial()
     }
 
     private fun exitSelectionMode() {
@@ -638,6 +639,7 @@ class InboxFragment : Fragment() {
                     offset = if (append) items.size else 0,
                     tag = currentTag,
                     search = searchQuery,
+                    deleted = false,
                 )
                 val sorted = if (sortByUpdated) {
                     list.sortedByDescending {
