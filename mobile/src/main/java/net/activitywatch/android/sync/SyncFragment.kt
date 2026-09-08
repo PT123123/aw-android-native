@@ -58,7 +58,8 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        viewModel = ViewModelProvider(this)[SyncViewModel::class.java]
+        // Activity 作用域：与 SyncDetailsFragment 共享同一实例，进详情页不再重起整套轮询
+        viewModel = ViewModelProvider(requireActivity())[SyncViewModel::class.java]
 
         binding.toolbar.setNavigationOnClickListener {
             requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)

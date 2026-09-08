@@ -22,6 +22,8 @@ import kotlinx.coroutines.launch
 
 data class SyncUiState(
     val initialLoading: Boolean = true,
+    // 首屏（refreshInitial）全部请求都失败时展示的整页错误；任一成功即清空，轮询期瞬时失败不打扰
+    val loadError: String? = null,
     val config: SyncConfig? = null,
     val status: DiscoveryStatus? = null,
     val devices: List<Device> = emptyList(),
@@ -88,33 +90,46 @@ class SyncViewModel : ViewModel() {
     }
 
     private suspend fun refreshInitial() {
-        coroutineScope {
-            launch { refreshConfig() }
-            launch { refreshDevices() }
-            launch { refreshLogs() }
-            launch { refreshStatus() }
+        val errors = coroutineScope {
+            listOf(
+                async { refreshConfig() },
+                async { refreshDevices() },
+                async { refreshLogs() },
+                async { refreshStatus() },
+            ).awaitAll()
         }
-        _state.update { it.copy(initialLoading = false) }
+        val allFailed = errors.all { it != null }
+        if (allFailed) {
+            val msg = errors.first { it != null }
+            val hadError = _state.value.loadError != null
+            _state.update { it.copy(loadError = msg, initialLoading = false) }
+            // 只在刚进入失败态时提示一次，避免轮询反复弹
+            if (!hadError) toast(msg ?: "同步服务未响应")
+        } else {
+            _state.update { it.copy(loadError = null, initialLoading = false) }
+        }
     }
 
-    private suspend fun refreshConfig() {
-        repo.call { api.getConfig() }
+    private suspend fun refreshConfig(): String? {
+        return repo.call { api.getConfig() }
             .onSuccess { cfg -> _state.update { it.copy(config = cfg) } }
+            .exceptionOrNull()?.message
     }
 
-    private suspend fun refreshStatus() {
-        repo.call { api.getStatus() }
+    private suspend fun refreshStatus(): String? {
+        return repo.call { api.getStatus() }
             .onSuccess { st -> _state.update { it.copy(status = st) } }
+            .exceptionOrNull()?.message
     }
 
-    private suspend fun refreshDevices() {
-        repo.call { api.getDevices() }.onSuccess { devices ->
+    private suspend fun refreshDevices(): String? {
+        return repo.call { api.getDevices() }.map { devices ->
             _state.update { it.copy(devices = devices) }
             // 已配对的远端设备附带统计（与 vue 的 loadAllDeviceStats 一致）
             for (d in devices) {
                 if (d.paired && !d.isSelf) loadDeviceStats(d.id)
             }
-        }
+        }.exceptionOrNull()?.message
     }
 
     private suspend fun loadDeviceStats(deviceId: String) {
@@ -128,9 +143,9 @@ class SyncViewModel : ViewModel() {
         }
     }
 
-    private suspend fun refreshLogs() {
+    private suspend fun refreshLogs(): String? {
         val s = _state.value
-        repo.call {
+        return repo.call {
             api.getLogs(
                 direction = s.filterDirection.ifEmpty { null },
                 eventType = s.filterEventType.ifEmpty { null },
@@ -142,7 +157,7 @@ class SyncViewModel : ViewModel() {
             _state.update { it.copy(logs = page.logs, logsTotal = page.total, logError = null) }
         }.onFailure { e ->
             _state.update { it.copy(logError = e.message) }
-        }
+        }.exceptionOrNull()?.message
     }
 
     // Rust 侧调试日志增量拉取，输出到 logcat（对应 vue 的 startLogPolling）

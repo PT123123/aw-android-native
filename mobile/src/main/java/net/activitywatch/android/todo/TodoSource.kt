@@ -36,6 +36,7 @@ abstract class TodoSource {
     abstract fun deleteList(listId: Long)
     /**
      * 新建任务。
+     * @param tags 自由标签（快速添加 #tag 解析结果）
      * @param onCreated 创建成功后回调新任务 id（主线程），页面据此滚动定位到刚建的任务；
      *                  数据源异步生效，回调只保证 id 可用，不保证快照已刷新
      */
@@ -43,6 +44,7 @@ abstract class TodoSource {
         title: String,
         listId: Long,
         dueDate: String = "",
+        tags: List<String> = emptyList(),
         onCreated: ((Long) -> Unit)? = null,
     )
     abstract fun updateTask(task: TodoTask)
@@ -78,6 +80,13 @@ abstract class TodoSource {
 }
 
 // ===================== 视图过滤与排序（契约 §5.2） =====================
+
+/**
+ * 任务是否命中标签筛选（与收件箱一致的层级匹配：整 tag 相等或为其子孙）。
+ * 筛选「项目」时 tag 为「项目/工作」的任务也算命中；[tag] 为 null 表示未筛选。
+ */
+fun TodoTask.matchesTag(tag: String?): Boolean =
+    tag == null || tags.any { it == tag || it.startsWith("$tag/") }
 
 /** 视图过滤：逾期任务包含在「今天」与「最近 7 天」内 */
 fun filterTasks(

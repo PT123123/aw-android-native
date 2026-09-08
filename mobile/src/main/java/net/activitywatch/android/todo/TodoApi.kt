@@ -81,4 +81,16 @@ interface TodoService {
 
     @PUT("inbox/todos/{id}/restore")
     suspend fun restoreTodo(@Path("id") id: Long): TodoResponse
+
+    @GET("inbox/todo-lists")
+    suspend fun getTodoLists(): List<TodoListResponse>
+
+    @POST("inbox/todo-lists")
+    suspend fun createTodoList(@Body payload: CreateTodoListPayload): TodoListResponse
+
+    @PUT("inbox/todo-lists/{id}")
+    suspend fun updateTodoList(@Path("id") id: Long, @Body payload: UpdateTodoListPayload): TodoListResponse
+
+    @DELETE("inbox/todo-lists/{id}")
+    suspend fun deleteTodoList(@Path("id") id: Long): Response<Void>
 }

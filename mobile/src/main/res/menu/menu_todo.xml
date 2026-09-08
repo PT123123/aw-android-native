@@ -3,6 +3,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/action_search"
+        android:icon="@android:drawable/ic_menu_search"
+        android:title="搜索"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/action_multiselect"
         android:icon="@drawable/ic_select_all"
         android:title="多选"

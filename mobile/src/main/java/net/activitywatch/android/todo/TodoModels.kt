@@ -17,9 +17,10 @@ import java.util.TimeZone
  *  - [TodoResponse] / [CreateTodoPayload] / [UpdateTodoPayload]：服务端 /inbox/todos 的 DTO
  *  - 两者之间的转换见文件末尾的映射函数（契约 §3.5）
  *
- * 服务端没有「清单 / 子任务 / 重复」概念，REST 数据源按契约做降级映射：
- *   - 清单 = 第一个 tag（listId = tag 哈希，0 = 收集箱）
- *   - 子任务 / 重复：服务端不支持，UI 按 [TodoSource.supportsSubtasks] / [supportsRecurrence] 隐藏
+ * 服务端契约（升级后）：清单有独立表与 API（/inbox/todo-lists），子任务存 todos.subtasks JSON 列：
+ *   - 清单 = 独立实体，任务以 list_id 关联（0 = 收集箱）；tag 与清单是两个独立概念
+ *   - 子任务：支持（id 由客户端分配，服务端原样存储）
+ *   - 重复：服务端不支持，UI 按 [TodoSource.supportsRecurrence] 隐藏
  */
 
 // ===================== 领域模型 =====================
@@ -135,9 +136,34 @@ internal fun writeTodoFile(file: TodoFile): String = todoGson.toJson(file)
 
 // ===================== REST DTO（契约 §3.3） =====================
 
-/** tag → listId（0 保留给收集箱；哈希取非负后映射到 [1, 1000000]） */
-fun tagToListId(tag: String): Long =
-    if (tag.isEmpty()) 0L else (tag.hashCode() and 0x7fffffff) % 1_000_000L + 1L
+/** 子任务项（todos.subtasks JSON 列的元素；id 由客户端分配，服务端原样存储） */
+data class SubtaskPayload(
+    val id: Long,
+    val title: String,
+    val completed: Boolean = false,
+)
+
+// ===================== 清单 DTO（/inbox/todo-lists） =====================
+
+data class TodoListResponse(
+    val id: Long,
+    val name: String,
+    val color: String = "",
+    @SerializedName("sort_order") val sortOrder: Int = 0,
+)
+
+data class CreateTodoListPayload(
+    val name: String,
+    val color: String = "",
+    @SerializedName("sort_order") val sortOrder: Int = 0,
+)
+
+/** Gson 默认不序列化 null，未提供的字段服务端保持原值 */
+data class UpdateTodoListPayload(
+    val name: String? = null,
+    val color: String? = null,
+    @SerializedName("sort_order") val sortOrder: Int? = null,
+)
 
 /** 服务端 GET /inbox/todos 返回的单条任务 */
 data class TodoResponse(
@@ -148,6 +174,8 @@ data class TodoResponse(
     val priority: Int? = null,
     @SerializedName("due_date") val dueDateRaw: String? = null, // RFC3339
     val tags: List<String> = emptyList(),
+    val subtasks: List<SubtaskPayload> = emptyList(),
+    @SerializedName("list_id") val listIdRaw: Long = 0,         // 0 = 收集箱
     @SerializedName("created_at") val createdAt: String? = null,
     @SerializedName("updated_at") val updatedAt: String? = null,
     @SerializedName("completed_at") val completedAt: String? = null,
@@ -160,10 +188,6 @@ data class TodoResponse(
     /** RFC3339 → yyyy-MM-dd（契约 §3.5） */
     val dueDate: String?
         get() = dueDateRaw?.take(10)?.takeIf { it.length == 10 }
-
-    /** 清单 id：用第一个 tag 模拟 */
-    val listId: Long
-        get() = tags.firstOrNull()?.let { tagToListId(it) } ?: 0L
 }
 
 /** POST /inbox/todos */
@@ -173,6 +197,8 @@ data class CreateTodoPayload(
     val priority: Int? = null,
     @SerializedName("due_date") val dueDate: String? = null,
     val tags: List<String>? = null,
+    val subtasks: List<SubtaskPayload>? = null,
+    @SerializedName("list_id") val listId: Long? = null,
     @SerializedName("created_at") val createdAt: String? = null,
 )
 
@@ -184,21 +210,19 @@ data class UpdateTodoPayload(
     val priority: Int? = null,
     @SerializedName("due_date") val dueDate: String? = null,
     val tags: List<String>? = null,
+    val subtasks: List<SubtaskPayload>? = null,
+    @SerializedName("list_id") val listId: Long? = null,
 )
 
 // ===================== 领域模型 ↔ REST DTO（契约 §3.5） =====================
 
-/**
- * 服务端 → 领域模型。
- * 约定（契约 §3.5）：服务端 tags[0] 承载清单，其余为自由标签；
- * 因此领域模型的 listId 由 tags[0] 派生，而 tags 只保留自由标签部分。
- */
+/** 服务端 → 领域模型。tags 全部是自由标签（清单由 list_id 关联，与 tag 无关）。 */
 fun TodoResponse.toTask(): TodoTask = TodoTask(
     id = id,
     title = title,
     notes = content ?: "",
-    listId = listId,
-    tags = (if (tags.isEmpty()) emptyList() else tags.drop(1)).toMutableList(),
+    listId = listIdRaw,
+    tags = tags.toMutableList(),
     priority = priority ?: 0,
     dueDate = dueDate ?: "",
     completed = completed,
@@ -207,12 +231,10 @@ fun TodoResponse.toTask(): TodoTask = TodoTask(
     createdAt = createdAt ?: "",
     updatedAt = updatedAt ?: "",
     sortOrder = 0,
-    subtasks = mutableListOf(),          // 服务端不支持子任务
+    subtasks = subtasks
+        .map { TodoSubtask(id = it.id, title = it.title, completed = it.completed) }
+        .toMutableList(),
 )
-
-/** 领域 tags（自由标签，不含清单 tag）+ 清单名 → 提交给服务端的 tags（清单 tag 在前） */
-fun TodoTask.serverTags(listName: String?): List<String> =
-    if (listName.isNullOrBlank()) tags.toList() else listOf(listName) + tags
 
 /** 日期（yyyy-MM-dd）→ 服务端 RFC3339：当天零点按 UTC 表示 */
 fun String.toRfc3339(): String = "${this}T00:00:00Z"

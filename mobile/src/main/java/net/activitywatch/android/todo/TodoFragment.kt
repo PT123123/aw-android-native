@@ -2,7 +2,9 @@ package net.activitywatch.android.todo
 
 import android.content.Context
 import android.os.Bundle
+import android.text.Editable
 import android.text.SpannableString
+import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
 import android.view.ContextThemeWrapper
 import android.view.Gravity
@@ -21,9 +23,15 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.TodoFragmentBinding
+import net.activitywatch.android.inbox.TagSuggestionView
+import net.activitywatch.android.inbox.buildMarkdownToolbar
+import net.activitywatch.android.inbox.formatTagBreadcrumb
+import net.activitywatch.android.inbox.tagParentPath
 
 /**
  * 任务页 —— aw-qtui TodoPage 的手机端映射（契约 §5）。
@@ -48,6 +56,12 @@ class TodoFragment : Fragment() {
     private var currentListId = 0L
     private var showCompleted = false
     private var currentSortMode = TodoSortMode.DEFAULT
+
+    /** 当前标签筛选（null = 未筛选；层级匹配同收件箱，跨视图/清单切换保留） */
+    private var currentTag: String? = null
+
+    /** 搜索关键字（null = 未搜索；匹配标题/备注，与视图/清单/标签筛选叠加） */
+    private var searchQuery: String? = null
 
     /**
      * 新建任务后要滚动定位的任务 id（-1 = 无待定位）。
@@ -92,6 +106,10 @@ class TodoFragment : Fragment() {
         // 右上角 ⋮ 菜单：新建清单 + 排序子菜单
         binding.toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                R.id.action_search -> {
+                    setSearchBarVisible(binding.searchBar.visibility == View.GONE)
+                    true
+                }
                 R.id.action_multiselect -> {
                     enterSelectionMode()
                     true
@@ -134,6 +152,24 @@ class TodoFragment : Fragment() {
         adapter.onSelectionChanged = { count ->
             updateSelectionTitle(count)
         }
+        // 点任务行内的标签 = 进入/取消该标签筛选（同收件箱）
+        adapter.onTagClick = { tag ->
+            applyTagFilter(if (currentTag == tag) null else tag)
+        }
+        // 筛选条：✕ 清除；↑ 回到上级标签路径（项目/工作/xx → 项目/工作）
+        binding.filterClear.setOnClickListener { applyTagFilter(null) }
+        binding.filterUp.setOnClickListener { applyTagFilter(tagParentPath(currentTag.orEmpty())) }
+
+        // 搜索：软键盘搜索键提交；失焦也提交（同收件箱）
+        binding.searchInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                applySearch()
+                true
+            } else false
+        }
+        binding.searchInput.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) applySearch()
+        }
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         binding.list.adapter = adapter
 
@@ -148,6 +184,14 @@ class TodoFragment : Fragment() {
             }
         }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, selectionBackCallback)
+
+        // 搜索条可见时拦截返回键：收起搜索条并清除搜索（同收件箱）
+        searchBackCallback = object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                setSearchBarVisible(false)
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, searchBackCallback)
 
         currentSortMode = loadSortMode()
 
@@ -168,6 +212,7 @@ class TodoFragment : Fragment() {
 
     private var selectionMode = false
     private lateinit var selectionBackCallback: androidx.activity.OnBackPressedCallback
+    private lateinit var searchBackCallback: androidx.activity.OnBackPressedCallback
 
     private fun enterSelectionMode() {
         selectionMode = true
@@ -265,8 +310,12 @@ class TodoFragment : Fragment() {
         adapter.setListColors(mLists.associate { it.id to it.argb })
         rebuildChips()
         updateSortMenuChecks()
+        updateFilterBar()
 
-        val (open, done) = visibleTasks(mTasks, currentView, currentListId, currentSortMode)
+        val (open0, done0) = visibleTasks(mTasks, currentView, currentListId, currentSortMode)
+        // 标签 + 搜索筛选叠加在视图/清单之上（视图 AND 清单 AND 标签 AND 搜索）
+        val open = open0.filter { it.matchesTag(currentTag) && matchesSearch(it) }
+        val done = done0.filter { it.matchesTag(currentTag) && matchesSearch(it) }
         binding.toolbar.subtitle = "${viewTitle()} · ${open.size} 项待办"
         adapter.submit(open, done, showCompleted)
         updateEmptyState()
@@ -302,14 +351,71 @@ class TodoFragment : Fragment() {
     }
 
     private fun updateEmptyState() {
-        val (open, done) = visibleTasks(mTasks, currentView, currentListId)
+        val (open0, done0) = visibleTasks(mTasks, currentView, currentListId)
+        val open = open0.filter { it.matchesTag(currentTag) && matchesSearch(it) }
+        val done = done0.filter { it.matchesTag(currentTag) && matchesSearch(it) }
         val nothing = open.isEmpty() && (done.isEmpty() || !showCompleted)
         binding.empty.visibility = if (nothing) View.VISIBLE else View.GONE
         binding.empty.text = if (open.isEmpty() && done.isEmpty()) {
-            "暂无任务\n点右下角 ＋ 添加任务"
+            when {
+                currentTag != null || searchQuery != null -> "没有符合条件的任务"
+                else -> "暂无任务\n点右下角 ＋ 添加任务"
+            }
         } else {
             "该视图下的任务已全部完成"
         }
+    }
+
+    // ── 标签筛选（同收件箱：点行内标签 / 筛选条 ✕ / ↑） ──
+
+    /** 进入/切换/清除标签筛选；视图与清单 chips 不受影响（叠加过滤） */
+    private fun applyTagFilter(tag: String?) {
+        currentTag = tag?.takeIf { it.isNotBlank() }
+        updateFilterBar()
+        render()
+    }
+
+    private fun updateFilterBar() {
+        val tag = currentTag
+        if (tag == null) {
+            binding.filterBar.visibility = View.GONE
+        } else {
+            binding.filterBar.visibility = View.VISIBLE
+            // 层级 tag 用面包屑展示：项目/工作 → 项目 / 工作
+            binding.filterText.text = "仅显示 #${formatTagBreadcrumb(tag)}"
+            binding.filterUp.visibility =
+                if (tagParentPath(tag) != null) View.VISIBLE else View.GONE
+        }
+    }
+
+    // ── 搜索（同收件箱：工具栏 🔍 开关搜索条） ───────────
+
+    private fun setSearchBarVisible(visible: Boolean) {
+        binding.searchBar.visibility = if (visible) View.VISIBLE else View.GONE
+        searchBackCallback.isEnabled = visible
+        if (visible) {
+            binding.searchInput.requestFocus()
+        } else {
+            // 先清空再 clearFocus：失焦监听里的 applySearch 会按空关键字重置列表
+            binding.searchInput.setText("")
+            binding.searchInput.clearFocus()
+            searchQuery = null
+            render()
+        }
+    }
+
+    private fun applySearch() {
+        val q = binding.searchInput.text?.toString()?.trim()
+        val newQuery = q?.takeIf { it.isNotEmpty() }
+        if (searchQuery == newQuery) return
+        searchQuery = newQuery
+        render()
+    }
+
+    /** 搜索匹配：标题或备注包含关键字（大小写敏感，与收件箱 content.contains 一致） */
+    private fun matchesSearch(task: TodoTask): Boolean {
+        val q = searchQuery ?: return true
+        return task.title.contains(q) || task.notes.contains(q)
     }
 
     /** 底部全局进度：已完成 X / Y（契约 §5.4 统计范围是全局而非当前视图） */
@@ -426,7 +532,7 @@ class TodoFragment : Fragment() {
         val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(themedCtx)
 
         val input = EditText(themedCtx).apply {
-            hint = "添加任务…"
+            hint = "添加任务…  输入 # 打标签"
             // 单行输入（任务标题不换行），紧凑样式与笔记页快速输入一致
             setMinLines(1)
             gravity = Gravity.TOP or Gravity.START
@@ -436,14 +542,77 @@ class TodoFragment : Fragment() {
             backgroundTintList = android.content.res.ColorStateList.valueOf(
                 ContextCompat.getColor(requireContext(), R.color.inbox_accent),
             )
+            // 标签筛选激活时预填 #当前标签（同收件箱快速输入的习惯，新任务自动带上筛选标签）
+            currentTag?.let { setText("#$it ") }
         }
+
+        // # 标签建议下拉（显示在输入框上方，与笔记页快速输入一致）
+        val suggestionView = TagSuggestionView(themedCtx)
+        suggestionView.listener = listener@{ selectedTag ->
+            val text = input.text?.toString() ?: return@listener
+            val cursorPos = input.selectionStart
+            val (prefix, tagStart) = TodoTagSuggest.extractTagPrefix(text, cursorPos)
+            if (tagStart >= 0 && cursorPos > 0) {
+                // 从 # 的位置开始整体替换为选中的标签
+                input.text.replace(tagStart - 1, cursorPos, "#$selectedTag")
+                input.setSelection(tagStart + selectedTag.length)
+            } else {
+                // 没有 # 前缀时直接在光标处插入（与笔记页快速输入一致）
+                input.text.insert(cursorPos, "#$selectedTag ")
+                input.setSelection(cursorPos + selectedTag.length + 2)
+            }
+        }
+
+        // 输入 # 后实时给出标签建议（建议源：任务 tag ∪ 笔记标签树）
+        var lastChangeWasDeletion = false
+        input.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                val text = s?.toString() ?: return
+                val cursorPos = input.selectionStart
+                if (cursorPos <= 0) {
+                    suggestionView.hide()
+                    return
+                }
+                val (prefix, tagStart) = TodoTagSuggest.extractTagPrefix(text, cursorPos)
+                // 不在 # 串内 → 不给建议
+                if (tagStart < 0) {
+                    suggestionView.hide()
+                    return
+                }
+                // 输入标签后又删除回退到只剩 # → 不给建议（避免退格时整个标签列表挂出来）
+                if (prefix.isEmpty() && lastChangeWasDeletion) {
+                    suggestionView.hide()
+                    return
+                }
+                // 刚输入 #（prefix 为空）或已有前缀 → 给建议（空前缀返回全量标签）
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val counts = TodoTagSuggest.tagCounts(source.tasks())
+                    val matches = TodoTagSuggest.suggestions(prefix, counts.keys.toList(), counts)
+                    if (_binding == null || matches.isEmpty()) {
+                        suggestionView.hide()
+                    } else {
+                        suggestionView.show(prefix, matches)
+                    }
+                }
+            }
+
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                // 纯删除（退格/剪切）→ 标记；输入 → 非删除
+                lastChangeWasDeletion = count == 0 && before > 0
+            }
+        })
 
         fun submit() {
             // 任务标题不换行：把换行/连续空白压成单个空格
-            val text = input.text?.toString()?.replace(Regex("\\s+"), " ")?.trim() ?: ""
-            if (text.isNotEmpty()) {
-                addTask(text)
-                dialog.dismiss()
+            val raw = input.text?.toString()?.replace(Regex("\\s+"), " ")?.trim() ?: ""
+            if (raw.isNotEmpty()) {
+                // #tag 记号解析为标签并从标题剥离（纯数字如 #123 不算）
+                val (title, tags) = TodoTagSuggest.parseTagTokens(raw)
+                if (title.isNotEmpty() || tags.isNotEmpty()) {
+                    addTask(title.ifEmpty { raw }, tags)
+                    dialog.dismiss()
+                }
             }
         }
 
@@ -455,31 +624,48 @@ class TodoFragment : Fragment() {
             } else false
         }
 
-        // 底部一行：发送按钮靠右下角（无取消按钮，下滑即可关闭）
-        val buttonRow = android.widget.FrameLayout(themedCtx).apply {
-            setPadding(dp(16), dp(8), dp(16), dp(12))
+        // 底部同一行：Markdown 工具栏在左、发送按钮在右（与笔记页快速输入一致；无取消按钮，下滑即可关闭）
+        val sendButton = com.google.android.material.button.MaterialButton(
+            themedCtx, null, com.google.android.material.R.attr.materialButtonStyle,
+        ).apply {
+            text = "➤"
+            contentDescription = "添加任务"
+            setOnClickListener { submit() }
+        }
+        val bottomRow = LinearLayout(themedCtx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(4), dp(12), 0)
             addView(
-                com.google.android.material.button.MaterialButton(
-                    themedCtx, null, com.google.android.material.R.attr.materialButtonStyle,
-                ).apply {
-                    text = "➤"
-                    contentDescription = "添加任务"
-                    setOnClickListener { submit() }
-                },
-                android.widget.FrameLayout.LayoutParams(
+                buildMarkdownToolbar(themedCtx, dp, input),
+                LinearLayout.LayoutParams(
+                    0,
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                    Gravity.END or Gravity.BOTTOM,
+                    1f,
                 ),
+            )
+            addView(
+                sendButton,
+                LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { marginStart = dp(4) },
             )
         }
 
-        // 垂直布局：单行输入框在上、按钮行紧随其下，弹层整体包裹内容（紧凑输入条）
+        // 垂直布局：建议下拉（收起时无高度）→ 输入框 → 按钮行，弹层整体包裹内容（紧凑输入条）
         val container = LinearLayout(themedCtx).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = android.widget.FrameLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            addView(
+                suggestionView,
+                LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
             )
             addView(
                 input,
@@ -489,7 +675,7 @@ class TodoFragment : Fragment() {
                 ),
             )
             addView(
-                buttonRow,
+                bottomRow,
                 LinearLayout.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -515,17 +701,19 @@ class TodoFragment : Fragment() {
         }, 100)
     }
 
-    private fun addTask(title: String) {
-        if (title.isEmpty()) return
+    private fun addTask(title: String, tags: List<String> = emptyList()) {
+        if (title.isEmpty() && tags.isEmpty()) return
         // 归属规则：清单视图 → 该清单；今天视图 → 收集箱 + 今天到期；其它 → 收集箱无期限
         val (listId, due) = when (currentView) {
             TodoView.LIST -> currentListId to ""
             TodoView.TODAY -> 0L to todayStr()
             else -> 0L to ""
         }
+        // 标签筛选激活时新任务自动带上当前标签（快速添加输入框已预填，此处兜底合并去重）
+        val allTags = (tags + listOfNotNull(currentTag)).distinct()
         // 登记待定位 id：数据源异步生效，等快照里出现该任务时再滚动
         pendingScrollTaskId = -1L
-        source.createTask(title, listId, due) { id -> pendingScrollTaskId = id }
+        source.createTask(title, listId, due, allTags) { id -> pendingScrollTaskId = id }
     }
 
     // ── 排序（右上角 ⋮ 菜单的「排序」子菜单） ────────────

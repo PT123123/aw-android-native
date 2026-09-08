@@ -141,14 +141,19 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
-            <!-- 标签：逗号（中英文皆可）分隔，失焦 / 回车提交 -->
+            <!-- 标签：逗号（中英文皆可）分隔，输入 # 时给出标签建议，失焦 / 回车提交 -->
+            <net.activitywatch.android.inbox.TagSuggestionView
+                android:id="@+id/detailTagSuggestions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" />
+
             <EditText
                 android:id="@+id/detailTags"
                 style="@style/AwEditText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:hint="标签，用逗号分隔"
+                android:hint="标签，用逗号分隔（输入 # 可选已有标签）"
                 android:imeOptions="actionDone"
                 android:inputType="text"
                 android:maxLines="1" />

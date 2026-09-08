@@ -1,5 +1,7 @@
 package net.activitywatch.android.inbox
 
+import android.os.Handler
+import android.os.Looper
 import android.view.GestureDetector
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
@@ -10,6 +12,7 @@ import android.text.Spanned
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import androidx.core.content.ContextCompat
 import net.activitywatch.android.databinding.InboxNoteItemBinding
 import net.activitywatch.android.R
 import java.text.SimpleDateFormat
@@ -46,6 +49,46 @@ class InboxAdapter(
     /** 已选中的笔记 id 集合 */
     val selectedIds = mutableSetOf<Long>()
 
+    // ==== 定位高亮（按笔记 id，不按 position）====
+
+    /** 当前被高亮闪烁的笔记 id；高亮走 bind 周期（setCardBackgroundColor），复用/重绑不会残留 */
+    private var highlightId: Long? = null
+
+    /** 高亮清除定时器，重复触发时先取消旧的 */
+    private var highlightClearRunnable: Runnable? = null
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /**
+     * 定位高亮：目标卡片背景闪 accent 色 durationMs 后恢复。
+     * 以笔记 id 为键，通过 payload 局部重绑刷新背景，避免 DiffUtil 动画/复用导致高亮残留在其他笔记上。
+     */
+    fun flashHighlight(noteId: Long, durationMs: Long = 500L) {
+        highlightClearRunnable?.let { mainHandler.removeCallbacks(it) }
+
+        // 旧高亮先清除（position 可能已变，按 id 重新定位）
+        val oldId = highlightId
+        highlightId = null
+        if (oldId != null) {
+            val oldPos = currentList.indexOfFirst { it.id == oldId }
+            if (oldPos >= 0) notifyItemChanged(oldPos, PAYLOAD_HIGHLIGHT)
+        }
+
+        val pos = currentList.indexOfFirst { it.id == noteId }
+        if (pos < 0) return
+        highlightId = noteId
+        notifyItemChanged(pos, PAYLOAD_HIGHLIGHT)
+
+        highlightClearRunnable = Runnable {
+            highlightId = null
+            highlightClearRunnable = null
+            // 清除时重新按 id 定位（期间列表可能已移动）
+            val p = currentList.indexOfFirst { it.id == noteId }
+            if (p >= 0) notifyItemChanged(p, PAYLOAD_HIGHLIGHT)
+        }
+        mainHandler.postDelayed(highlightClearRunnable!!, durationMs)
+    }
+
     /** 选中状态变化回调 */
     var onSelectionChanged: ((Int) -> Unit)? = null
 
@@ -72,6 +115,9 @@ class InboxAdapter(
     }
 
     companion object {
+        /** 局部重绑 payload：只刷新定位高亮背景，不重设正文 */
+        const val PAYLOAD_HIGHLIGHT = "payload_highlight"
+
         private val DIFF = object : DiffUtil.ItemCallback<NoteResponse>() {
             override fun areItemsTheSame(a: NoteResponse, b: NoteResponse) = a.id == b.id
             // parentId/parentPreview 是类体中的 var 属性，不参与 data class 的 equals，
@@ -208,6 +254,15 @@ class InboxAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH =
         VH(InboxNoteItemBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
+    override fun onBindViewHolder(holder: VH, position: Int, payloads: List<Any>) {
+        // 定位高亮的局部刷新：只更新卡片背景，不动正文
+        if (payloads.contains(PAYLOAD_HIGHLIGHT)) {
+            bindCardBackground(holder, getItem(position))
+            return
+        }
+        super.onBindViewHolder(holder, position, payloads)
+    }
+
     override fun onBindViewHolder(holder: VH, position: Int) {
         val note = getItem(position)
         val ctx = holder.b.root.context
@@ -221,6 +276,7 @@ class InboxAdapter(
             holder.b.parentPreview.visibility = View.GONE
         }
         holder.b.time.text = buildTimeString(note)
+        bindCardBackground(holder, note)
 
         // 多选模式：显示/隐藏 checkbox
         if (selectionMode) {
@@ -240,6 +296,13 @@ class InboxAdapter(
             holder.b.checkmark.visibility = View.GONE
             holder.b.overflow.visibility = View.VISIBLE
         }
+    }
+
+    /** 卡片背景：被定位高亮的笔记闪 accent 色，其余用正常卡片色（走 bind 周期，复用/重绑安全） */
+    private fun bindCardBackground(holder: VH, note: NoteResponse) {
+        val ctx = holder.b.root.context
+        val colorRes = if (note.id == highlightId) R.color.aw_accent else R.color.inbox_card
+        holder.b.root.setCardBackgroundColor(ContextCompat.getColor(ctx, colorRes))
     }
 
     private fun buildTimeString(note: NoteResponse): String {
