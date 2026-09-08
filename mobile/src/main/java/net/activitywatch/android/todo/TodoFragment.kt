@@ -156,6 +156,15 @@ class TodoFragment : Fragment() {
         adapter.onTagClick = { tag ->
             applyTagFilter(if (currentTag == tag) null else tag)
         }
+        // 卡片上直接勾选/取消子任务（写数据源后 reload 会刷新进度与删除线）
+        adapter.onSubtaskToggle = { task, subId, completed ->
+            val updated = task.copy().apply {
+                subtasks = subtasks.map {
+                    if (it.id == subId) it.copy(completed = completed) else it.copy()
+                }.toMutableList()
+            }
+            source.updateTask(updated)
+        }
         // 筛选条：✕ 清除；↑ 回到上级标签路径（项目/工作/xx → 项目/工作）
         binding.filterClear.setOnClickListener { applyTagFilter(null) }
         binding.filterUp.setOnClickListener { applyTagFilter(tagParentPath(currentTag.orEmpty())) }

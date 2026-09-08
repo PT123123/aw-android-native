@@ -1,10 +1,19 @@
 package net.activitywatch.android
 
+import android.Manifest
+import android.app.AlarmManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.PorterDuff
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
@@ -48,6 +57,12 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 private const val TAG = "MainActivity"
+
+/** 通知权限运行时申请 requestCode */
+private const val REQ_POST_NOTIFICATIONS = 4101
+
+/** 任务提醒通知渠道 id */
+private const val CHANNEL_TODO_REMINDER = "todo_reminder"
 
 /**
  * 抽屉导航的可折叠分组。
@@ -141,6 +156,9 @@ class MainActivity : AppCompatActivity() {
         // Wi-Fi 自动开关：连上 Wi-Fi 自动开启局域网同步，离开自动关闭（无需人工开关）
         LanSyncNetworkMonitor.register(this, ri)
 
+        // 提醒所需权限：通知（13+ 运行时申请）、精确闹钟（12+ 特殊权限，缺失时提示引导）
+        ensureReminderPermissions()
+
         // 如果 savedInstanceState 不为 null，则跳过添加 Fragment
         if (savedInstanceState != null) {
             return
@@ -159,6 +177,57 @@ class MainActivity : AppCompatActivity() {
         // 确保数据总是最新的
         val usw = UsageStatsWatcher(this)
         usw.sendHeartbeats()
+    }
+
+    // ===================== 提醒权限 =====================
+
+    private fun ensureReminderPermissions() {
+        createReminderChannel()
+
+        // 通知权限（Android 13+ 运行时申请）
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_POST_NOTIFICATIONS)
+        }
+
+        // 精确闹钟（Android 12+ 的「闹钟和提醒」特殊权限，无法弹窗申请）：
+        // 缺失时用 Snackbar 引导跳系统设置，不阻塞使用
+        if (Build.VERSION.SDK_INT >= 31) {
+            val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            if (!am.canScheduleExactAlarms()) {
+                Snackbar.make(
+                    binding.coordinatorLayout,
+                    "任务到期提醒需要「闹钟和提醒」权限",
+                    Snackbar.LENGTH_LONG
+                ).setAction("去设置") {
+                    try {
+                        startActivity(
+                            Intent(
+                                Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                Uri.parse("package:$packageName"),
+                            )
+                        )
+                    } catch (e: Throwable) {
+                        Log.w(TAG, "打开精确闹钟设置页失败", e)
+                    }
+                }.show()
+            }
+        }
+    }
+
+    /** 任务提醒通知渠道（Importance：弹出横幅 + 声音） */
+    private fun createReminderChannel() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_TODO_REMINDER,
+                    "任务提醒",
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply { description = "任务到期提醒通知" }
+            )
+        }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -182,12 +251,17 @@ class MainActivity : AppCompatActivity() {
         if (currentFragment !is InboxFragment) {
             super.onBackPressed()
             // 如果活动仍在运行，说明某个回调处理了返回事件
-            if (!isFinishing && !isDestroyed) return
+            if (!isFinishing && !isDestroyed) {
+                // 弹栈可能切回了上一页（如 TODO → 笔记），同步侧边栏高亮
+                syncSidebarHighlight()
+                return
+            }
         }
 
         // 编辑器等子页面在返回栈中，正常弹出返回
         if (supportFragmentManager.backStackEntryCount > 0) {
             supportFragmentManager.popBackStackImmediate()
+            syncSidebarHighlight()
             return
         }
 
@@ -451,6 +525,17 @@ class MainActivity : AppCompatActivity() {
                 PorterDuff.Mode.SRC_IN
             )
         }
+    }
+
+    /**
+     * 让侧边栏高亮跟随当前实际显示的片段（返回键弹栈后调用）。
+     * 按片段运行时类匹配导航行定义；找不到对应行（如编辑器子页）则保持原高亮。
+     */
+    private fun syncSidebarHighlight() {
+        val current = supportFragmentManager.findFragmentById(R.id.fragment_container) ?: return
+        val row = buildNavGroups().flatMap { it.rows }
+            .firstOrNull { it.fragmentClass == current.javaClass } ?: return
+        selectRow(row.id)
     }
 
     private fun navigateTo(fragmentClass: Class<out Fragment>, args: Bundle? = null) {

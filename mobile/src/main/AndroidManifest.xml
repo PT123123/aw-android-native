@@ -23,6 +23,10 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- 提醒：通知推送（Android 13+ 运行时申请）+ 精确闹钟（任务到期提醒；「闹钟和提醒」特殊权限） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission
@@ -70,6 +74,18 @@
             <intent-filter>
                 <action android:name="net.activitywatch.android.watcher.LOG_DATA"/>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- 任务到期提醒：闹钟触发发通知；开机/时间/时区变更后重挂登记表里的闹钟 -->
+        <receiver
+                android:name=".todo.TodoReminderReceiver"
+                android:enabled="true"
+                android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.TIME_SET"/>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED"/>
             </intent-filter>
         </receiver>
 
