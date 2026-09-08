@@ -64,6 +64,29 @@ class TodoAdapter(
     /** 任务在 ordered（含可选「显示已完成」折叠头）中的 adapter position；不在可见区返回 -1 */
     fun indexOfTask(taskId: Long): Int = ordered.indexOfFirst { it.id == taskId }
 
+    // 新建定位闪烁：以任务 id 为状态的背景高亮，主线程 Handler 定时清除。
+    // 不直接改行 view 背景（view.postDelayed 依赖 view 附着窗口，行被回收后恢复 runnable
+    // 会被挂起，蓝色残留到下次刷新）；重绑时也按该状态渲染，复用/滚动不会留下脏背景。
+    private var highlightTaskId = -1L
+    private val highlightHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val highlightClear = Runnable {
+        val id = highlightTaskId
+        highlightTaskId = -1L
+        if (id != -1L) {
+            val pos = indexOfTask(id)
+            if (pos >= 0) notifyItemChanged(pos)
+        }
+    }
+
+    /** 定位并闪烁高亮指定任务 ~400ms（可重复调用，重新计时） */
+    fun flashHighlight(taskId: Long) {
+        highlightHandler.removeCallbacks(highlightClear)
+        highlightTaskId = taskId
+        val pos = indexOfTask(taskId)
+        if (pos >= 0) notifyItemChanged(pos)
+        highlightHandler.postDelayed(highlightClear, 400)
+    }
+
     /** 获取所有可见任务的 id 列表（排除折叠头） */
     fun getAllTaskIds(): List<Long> = ordered.filter { it.id != -1L }.map { it.id }
 
@@ -147,17 +170,21 @@ class TodoAdapter(
                 b.title.setTextColor(ContextCompat.getColor(ctx, R.color.aw_text_primary))
             }
 
-            // 多选模式：显示选中背景，隐藏复选框
-            if (selectionMode) {
-                b.root.setBackgroundColor(
-                    if (task.id in selectedIds) ContextCompat.getColor(ctx, R.color.aw_text_disabled)
-                    else ContextCompat.getColor(ctx, android.R.color.transparent)
-                )
-                b.check.visibility = View.GONE
-            } else {
-                b.root.setBackgroundColor(ContextCompat.getColor(ctx, android.R.color.transparent))
-                b.check.visibility = View.VISIBLE
-            }
+            // 背景一律由绑定状态决定：多选选中态 > 新建闪烁高亮 > 透明（重绑即恢复，不留脏背景）
+            b.root.setBackgroundColor(
+                when {
+                    selectionMode && task.id in selectedIds ->
+                        ContextCompat.getColor(ctx, R.color.aw_text_disabled)
+                    selectionMode ->
+                        ContextCompat.getColor(ctx, android.R.color.transparent)
+                    task.id == highlightTaskId ->
+                        ContextCompat.getColor(ctx, R.color.aw_accent)
+                    else ->
+                        ContextCompat.getColor(ctx, android.R.color.transparent)
+                }
+            )
+            // 多选模式隐藏复选框（避免与 checkbox 勾选冲突）
+            b.check.visibility = if (selectionMode) View.GONE else View.VISIBLE
 
             // 统一点击监听器：点击时实时判断 selectionMode，避免绑定残留问题
             b.root.setOnClickListener {
