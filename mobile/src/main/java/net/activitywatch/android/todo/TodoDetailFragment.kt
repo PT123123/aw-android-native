@@ -106,12 +106,6 @@ class TodoDetailFragment : DialogFragment() {
         b.subtaskList.adapter = subtaskAdapter
 
         b.detailToolbar.setNavigationOnClickListener { dismiss() }
-        b.detailToolbar.setOnMenuItemClickListener { item ->
-            if (item.itemId == R.id.action_delete_task) {
-                confirmDelete()
-                true
-            } else false
-        }
 
         // ── 标题 / 标签：失焦或回车提交 ──
         b.detailTitle.setOnEditorActionListener { _, actionId, _ ->
@@ -427,18 +421,15 @@ class TodoDetailFragment : DialogFragment() {
         source.addSubtask(taskId, title)
     }
 
+    /**
+     * 删除（无确认对话框，笔记同款撤销流程）：
+     * 先登记进撤销窗口（列表隐藏 + 悬浮条可撤销），窗口超时才真正调服务端删除。
+     */
     private fun confirmDelete() {
         val task = base ?: return
-        AlertDialog.Builder(requireContext())
-            .setTitle("删除任务")
-            .setMessage("确定删除「${task.title}」？")
-            .setPositiveButton("删除") { _, _ ->
-                deleted = true
-                source.deleteTask(taskId)
-                dismissAllowingStateLoss()
-            }
-            .setNegativeButton("取消", null)
-            .show()
+        deleted = true
+        TodoRepository.enqueuePendingDelete(task)
+        dismissAllowingStateLoss()
     }
 
     private fun toast(msg: String) {

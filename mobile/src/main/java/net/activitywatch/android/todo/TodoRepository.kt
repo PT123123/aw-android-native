@@ -30,6 +30,24 @@ object TodoRepository {
     private var current: TodoSource? = null
     private var currentKind: TodoSourceKind? = null
 
+    /**
+     * 撤销删除窗口期（笔记同款）：详情页删除先从列表隐藏、暂缓调服务端，
+     * 悬浮条超时才真正删除；点撤销从这里取回任务重新显示。
+     * 仅存内存，进程被杀等价于放弃撤销（窗口本就只有几秒）。
+     */
+    private val pendingDeletedTasks = LinkedHashMap<Long, TodoTask>()
+
+    /** 详情页删除：登记进撤销窗口并通知列表刷新（列表据此隐藏 + 弹撤销悬浮条） */
+    fun enqueuePendingDelete(task: TodoTask) {
+        pendingDeletedTasks[task.id] = task
+        notifyChanged()
+    }
+
+    /** 撤销：取回待删任务（重新显示，服务端未动过） */
+    fun takePendingDelete(taskId: Long): TodoTask? = pendingDeletedTasks.remove(taskId)
+
+    fun pendingDeleteIds(): Set<Long> = pendingDeletedTasks.keys.toSet()
+
     fun kind(context: Context): TodoSourceKind {
         currentKind?.let { return it }
         val key = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

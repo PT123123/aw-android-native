@@ -16,7 +16,6 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="@color/aw_bg"
-        app:menu="@menu/menu_todo_detail"
         app:navigationIcon="@drawable/ic_close"
         app:navigationIconTint="@color/aw_text_primary"
         app:subtitleTextColor="@color/aw_text_secondary"

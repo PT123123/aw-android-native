@@ -321,7 +321,10 @@ class TodoFragment : Fragment() {
         updateSortMenuChecks()
         updateFilterBar()
 
-        val (open0, done0) = visibleTasks(mTasks, currentView, currentListId, currentSortMode)
+        val (open0, done0) = visibleTasks(
+            mTasks.filter { it.id !in TodoRepository.pendingDeleteIds() },
+            currentView, currentListId, currentSortMode,
+        )
         // 标签 + 搜索筛选叠加在视图/清单之上（视图 AND 清单 AND 标签 AND 搜索）
         val open = open0.filter { it.matchesTag(currentTag) && matchesSearch(it) }
         val done = done0.filter { it.matchesTag(currentTag) && matchesSearch(it) }
@@ -330,6 +333,37 @@ class TodoFragment : Fragment() {
         updateEmptyState()
         updateProgress()
         consumePendingScroll()
+        // 有待删任务在撤销窗口期内 → 弹撤销悬浮条（笔记同款）
+        if (TodoRepository.pendingDeleteIds().isNotEmpty()) showPendingDeleteSnackbar()
+    }
+
+    // ── 撤销删除（笔记同款）：详情页删除先从列表隐藏，窗口超时才真正调服务端 ──
+
+    private fun showPendingDeleteSnackbar() {
+        val ids = TodoRepository.pendingDeleteIds()
+        val snackbar = com.google.android.material.snackbar.Snackbar.make(
+            binding.root,
+            if (ids.size == 1) "已删除任务" else "已删除 ${ids.size} 项任务",
+            UNDO_DELETE_WINDOW_MS,
+        ).setAnchorView(binding.fab)
+
+        snackbar.setAction("撤销") {
+            // 撤销：从窗口期取回任务并重新渲染（服务端未动过，无需重插）
+            ids.forEach { TodoRepository.takePendingDelete(it) }
+            render()
+        }
+        snackbar.addCallback(object : com.google.android.material.snackbar.Snackbar.Callback() {
+            override fun onDismissed(bar: com.google.android.material.snackbar.Snackbar, event: Int) {
+                super.onDismissed(bar, event)
+                // 点撤销时不删除；其他（超时/被新浮条顶替/手动滑走）执行真正删除
+                if (event == DISMISS_EVENT_ACTION) return
+                TodoRepository.pendingDeleteIds().forEach { id ->
+                    TodoRepository.takePendingDelete(id)
+                    source.deleteTask(id)
+                }
+            }
+        })
+        snackbar.show()
     }
 
     /**
@@ -343,20 +377,15 @@ class TodoFragment : Fragment() {
         val pos = adapter.indexOfTask(id)
         if (pos < 0) return
         pendingScrollTaskId = -1L
-        scrollToTaskWithHighlight(pos)
+        scrollToTaskWithHighlight(pos, id)
     }
 
     /** 滚动到指定位置并让目标行背景闪烁 ~400ms，让用户一眼看到刚新建的任务 */
-    private fun scrollToTaskWithHighlight(pos: Int) {
+    private fun scrollToTaskWithHighlight(pos: Int, taskId: Long) {
         val lm = binding.list.layoutManager as? LinearLayoutManager ?: return
         lm.scrollToPositionWithOffset(pos, 0)
-        binding.list.post {
-            binding.list.findViewHolderForAdapterPosition(pos)?.itemView?.let { view ->
-                val original = view.background
-                view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.aw_accent))
-                view.postDelayed({ view.background = original }, 400)
-            }
-        }
+        // 落位后交给 adapter 做基于任务 id 的高亮（主线程定时清除，重绑安全）
+        binding.list.post { adapter.flashHighlight(taskId) }
     }
 
     private fun updateEmptyState() {
@@ -542,10 +571,11 @@ class TodoFragment : Fragment() {
 
         val input = EditText(themedCtx).apply {
             hint = "添加任务…  输入 # 打标签"
-            // 单行输入（任务标题不换行），紧凑样式与笔记页快速输入一致
+            // 单行输入（任务标题不换行），紧凑样式与笔记页快速输入一致；
+            // paddingBottom 必须保留：否则文字下端会被蓝色下划线（背景底边）压住
             setMinLines(1)
             gravity = Gravity.TOP or Gravity.START
-            setPadding(dp(16), dp(12), dp(16), 0)
+            setPadding(dp(16), dp(12), dp(16), dp(8))
             setTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_text))
             setHintTextColor(ContextCompat.getColor(requireContext(), R.color.inbox_sub))
             backgroundTintList = android.content.res.ColorStateList.valueOf(
@@ -847,5 +877,8 @@ class TodoFragment : Fragment() {
     companion object {
         /** 抽屉视图入口参数 key（MainActivity.todoArgs 写入） */
         const val ARG_VIEW = "todo_view"
+
+        /** 撤销删除悬浮条的窗口时长（同收件箱笔记） */
+        private const val UNDO_DELETE_WINDOW_MS = 3000
     }
 }

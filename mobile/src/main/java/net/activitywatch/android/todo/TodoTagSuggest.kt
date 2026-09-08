@@ -48,7 +48,7 @@ object TodoTagSuggest {
     /**
      * 计算匹配 prefix 的建议列表（调用方在协程里调用）。
      * 空前缀 = 刚输入 #：返回全部标签（按使用频率排序）；非空前缀按前缀匹配。
-     * 返回已排序、最多 10 条；顺序反转后展示在输入框上方（最相关的贴着输入行）。
+     * 返回已排序、最多 5 条；顺序反转后展示在输入框上方（最相关的贴着输入行）。
      */
     suspend fun suggestions(
         prefix: String,
@@ -67,7 +67,7 @@ object TodoTagSuggest {
                     .thenByDescending { taskTags.contains(it) }
                     .thenBy { it }
             )
-            .take(10)
+            .take(5)
             .reversed()
     }
 
