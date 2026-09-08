@@ -2,6 +2,7 @@ package net.activitywatch.android.todo
 
 import android.graphics.Paint
 import android.text.SpannableString
+import android.text.SpannableStringBuilder
 import android.text.TextPaint
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
@@ -51,6 +52,9 @@ class TodoAdapter(
 
     /** 行内标签点击回调（多选模式自动退化为纯文本，不触发） */
     var onTagClick: ((String) -> Unit)? = null
+
+    /** 卡片上子任务 checkbox 切换回调（多选模式下禁用） */
+    var onSubtaskToggle: ((task: TodoTask, subtaskId: Long, completed: Boolean) -> Unit)? = null
 
     fun setListColors(colors: Map<Long, Int>) {
         listColors = colors
@@ -207,7 +211,7 @@ class TodoAdapter(
                 b.dueDate.visibility = View.GONE
             }
 
-            // 子任务进度
+            // 子任务进度徽章（摘要）
             if (task.subtasks.isNotEmpty()) {
                 b.subtasks.visibility = View.VISIBLE
                 b.subtasks.text = "☑ ${task.subtasks.size - task.openSubtaskCount()}/${task.subtasks.size}"
@@ -215,12 +219,48 @@ class TodoAdapter(
                 b.subtasks.visibility = View.GONE
             }
 
-            // 标签行：非多选时按「 · 」分段可点（点标签 = 进入该标签筛选）
+            // 子任务树形列表：缩进行 + checkbox，点选即切换完成态（多选模式下只读）
+            b.subtaskList.removeAllViews()
+            if (task.subtasks.isNotEmpty()) {
+                b.subtaskList.visibility = View.VISIBLE
+                val toggle = if (selectionMode) null else onSubtaskToggle
+                val subCtx = b.subtaskList.context
+                task.subtasks.forEach { sub ->
+                    val item = net.activitywatch.android.databinding.TodoSubtaskItemBinding
+                        .inflate(LayoutInflater.from(subCtx), b.subtaskList, false)
+                    item.subRemove.visibility = View.GONE
+                    item.subTitle.text = sub.title
+                    item.subTitle.paintFlags = if (sub.completed) {
+                        item.subTitle.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
+                    } else {
+                        item.subTitle.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
+                    }
+                    item.subTitle.setTextColor(
+                        ContextCompat.getColor(
+                            subCtx,
+                            if (sub.completed) R.color.aw_text_disabled else R.color.aw_text_primary,
+                        )
+                    )
+                    item.subCheck.isChecked = sub.completed
+                    if (toggle == null) {
+                        item.subCheck.isEnabled = false
+                    } else {
+                        item.subCheck.setOnClickListener {
+                            toggle(task, sub.id, item.subCheck.isChecked)
+                        }
+                    }
+                    b.subtaskList.addView(item.root)
+                }
+            } else {
+                b.subtaskList.visibility = View.GONE
+            }
+
+            // 标签：卡片最右侧，带 # 前缀；非多选时可点（点标签 = 进入该标签筛选）
             if (task.tags.isNotEmpty()) {
                 b.tags.visibility = View.VISIBLE
                 val click = if (selectionMode) null else onTagClick
                 if (click == null) {
-                    b.tags.text = task.tags.joinToString(" · ")
+                    b.tags.text = task.tags.joinToString(" · ") { "#$it" }
                     b.tags.movementMethod = null
                 } else {
                     b.tags.text = clickableTagText(task.tags, click)
@@ -231,13 +271,15 @@ class TodoAdapter(
             }
         }
 
-        /** 每个标签段挂 ClickableSpan（高亮透明、不下划线，保持行内标签观感） */
+        /** 每个标签段（#tag）挂 ClickableSpan，点击回调整段对应的完整 tag */
         private fun clickableTagText(tags: List<String>, click: (String) -> Unit): CharSequence {
-            val sp = SpannableString(tags.joinToString(" · "))
-            var start = 0
-            for (tag in tags) {
-                val end = start + tag.length
-                sp.setSpan(
+            val sb = SpannableStringBuilder()
+            tags.forEachIndexed { i, tag ->
+                if (i > 0) sb.append(" · ")
+                val start = sb.length
+                sb.append("#").append(tag)
+                val end = sb.length
+                sb.setSpan(
                     object : ClickableSpan() {
                         override fun onClick(widget: View) = click(tag)
                         override fun updateDrawState(ds: TextPaint) {
@@ -246,9 +288,8 @@ class TodoAdapter(
                     },
                     start, end, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE,
                 )
-                start = end + 3   // " · " 分隔符
             }
-            return sp
+            return sb
         }
     }
 
