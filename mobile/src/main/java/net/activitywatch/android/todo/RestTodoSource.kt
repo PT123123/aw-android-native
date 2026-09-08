@@ -7,17 +7,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * REST 数据源（契约 §3.5，对标 aw-qtui TodoApiStore）。
+ * REST 数据源（对标 aw-qtui TodoApiStore）。
  *
- * 服务端（aw-server-rust /inbox/todos）只有「任务」一种实体，因此做如下降级映射：
+ * 服务端契约（升级后）：
  *  - notes        ↔ content
  *  - dueDate      ← due_date 取前 10 位
- *  - 清单          = 第一个 tag（listId = tag 哈希，无 tag → 0 收集箱）
- *  - lists()      = 虚拟收集箱 + 所有任务 tag 去重 + 本次会话新建的空清单
- *  - 子任务 / 重复  → 不支持（[supportsSubtasks] / [supportsRecurrence] 为 false，UI 隐藏）
- *  - createList   → 空操作（清单随任务 tag 在下一次 load 时自然出现）
- *  - renameList / deleteList → 遍历持有该 tag 的任务逐个 PUT 改 tags
- *  - createTask   → POST（title + tags），带期限时拿到 id 后再补一次 PUT
+ *  - 清单          = 独立实体 /inbox/todo-lists，任务以 list_id 关联（0 = 收集箱），与 tag 无关
+ *  - 子任务        = todos.subtasks JSON 列（[SubtaskPayload]），整组读改写
+ *  - tags         = 全部自由标签，详情页标签栏原样可见
+ *  - 重复          → 不支持（[supportsRecurrence] 为 false，UI 隐藏）
+ *  - createTask   → POST（title + tags + list_id），带期限时拿到 id 后再补一次 PUT
  *  - 每个写操作    → 完成后全量 load()（无增量、无乐观更新）
  */
 class RestTodoSource(context: Context) : TodoSource() {
@@ -27,16 +26,14 @@ class RestTodoSource(context: Context) : TodoSource() {
 
     private var mTasks: List<TodoTask> = emptyList()
     private var mLists: List<TodoList> = emptyList()
-    /** 本地新建、尚无任务使用的清单名（否则新建的清单会一闪而过） */
-    private val pendingLists = LinkedHashSet<String>()
 
     override var ready: Boolean = false
         private set
 
     override val label: String get() = "服务器"
-    override val supportsSubtasks: Boolean get() = false
+    override val supportsSubtasks: Boolean get() = true
     override val supportsRecurrence: Boolean get() = false
-    override val supportsLists: Boolean get() = false
+    override val supportsLists: Boolean get() = true
 
     init {
         TodoApi.init(context.applicationContext)
@@ -48,20 +45,29 @@ class RestTodoSource(context: Context) : TodoSource() {
 
     override fun tasks(): List<TodoTask> = synchronized(lock) { mTasks.map { it.deepCopy() } }
 
-    /** 清单 id → 名称（id 由 tag 哈希派生） */
-    fun listName(listId: Long): String? =
-        synchronized(lock) { mLists.firstOrNull { it.id == listId }?.name }
-
     // ── 加载 ────────────────────────────────────────────
 
     override fun load() {
         scope.launch {
             try {
                 val response = TodoApi.service.getTodos()   // 不带 completed → 返回全部（含已完成）
-                val tasks = response.map { it.toTask() }
+                val lists = runCatching { TodoApi.service.getTodoLists() }.getOrDefault(emptyList())
+                val tasks = response.map { it.toTask() }.toMutableList()
+                val knownListIds = lists.map { it.id }.toSet()
+                // 清单可能已在别处删除：悬空 list_id 的任务按收集箱展示（不丢任务）
+                for (t in tasks) {
+                    if (t.listId != 0L && t.listId !in knownListIds) t.listId = 0L
+                }
                 synchronized(lock) {
                     mTasks = tasks
-                    deriveListsLocked()
+                    mLists = lists.map { l ->
+                        TodoList(
+                            id = l.id,
+                            name = l.name,
+                            color = l.color,
+                            sortOrder = l.sortOrder,
+                        )
+                    }
                     ready = true
                 }
                 notifyChanged()
@@ -71,45 +77,30 @@ class RestTodoSource(context: Context) : TodoSource() {
         }
     }
 
-    /** 清单由任务 tag 派生：所有任务 tag 去重 + 本次会话新建的空清单 */
-    private fun deriveListsLocked() {
-        val names = LinkedHashSet<String>()
-        for (t in mTasks) names.addAll(t.tags)
-        names.addAll(pendingLists)
-        mLists = names.map { name -> TodoList(id = tagToListId(name), name = name) }
-    }
-
     /** 写操作收尾：全量重新拉取（契约 §3.5） */
     private fun reload() {
         load()
     }
 
-    // ── 清单（tag 模拟） ────────────────────────────────
+    // ── 清单（独立实体） ────────────────────────────────
 
     override fun createList(name: String, color: String) {
         if (name.isBlank()) return
-        synchronized(lock) { pendingLists.add(name.trim()) }
-        reload()
+        scope.launch {
+            try {
+                TodoApi.service.createTodoList(CreateTodoListPayload(name = name.trim(), color = color))
+                reload()
+            } catch (e: Throwable) {
+                reportError("新建清单失败：${e.message}")
+            }
+        }
     }
 
     override fun renameList(listId: Long, name: String) {
         if (listId <= 0 || name.isBlank()) return
-        val oldName = synchronized(lock) { mLists.firstOrNull { it.id == listId }?.name }
-            ?: return
-        val newName = name.trim()
-        val targets = tasks().filter { it.listId == listId }
         scope.launch {
             try {
-                for (t in targets) {
-                    TodoApi.service.updateTodo(
-                        t.id,
-                        UpdateTodoPayload(tags = t.serverTags(newName))
-                    )
-                }
-                synchronized(lock) {
-                    pendingLists.remove(oldName)
-                    pendingLists.add(newName)
-                }
+                TodoApi.service.updateTodoList(listId, UpdateTodoListPayload(name = name.trim()))
                 reload()
             } catch (e: Throwable) {
                 reportError("重命名清单失败：${e.message}")
@@ -119,18 +110,9 @@ class RestTodoSource(context: Context) : TodoSource() {
 
     override fun deleteList(listId: Long) {
         if (listId <= 0) return
-        val name = synchronized(lock) { mLists.firstOrNull { it.id == listId }?.name } ?: return
-        val targets = tasks().filter { it.listId == listId }
         scope.launch {
             try {
-                for (t in targets) {
-                    // 清掉清单 tag → 任务回落收集箱（契约：清单内任务不删除）
-                    TodoApi.service.updateTodo(
-                        t.id,
-                        UpdateTodoPayload(tags = t.serverTags(null))
-                    )
-                }
-                synchronized(lock) { pendingLists.remove(name) }
+                TodoApi.service.deleteTodoList(listId)   // 服务端把其下任务 list_id 归零
                 reload()
             } catch (e: Throwable) {
                 reportError("删除清单失败：${e.message}")
@@ -144,17 +126,18 @@ class RestTodoSource(context: Context) : TodoSource() {
         title: String,
         listId: Long,
         dueDate: String,
+        tags: List<String>,
         onCreated: ((Long) -> Unit)?,
     ) {
         val trimmed = title.trim()
         if (trimmed.isEmpty()) return
-        val tag = listName(listId)
         scope.launch {
             try {
                 val created = TodoApi.service.createTodo(
                     CreateTodoPayload(
                         title = trimmed,
-                        tags = if (tag != null) listOf(tag) else null,
+                        tags = tags.takeIf { it.isNotEmpty() },
+                        listId = listId.takeIf { it != 0L },
                     )
                 )
                 // 服务端分配的新任务 id 回传页面，用于创建后的滚动定位（load 是异步的，这里先给 id）
@@ -174,7 +157,6 @@ class RestTodoSource(context: Context) : TodoSource() {
     }
 
     override fun updateTask(task: TodoTask) {
-        val tags = task.serverTags(listName(task.listId))
         // 已知缺口：无法清空 due_date，故仅在非空时提交（契约 §3.8 缺口 4）
         val cached = synchronized(lock) { mTasks.firstOrNull { it.id == task.id } }
         val completed = if (cached != null && cached.completed != task.completed) task.completed else null
@@ -187,7 +169,8 @@ class RestTodoSource(context: Context) : TodoSource() {
                         content = task.notes,
                         priority = task.priority,
                         dueDate = task.dueDate.takeIf { it.isNotBlank() }?.toRfc3339(),
-                        tags = tags,
+                        tags = task.tags,
+                        subtasks = task.subtasks.map { SubtaskPayload(it.id, it.title, it.completed) },
                         completed = completed,
                     )
                 )
@@ -220,9 +203,46 @@ class RestTodoSource(context: Context) : TodoSource() {
         }
     }
 
-    // ── 子任务：服务端不支持，降级为空操作（契约 §3.5） ──
+    // ── 子任务：todos.subtasks 整组读改写 ────────────────
 
-    override fun addSubtask(taskId: Long, title: String) = Unit
-    override fun toggleSubtask(taskId: Long, subtaskId: Long) = Unit
-    override fun removeSubtask(taskId: Long, subtaskId: Long) = Unit
+    /** 全局唯一子任务 id：所有任务已有子任务 id 的最大值 +1 */
+    private fun nextSubtaskId(): Long {
+        val snapshot = synchronized(lock) { mTasks }
+        return (snapshot.maxOfOrNull { t -> t.subtasks.maxOfOrNull { it.id } ?: 0L } ?: 0L) + 1L
+    }
+
+    private fun mutateSubtasks(taskId: Long, block: (MutableList<TodoSubtask>) -> Unit) {
+        val task = synchronized(lock) { mTasks.firstOrNull { it.id == taskId }?.deepCopy() }
+            ?: return
+        block(task.subtasks)
+        scope.launch {
+            try {
+                TodoApi.service.updateTodo(
+                    taskId,
+                    UpdateTodoPayload(
+                        subtasks = task.subtasks.map { SubtaskPayload(it.id, it.title, it.completed) }
+                    )
+                )
+                reload()
+            } catch (e: Throwable) {
+                reportError("子任务保存失败：${e.message}")
+            }
+        }
+    }
+
+    override fun addSubtask(taskId: Long, title: String) {
+        val trimmed = title.trim()
+        if (trimmed.isEmpty()) return
+        mutateSubtasks(taskId) { it.add(TodoSubtask(id = nextSubtaskId(), title = trimmed)) }
+    }
+
+    override fun toggleSubtask(taskId: Long, subtaskId: Long) {
+        mutateSubtasks(taskId) { list ->
+            list.firstOrNull { it.id == subtaskId }?.let { it.completed = !it.completed }
+        }
+    }
+
+    override fun removeSubtask(taskId: Long, subtaskId: Long) {
+        mutateSubtasks(taskId) { list -> list.removeAll { it.id == subtaskId } }
+    }
 }
