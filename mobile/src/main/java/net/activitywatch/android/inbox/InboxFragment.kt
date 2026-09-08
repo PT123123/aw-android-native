@@ -280,6 +280,9 @@ class InboxFragment : Fragment() {
 
     private fun setupTagSuggestion(input: android.widget.EditText, suggestionView: TagSuggestionView) {
         input.addTextChangedListener(object : TextWatcher {
+            // 是否纯删除（退格）：删到只剩 # 时不弹全量列表
+            private var lastChangeWasDeletion = false
+
             override fun afterTextChanged(s: Editable?) {
                 val text = s?.toString() ?: return
                 val cursorPos = input.selectionStart
@@ -295,10 +298,14 @@ class InboxFragment : Fragment() {
                     return
                 }
 
-                // 光标紧贴 #（只剩井号，或刚打下 # 还没输入内容）时不给建议，
-                // 避免退格删到只剩 # 时整个标签列表还挂在输入框上方
+                // 刚打下 #（前缀为空）→ 直接给全量建议（按使用频率排序）；
+                // 但退格删到只剩 # 时不弹，避免整个标签列表还挂在输入框上方
                 if (prefix.isEmpty()) {
-                    suggestionView.hide()
+                    if (lastChangeWasDeletion) {
+                        suggestionView.hide()
+                    } else {
+                        suggestTags("", suggestionView)
+                    }
                     return
                 }
 
@@ -307,7 +314,9 @@ class InboxFragment : Fragment() {
             }
 
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                lastChangeWasDeletion = count == 0 && before > 0
+            }
         })
     }
 
