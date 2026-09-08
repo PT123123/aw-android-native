@@ -1,6 +1,7 @@
 [submodule "aw-server-rust"]
 	path = aw-server-rust
-	url = https://github.com/PT123123/aw-server-rust.git
+	url = git@github.com:PT123123/aw-server-plus.git
+	branch = main
 [submodule "mobile/src/main/res/drawable/media"]
 	path = mobile/src/main/res/drawable/media
 	url = https://github.com/PT123123/media.git
