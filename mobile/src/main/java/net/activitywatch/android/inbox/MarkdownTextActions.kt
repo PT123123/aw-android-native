@@ -1,6 +1,12 @@
 package net.activitywatch.android.inbox
 
+import android.content.Context
 import android.widget.EditText
+import android.widget.HorizontalScrollView
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.core.content.ContextCompat
+import net.activitywatch.android.R
 
 /**
  * 编辑器 markdown 工具栏的文本操作：
@@ -124,5 +130,69 @@ object MarkdownTextActions {
         } else {
             editor.setSelection(start + newText.length)
         }
+    }
+}
+
+/**
+ * 快速输入弹窗底部的 Markdown 工具栏（与 note_editor.xml 中的样式一致）。
+ * 笔记页与任务页的快速输入共用；[dp] 由调用方按屏幕密度给出。
+ */
+fun buildMarkdownToolbar(
+    ctx: Context,
+    dp: (Int) -> Int,
+    input: EditText,
+): android.view.View {
+    val subColor = ContextCompat.getColor(ctx, R.color.inbox_sub)
+    fun item(text: String, desc: String, onClick: () -> Unit) =
+        TextView(ctx).apply {
+            this.text = text
+            contentDescription = desc
+            gravity = android.view.Gravity.CENTER
+            setTextColor(subColor)
+            setOnClickListener { onClick() }
+        }
+
+    val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+    val items = listOf(
+        // 井号/斜杠键插入字面字符（打 #标签 与层级 tag 的 a/b 分隔），不是 Markdown 语法
+        item("#", "井号") { MarkdownTextActions.insert(input, "#") }.apply {
+            textSize = 17f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        },
+        item("B", "加粗") { MarkdownTextActions.toggleWrap(input, "**") }.apply {
+            textSize = 16f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        },
+        item("/", "斜杠") { MarkdownTextActions.insert(input, "/") }.apply { textSize = 18f },
+        item("•", "无序列表") { MarkdownTextActions.toggleBullet(input) }.apply { textSize = 18f },
+        item("1.", "有序列表") { MarkdownTextActions.toggleOrdered(input) }.apply { textSize = 15f },
+    )
+    // ?attr/selectableItemBackgroundBorderless 的水波纹背景
+    val tv = android.util.TypedValue()
+    ctx.theme.resolveAttribute(
+        androidx.appcompat.R.attr.selectableItemBackgroundBorderless, tv, true
+    )
+    val ripple = ContextCompat.getDrawable(ctx, tv.resourceId)
+    items.forEach { v ->
+        v.background = ripple?.constantState?.newDrawable()?.mutate()
+        val lp = LinearLayout.LayoutParams(dp(42), dp(38))
+        lp.marginEnd = dp(4)
+        row.addView(v, lp)
+    }
+
+    return HorizontalScrollView(ctx).apply {
+        layoutParams = android.widget.FrameLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+        )
+        isHorizontalScrollBarEnabled = false
+        setPadding(dp(16), dp(2), dp(16), 0)
+        addView(
+            row,
+            android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
     }
 }

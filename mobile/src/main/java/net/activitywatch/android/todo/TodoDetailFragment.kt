@@ -13,7 +13,9 @@ import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.DialogFragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.TodoDetailFragmentBinding
 import java.text.SimpleDateFormat
@@ -61,6 +63,9 @@ class TodoDetailFragment : DialogFragment() {
     private val handler = Handler(Looper.getMainLooper())
     private var notesDebounce: Runnable? = null
     private var notesPending = false
+
+    /** 已确认删除：onPause 不再提交，避免把已删任务再 PUT 一次 */
+    private var deleted = false
 
     private lateinit var subtaskAdapter: TodoSubtaskAdapter
 
@@ -127,6 +132,58 @@ class TodoDetailFragment : DialogFragment() {
         }
         b.detailTags.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) commit() }
 
+        // ── 标签 # 建议：输入 # 后给建议，点选插入 ──
+        b.detailTagSuggestions.listener = listener@{ selectedTag ->
+            val text = b.detailTags.text?.toString() ?: return@listener
+            val cursorPos = b.detailTags.selectionStart
+            if (cursorPos > 0) {
+                val (prefix, tagStart) = TodoTagSuggest.extractTagPrefix(text, cursorPos)
+                if (tagStart >= 0) {
+                    b.detailTags.text.replace(tagStart - 1, cursorPos, selectedTag)
+                    b.detailTags.setSelection(tagStart + selectedTag.length)
+                }
+            }
+        }
+        // 输入 # 后实时给出标签建议（建议源：任务 tag ∪ 笔记标签树）
+        var lastChangeWasDeletion = false
+        b.detailTags.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                val text = s?.toString() ?: return
+                val cursorPos = b.detailTags.selectionStart
+                if (cursorPos <= 0) {
+                    b.detailTagSuggestions.hide()
+                    return
+                }
+                val (prefix, tagStart) = TodoTagSuggest.extractTagPrefix(text, cursorPos)
+                // 不在 # 串内 → 不给建议
+                if (tagStart < 0) {
+                    b.detailTagSuggestions.hide()
+                    return
+                }
+                // 输入标签后又删除回退到只剩 # → 不给建议（避免退格时整个标签列表挂出来）
+                if (prefix.isEmpty() && lastChangeWasDeletion) {
+                    b.detailTagSuggestions.hide()
+                    return
+                }
+                // 刚输入 #（prefix 为空）或已有前缀 → 给建议（空前缀返回全量标签）
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val counts = TodoTagSuggest.tagCounts(source.tasks())
+                    val matches = TodoTagSuggest.suggestions(prefix, counts.keys.toList(), counts)
+                    if (_binding == null || matches.isEmpty()) {
+                        b.detailTagSuggestions.hide()
+                    } else {
+                        b.detailTagSuggestions.show(prefix, matches)
+                    }
+                }
+            }
+
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                // 纯删除（退格/剪切）→ 标记；输入 → 非删除
+                lastChangeWasDeletion = count == 0 && before > 0
+            }
+        })
+
         // ── 备注：250ms 防抖 ──
         b.detailNotes.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -181,6 +238,16 @@ class TodoDetailFragment : DialogFragment() {
         refreshFromSource()
     }
 
+    /** 返回键 / ✕ / 切后台离开详情前兜底提交：冲刷未落地的备注防抖并提交全部控件值 */
+    override fun onPause() {
+        if (_binding != null && !deleted) {
+            notesDebounce?.let { handler.removeCallbacks(it) }
+            notesDebounce?.run()          // 立即执行备注提交（含 notesPending 置位清理）
+            commit()
+        }
+        super.onPause()
+    }
+
     override fun onDestroyView() {
         notesDebounce?.let { handler.removeCallbacks(it) }
         TodoRepository.removeListener(dataChanged)
@@ -214,9 +281,14 @@ class TodoDetailFragment : DialogFragment() {
         selectedDue = task.dueDate.takeIf { it.isNotBlank() }
         selectedRecurrence = task.recurrence
 
-        b.detailTitle.setText(task.title)
+        // 正在输入的控件不重填（每次写操作后都会全量 reload → bind），
+        // 否则服务端快照会覆盖用户未提交的半截输入
+        if (!b.detailTitle.hasFocus()) b.detailTitle.setText(task.title)
         b.detailDone.isChecked = task.completed
-        b.detailTags.setText(task.tags.joinToString(", "))
+        if (!b.detailTags.hasFocus()) {
+            b.detailTags.setText(task.tags.joinToString(", "))
+            b.detailTagSuggestions.hide()
+        }
         b.detailNotes.setText(task.notes)
 
         val listName = source.lists().firstOrNull { it.id == selectedListId }?.name
@@ -337,12 +409,13 @@ class TodoDetailFragment : DialogFragment() {
         }
         if (updated == task) return               // 无变化则不打扰数据源
         source.updateTask(updated)
+        base = updated   // 提交即生效为基线，防止短时间重复提交相同内容（reload 后会被服务端快照覆盖）
     }
 
     private fun parseTags(raw: String?): MutableList<String> =
         raw.orEmpty()
             .split(',', '，')
-            .map { it.trim() }
+            .map { it.trim().trimStart('#') }   // 容忍 "#标签" 写法
             .filter { it.isNotEmpty() }
             .distinct()
             .toMutableList()
@@ -360,6 +433,7 @@ class TodoDetailFragment : DialogFragment() {
             .setTitle("删除任务")
             .setMessage("确定删除「${task.title}」？")
             .setPositiveButton("删除") { _, _ ->
+                deleted = true
                 source.deleteTask(taskId)
                 dismissAllowingStateLoss()
             }
