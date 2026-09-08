@@ -2,6 +2,8 @@ package net.activitywatch.android
 
 import android.app.Application
 import androidx.appcompat.app.AppCompatDelegate
+import net.activitywatch.android.todo.TodoReminderScheduler
+import net.activitywatch.android.todo.TodoRepository
 
 /**
  * 全局强制深色外观。
@@ -17,5 +19,10 @@ class AWApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+
+        // 任务数据每次变化（load/写操作后）重算到期提醒闹钟（数据源加载失败时静默忽略）
+        TodoRepository.addListener {
+            TodoReminderScheduler.syncFromRepository(this@AWApplication)
+        }
     }
 }
