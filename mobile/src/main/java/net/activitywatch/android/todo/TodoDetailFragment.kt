@@ -286,7 +286,7 @@ class TodoDetailFragment : DialogFragment() {
         if (!b.detailTitle.hasFocus()) b.detailTitle.setText(task.title)
         b.detailDone.isChecked = task.completed
         if (!b.detailTags.hasFocus()) {
-            b.detailTags.setText(task.tags.joinToString(", "))
+            b.detailTags.setText(task.tags.joinToString(" "))   // 空格分隔（parseTags 同步按空白/逗号切分）
             b.detailTagSuggestions.hide()
         }
         b.detailNotes.setText(task.notes)
@@ -414,7 +414,7 @@ class TodoDetailFragment : DialogFragment() {
 
     private fun parseTags(raw: String?): MutableList<String> =
         raw.orEmpty()
-            .split(',', '，')
+            .split(Regex("[,，\\s]+"))   // 逗号与空白（空格/换行/Tab）都视为分隔符，空格不再混入 tag 文字
             .map { it.trim().trimStart('#') }   // 容忍 "#标签" 写法
             .filter { it.isNotEmpty() }
             .distinct()

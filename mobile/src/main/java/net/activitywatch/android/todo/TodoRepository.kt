@@ -50,6 +50,9 @@ object TodoRepository {
         }
     }
 
+    /** 已创建的数据源（不创建新的）；提醒调度等旁路功能用，避免过早拉起数据源 */
+    fun peekSource(): TodoSource? = current
+
     /** 切换数据源（重新创建 + 重新加载） */
     fun switchTo(context: Context, kind: TodoSourceKind) {
         val app = context.applicationContext
