@@ -44,8 +44,11 @@ class InboxFragment : Fragment() {
         private const val PREFS_QUICK_NOTE = "inbox_quick_note_draft"
         private const val KEY_QUICK_NOTE_DRAFT = "quick_note_draft"
 
-        /** 最大建议数 */
-        private const val MAX_SUGGESTIONS = 10
+        /** 最大建议数（列表在输入框上方，条数太多会把整个输入区顶出屏幕） */
+        private const val MAX_SUGGESTIONS = 5
+
+        /** 统计 tag 使用频率时拉取的近期笔记条数 */
+        private const val TAG_USAGE_NOTE_LIMIT = 300
     }
 
     private var _binding: InboxFragmentBinding? = null
@@ -70,6 +73,12 @@ class InboxFragment : Fragment() {
 
     /** 层级标签树（GET /inbox/tags/tree），驱动标签 chips 行 */
     private var tagTree: List<TagNodeResponse> = emptyList()
+
+    /** tag 使用频率缓存（近期笔记统计），弹窗打开时失效重算 */
+    private var tagUsageCache: Map<String, TagUsage>? = null
+
+    /** 单个 tag 的使用统计：count = 近期笔记中出现次数，lastUsed = 最近一次使用的 updated_at */
+    private data class TagUsage(val count: Int, val lastUsed: String)
 
     /** 局域网拉取：笔记页每次刷新逻辑顺带触发一次，拉完重载列表让远端变更即刷即现 */
     private var lanPullJob: Job? = null
@@ -217,36 +226,29 @@ class InboxFragment : Fragment() {
             adapter.pinnedIds = PinStore.pinnedIdsSet(requireContext())
             sortItems()
             hydrateRelations()
-            val idx = items.indexOfFirst { it.id == noteId }
-            if (idx >= 0) scrollToPositionWithHighlight(idx)
+            scrollToNoteWithHighlight(noteId)
         }
     }
 
-    /** 滚动到指定位置并让目标行背景闪烁 ~400ms，让用户一眼看到跳转到了哪里 */
-    private fun scrollToPositionWithHighlight(idx: Int) {
-        val lm = binding.list.layoutManager as? LinearLayoutManager ?: return
-        // 先确保目标位置可见
-        lm.scrollToPosition(idx)
-        // 等布局完成后再精确滚动并高亮
-        binding.list.post {
-            // 滚动到顶部对齐
-            lm.scrollToPositionWithOffset(idx, 0)
-            // 高亮闪烁
-            binding.list.findViewHolderForAdapterPosition(idx)?.itemView?.let { view ->
-                val original = view.background
-                view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.aw_accent))
-                view.postDelayed({ view.background = original }, 400)
-            } ?: run {
-                // 如果 ViewHolder 还没绑定，再延迟重试
-                binding.list.postDelayed({
-                    binding.list.findViewHolderForAdapterPosition(idx)?.itemView?.let { view ->
-                        val original = view.background
-                        view.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.aw_accent))
-                        view.postDelayed({ view.background = original }, 400)
-                    }
-                }, 200)
+    /**
+     * 滚动定位到指定笔记并高亮闪烁。
+     * 以笔记 id 为键：等 submitList 异步提交后，每次都在已提交的 currentList 里按 id 重新定位，
+     * 绝不命中旧数据里同 position 的其他笔记（旧实现先按新列表 index 高亮再等列表刷新，
+     * 高亮会落在错误笔记上并随复用残留）。
+     */
+    private fun scrollToNoteWithHighlight(noteId: Long) {
+        fun attempt(tries: Int) {
+            val idx = adapter.currentList.indexOfFirst { it.id == noteId }
+            if (idx >= 0) {
+                (binding.list.layoutManager as? LinearLayoutManager)
+                    ?.scrollToPositionWithOffset(idx, 0)
+                adapter.flashHighlight(noteId)
+            } else if (tries > 0) {
+                // submitList 是异步 diff 提交，间隔 50ms 重试直到列表包含目标（最多 ~500ms）
+                binding.list.postDelayed({ attempt(tries - 1) }, 50)
             }
         }
+        attempt(10)
     }
 
     // ==== 输入缓存（SharedPreferences） ====
@@ -293,7 +295,14 @@ class InboxFragment : Fragment() {
                     return
                 }
 
-                // 找到 #，根据前缀搜索建议（前缀为空时也显示）
+                // 光标紧贴 #（只剩井号，或刚打下 # 还没输入内容）时不给建议，
+                // 避免退格删到只剩 # 时整个标签列表还挂在输入框上方
+                if (prefix.isEmpty()) {
+                    suggestionView.hide()
+                    return
+                }
+
+                // 找到 # 且有前缀，搜索建议
                 suggestTags(prefix, suggestionView)
             }
 
@@ -305,6 +314,8 @@ class InboxFragment : Fragment() {
     /**
      * 从光标位置向左提取标签前缀。
      * 例如："记录 #健身日记的内容"，光标在"记"位置 → 返回 ("健", 2)
+     * 注意：'/' 是层级 tag 的段分隔符（如 项目/工作），必须算作前缀的一部分，
+     * 否则 #健身日记/ 打斜杠时建议会中断。
      */
     private fun extractTagPrefix(text: String, cursorPos: Int): Pair<String, Int> {
         var pos = cursorPos - 1
@@ -317,7 +328,7 @@ class InboxFragment : Fragment() {
                     start = pos
                     break
                 }
-                ' ', '\n', '\t', ',', '.', '!', '?', ';', ':', '+', '/' -> break
+                ' ', '\n', '\t', ',', '.', '!', '?', ';', ':', '+' -> break
                 else -> pos--
             }
         }
@@ -329,11 +340,28 @@ class InboxFragment : Fragment() {
         return prefix to tagStart
     }
 
+    /** 拉取近期笔记统计各 tag 的使用频率与最近使用时间，结果缓存到弹窗关闭/下次打开为止 */
+    private suspend fun loadTagUsage(): Map<String, TagUsage> {
+        tagUsageCache?.let { return it }
+        val usage = runCatching { LocalInboxApi.service.getNotes(limit = TAG_USAGE_NOTE_LIMIT) }
+            .getOrDefault(emptyList())
+            .flatMap { note ->
+                val time = note.updated_at ?: note.created_at ?: ""
+                note.tags.map { it to time }
+            }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, times) -> TagUsage(times.size, times.maxOrNull() ?: "") }
+        tagUsageCache = usage
+        return usage
+    }
+
     private fun suggestTags(prefix: String, suggestionView: TagSuggestionView) {
         viewLifecycleOwner.lifecycleScope.launch {
             val tree = tagTree.ifEmpty { runCatching { LocalInboxApi.service.getTagTree() }.getOrNull()?.tags ?: emptyList() }
+            val usage = loadTagUsage()
 
-            // 根据前缀搜索标签（层级匹配：#健匹配 健身日记、健康饮食 等）
+            // 根据前缀搜索标签（层级匹配：#健匹配 健身日记、健康饮食 等；
+            // 前缀含 / 时匹配其子层级，如 #健身日记/ 匹配 健身日记/力量训练）
             val matches = mutableListOf<String>()
             fun collect(node: TagNodeResponse) {
                 if (node.path.startsWith(prefix)) {
@@ -348,13 +376,16 @@ class InboxFragment : Fragment() {
                 return@launch
             }
 
-            // 按匹配度（前缀位置）和字母排序，最多10个
+            // 按使用频率降序（近 300 条笔记中出现次数，次数相同按最近使用时间新者优先），
+            // 取前 N 条后整体反转：列表显示在输入框上方，反转后频率最高的贴着输入行（最下面）
             val sorted = matches
-                .sortedWith(compareBy(
-                    { if (it.startsWith(prefix)) 0 else 1 },
-                    { it }
-                ))
+                .sortedWith(
+                    compareByDescending<String> { usage[it]?.count ?: 0 }
+                        .thenByDescending { usage[it]?.lastUsed ?: "" }
+                        .thenBy { it }
+                )
                 .take(MAX_SUGGESTIONS)
+                .reversed()
 
             suggestionView.show(prefix, sorted)
         }
@@ -811,6 +842,9 @@ class InboxFragment : Fragment() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         })
 
+        // 每次打开弹窗重算 tag 使用频率（新建/编辑笔记后频率可能已变）
+        tagUsageCache = null
+
         val suggestionView = TagSuggestionView(themedCtx).apply {
             listener = { selectedTag ->
                 val cursorPos = input.selectionStart
@@ -891,6 +925,9 @@ class InboxFragment : Fragment() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         })
+
+        // 每次打开弹窗重算 tag 使用频率（新建/编辑笔记后频率可能已变）
+        tagUsageCache = null
 
         val suggestionView = TagSuggestionView(themedCtx).apply {
             listener = { selectedTag ->
@@ -995,66 +1032,7 @@ class InboxFragment : Fragment() {
         }, 100)
     }
 
-    /** 快速发送弹窗底部的 Markdown 工具栏（与 note_editor.xml 中的样式一致） */
-    private fun buildMarkdownToolbar(
-        ctx: android.content.Context,
-        dp: (Int) -> Int,
-        input: android.widget.EditText,
-    ): android.view.View {
-        val subColor = ContextCompat.getColor(requireContext(), R.color.inbox_sub)
-        fun item(text: String, desc: String, onClick: () -> Unit) =
-            android.widget.TextView(ctx).apply {
-                this.text = text
-                contentDescription = desc
-                gravity = Gravity.CENTER
-                setTextColor(subColor)
-                setOnClickListener { onClick() }
-            }
-
-        val row = android.widget.LinearLayout(ctx).apply { orientation = android.widget.LinearLayout.HORIZONTAL }
-        val items = listOf(
-            // 井号/斜杠键插入字面字符（打 #标签 与层级 tag 的 a/b 分隔），不是 Markdown 语法
-            item("#", "井号") { MarkdownTextActions.insert(input, "#") }.apply {
-                textSize = 17f
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-            },
-            item("B", "加粗") { MarkdownTextActions.toggleWrap(input, "**") }.apply {
-                textSize = 16f
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-            },
-            item("/", "斜杠") { MarkdownTextActions.insert(input, "/") }.apply { textSize = 18f },
-            item("•", "无序列表") { MarkdownTextActions.toggleBullet(input) }.apply { textSize = 18f },
-            item("1.", "有序列表") { MarkdownTextActions.toggleOrdered(input) }.apply { textSize = 15f },
-        )
-        // ?attr/selectableItemBackgroundBorderless 的水波纹背景
-        val tv = android.util.TypedValue()
-        ctx.theme.resolveAttribute(
-            androidx.appcompat.R.attr.selectableItemBackgroundBorderless, tv, true
-        )
-        val ripple = androidx.core.content.ContextCompat.getDrawable(ctx, tv.resourceId)
-        items.forEach { v ->
-            v.background = ripple?.constantState?.newDrawable()?.mutate()
-            val lp = android.widget.LinearLayout.LayoutParams(dp(42), dp(38))
-            lp.marginEnd = dp(4)
-            row.addView(v, lp)
-        }
-
-        return android.widget.HorizontalScrollView(ctx).apply {
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
-            isHorizontalScrollBarEnabled = false
-            setPadding(dp(16), dp(2), dp(16), 0)
-            addView(
-                row,
-                android.widget.FrameLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                ),
-            )
-        }
-    }
+    // 快速发送弹窗底部的 Markdown 工具栏：buildMarkdownToolbar（inbox 包顶层函数，任务页共用）
 
     private fun createQuickNote(content: String) {
         viewLifecycleOwner.lifecycleScope.launch {

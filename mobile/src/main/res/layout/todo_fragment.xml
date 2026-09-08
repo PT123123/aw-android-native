@@ -23,6 +23,26 @@
             app:navigationIcon="@drawable/ic_menu"
             app:navigationIconTint="@color/aw_text_primary" />
 
+        <!-- 搜索条：点工具栏 🔍 后出现（同收件箱） -->
+        <LinearLayout
+            android:id="@+id/searchBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <EditText
+                android:id="@+id/searchInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:backgroundTint="@color/aw_accent"
+                android:hint="搜索任务…"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:textColor="@color/aw_text_primary"
+                android:textColorHint="@color/aw_text_secondary" />
+        </LinearLayout>
+
         <!-- 视图导航：收集箱 / 今天 / 最近 7 天 / 全部 -->
         <HorizontalScrollView
             android:id="@+id/viewChipRow"
@@ -40,7 +60,7 @@
                 android:orientation="horizontal" />
         </HorizontalScrollView>
 
-        <!-- 清单导航：彩色清单 chips（本地源来自 lists，REST 源由 tag 派生） -->
+        <!-- 清单导航：彩色清单 chips -->
         <HorizontalScrollView
             android:id="@+id/listChipRow"
             android:layout_width="match_parent"
@@ -56,6 +76,49 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal" />
         </HorizontalScrollView>
+
+        <!-- 标签筛选条：点任务行内的标签后出现，↑ 返回上级、✕ 清除筛选（同收件箱） -->
+        <LinearLayout
+            android:id="@+id/filterBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="6dp"
+            android:visibility="gone">
+
+            <ImageButton
+                android:id="@+id/filterUp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="返回上级标签"
+                android:src="@drawable/ic_arrow_up"
+                android:visibility="gone"
+                app:tint="@color/aw_accent" />
+
+            <TextView
+                android:id="@+id/filterText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/aw_accent"
+                android:textSize="13sp" />
+
+            <ImageButton
+                android:id="@+id/filterClear"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="清除筛选"
+                android:src="@drawable/ic_x"
+                app:tint="@color/aw_text_secondary" />
+        </LinearLayout>
 
         <!-- 快速添加输入框已移除：点右下角 FAB 从底部展开输入层（同笔记页） -->
 

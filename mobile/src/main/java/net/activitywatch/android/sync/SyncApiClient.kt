@@ -1,5 +1,6 @@
 package net.activitywatch.android.sync
 
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -10,6 +11,8 @@ object SyncApiClient {
     private const val BASE_URL = "http://127.0.0.1:5600/"
 
     private val client = OkHttpClient.Builder()
+        // 首屏 config/devices/log/status + debuglog 共 5 条并发，默认 maxRequestsPerHost=5 恰好顶满
+        .dispatcher(Dispatcher().apply { maxRequestsPerHost = 8 })
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()

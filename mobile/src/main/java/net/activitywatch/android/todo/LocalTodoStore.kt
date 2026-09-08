@@ -131,6 +131,7 @@ class LocalTodoStore(private val context: Context) : TodoSource() {
         title: String,
         listId: Long,
         dueDate: String,
+        tags: List<String>,
         onCreated: ((Long) -> Unit)?,
     ) {
         val trimmed = title.trim()
@@ -143,6 +144,7 @@ class LocalTodoStore(private val context: Context) : TodoSource() {
                 title = trimmed,
                 listId = listId,
                 dueDate = dueDate,
+                tags = tags.toMutableList(),
                 createdAt = now,
                 updatedAt = now,
                 sortOrder = (mTasks.maxOfOrNull { it.sortOrder } ?: 0) + 1,

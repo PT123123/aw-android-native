@@ -1,6 +1,10 @@
 package net.activitywatch.android.todo
 
 import android.graphics.Paint
+import android.text.SpannableString
+import android.text.TextPaint
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -44,6 +48,9 @@ class TodoAdapter(
 
     /** 选择变化回调 */
     var onSelectionChanged: ((Int) -> Unit)? = null
+
+    /** 行内标签点击回调（多选模式自动退化为纯文本，不触发） */
+    var onTagClick: ((String) -> Unit)? = null
 
     fun setListColors(colors: Map<Long, Int>) {
         listColors = colors
@@ -208,14 +215,40 @@ class TodoAdapter(
                 b.subtasks.visibility = View.GONE
             }
 
-            // 标签行
-            val tagText = task.tags.joinToString(" · ")
-            if (tagText.isNotEmpty()) {
+            // 标签行：非多选时按「 · 」分段可点（点标签 = 进入该标签筛选）
+            if (task.tags.isNotEmpty()) {
                 b.tags.visibility = View.VISIBLE
-                b.tags.text = tagText
+                val click = if (selectionMode) null else onTagClick
+                if (click == null) {
+                    b.tags.text = task.tags.joinToString(" · ")
+                    b.tags.movementMethod = null
+                } else {
+                    b.tags.text = clickableTagText(task.tags, click)
+                    b.tags.movementMethod = LinkMovementMethod.getInstance()
+                }
             } else {
                 b.tags.visibility = View.GONE
             }
+        }
+
+        /** 每个标签段挂 ClickableSpan（高亮透明、不下划线，保持行内标签观感） */
+        private fun clickableTagText(tags: List<String>, click: (String) -> Unit): CharSequence {
+            val sp = SpannableString(tags.joinToString(" · "))
+            var start = 0
+            for (tag in tags) {
+                val end = start + tag.length
+                sp.setSpan(
+                    object : ClickableSpan() {
+                        override fun onClick(widget: View) = click(tag)
+                        override fun updateDrawState(ds: TextPaint) {
+                            ds.isUnderlineText = false
+                        }
+                    },
+                    start, end, SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+                start = end + 3   // " · " 分隔符
+            }
+            return sp
         }
     }
 
