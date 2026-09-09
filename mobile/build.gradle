@@ -40,6 +40,9 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // 复用 debug 签名（~/.android/debug.keystore），无需额外管理 keystore，
+            // 使 Release 包可直接安装到设备
+            signingConfig signingConfigs.debug
             ndk {
                 debugSymbolLevel 'SYMBOL_TABLE'
             }
