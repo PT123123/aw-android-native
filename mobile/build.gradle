@@ -19,10 +19,10 @@ android {
         // Set in CI on tagged commit
         // FIXME: should be set before tagging, so that F-droid picks it up correctly
         //        https://gitlab.com/fdroid/fdroiddata/-/merge_requests/11786?commit_id=d2cedcbe3d26db59378d582a8cf952af16b6407f#note_1966750559
-        versionName "0.13.3"
+        versionName "0.13.6"
 
         // Set in CI by `bundle exec fastlane update_version`
-        versionCode 38
+        versionCode 41
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // NOTE: This only works for API level 28 and above
