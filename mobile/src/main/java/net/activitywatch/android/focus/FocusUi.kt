@@ -17,6 +17,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import com.google.android.material.appbar.MaterialToolbar
 import net.activitywatch.android.R
+import net.activitywatch.android.hub.TabHub
 
 /** 专注模块共用的程序化 UI 脚手架（全部 aw_* 语义色） */
 object FocusUi {
@@ -74,9 +75,13 @@ object FocusUi {
     /**
      * 页面根布局：MaterialToolbar（抽屉键 + 模块开关菜单）+ 内容容器。
      * 返回 (toolbar, content)；content 已占满剩余空间。
+     *
+     * 由 [FocusHubFragment] 以「内嵌」方式打开时不再挂自带 toolbar——
+     * 标题栏与 Tab 由宿主提供，否则会出现两层标题栏。
      */
     fun buildRoot(fragment: Fragment, titleText: String): Pair<MaterialToolbar, LinearLayout> {
         val ctx = fragment.requireContext()
+        val embedded = TabHub.isEmbedded(fragment)
         val root = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(color(ctx, R.color.aw_bg))
@@ -94,11 +99,13 @@ object FocusUi {
                 .findViewById<DrawerLayout>(R.id.drawer_layout)
                 ?.openDrawer(GravityCompat.START)
         }
-        root.addView(
-            toolbar,
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            dp(ctx, 56)
-        )
+        if (!embedded) {
+            root.addView(
+                toolbar,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(ctx, 56)
+            )
+        }
         val content = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(ctx, 16), dp(ctx, 12), dp(ctx, 16), dp(ctx, 16))

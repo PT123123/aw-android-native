@@ -14,7 +14,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.fragment.app.Fragment
 import net.activitywatch.android.R
 import net.activitywatch.android.todo.TodoRepository
 import java.util.Date
@@ -25,7 +24,7 @@ import java.util.Date
  * 从 TodoSource::tasks() 读任务列表作为可选项（唯一耦合点），
  * 选中任务时用其标题填充事件名；自由输入亦可。停止时写入 FocusStore。
  */
-class FocusTimerFragment : Fragment() {
+class FocusTimerFragment : FocusPageFragment() {
 
     private var body: LinearLayout? = null
     private var taskValue: TextView? = null
@@ -55,16 +54,13 @@ class FocusTimerFragment : Fragment() {
     ): View {
         FocusStore.init(requireContext())
         val (toolbar, content) = FocusUi.buildRoot(this, "计时")
-        toolbar.setOnMenuItemClickListener { item ->
-            if (item.itemId == R.id.action_focus_modules) {
-                FocusUi.showModulesDialog(this) { buildBody() }
-                true
-            } else false
-        }
+        bindToolbar(toolbar)
         body = content
         buildBody()
         return content.parent as View
     }
+
+    override fun refreshPage() = buildBody()
 
     private fun buildBody() {
         val ctx = requireContext()

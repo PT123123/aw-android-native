@@ -1,0 +1,6 @@
+# 本仓库在 Windows 上开发，全局 core.autocrlf=true 会把 checkout 出来的文件转成 CRLF。
+# 这对 shell 脚本是致命的：`set -euo pipefail` 变成 `set -euo pipefail\r`，
+# bash 直接报 "set: pipefail: invalid option name"，整条 just 配方挂掉。
+# 因此这里强制脚本类文件始终以 LF 落盘（与仓库 blob 保持一致，不产生额外 diff）。
+*.sh      text eol=lf
+Justfile  text eol=lf

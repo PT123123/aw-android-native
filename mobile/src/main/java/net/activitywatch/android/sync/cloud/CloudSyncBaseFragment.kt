@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.FragmentCloudSyncBinding
+import net.activitywatch.android.hub.EmbeddedToolbar
 
 /**
  * 云备份设置页基类（实验性）。WebDAV 与 S3 共用一套 UI 与流程，
@@ -59,6 +60,8 @@ abstract class CloudSyncBaseFragment : Fragment() {
         binding.toolbar.setNavigationOnClickListener {
             parentFragmentManager.popBackStack()
         }
+        // 由 SyncHubFragment 内嵌打开时隐藏自带标题栏（页内仍有 WebDAV / S3 两个 Tab）
+        EmbeddedToolbar.hideWhenEmbedded(this, binding.toolbar)
 
         // Tab 切换
         setupTabs()

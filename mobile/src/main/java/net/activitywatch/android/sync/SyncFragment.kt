@@ -20,13 +20,15 @@ import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.FragmentSyncBinding
+import net.activitywatch.android.hub.EmbeddedToolbar
+import net.activitywatch.android.hub.TabHub
 import net.activitywatch.android.sync.wifi.WifiTransferFragment
 import net.activitywatch.android.sync.SyncDetailsFragment
 
 // 局域网同步页：
 // 配对与设备 / 设置 两个可折叠面板，数据来自本机 Rust server 的 /api/0/sync。
 // 同步由 Wi-Fi 状态自动开关（LanSyncNetworkMonitor），三档模式=自动同步频率预设。
-class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
+class SyncFragment : Fragment(), SyncRowsAdapter.Actions, TabHub.MenuTarget {
 
     companion object {
         // 三档模式的间隔预设（秒），与 Rust 侧 sync_interval 对应
@@ -67,14 +69,8 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
         }
 
         // 标题栏刷新 = 立即同步：对全部已配对设备触发一次同步
-        binding.toolbar.setOnMenuItemClickListener {
-            if (it.itemId == R.id.action_sync_now) {
-                viewModel.syncAllPaired()
-                true
-            } else {
-                false
-            }
-        }
+        // （被 SyncHubFragment 内嵌时标题栏隐藏，点击由宿主派发给当前可见页）
+        EmbeddedToolbar.bind(this, binding.toolbar) { itemId -> onHubMenu(itemId) }
 
         rowsAdapter = SyncRowsAdapter(this)
         binding.devicesList.layoutManager = LinearLayoutManager(requireContext())
@@ -121,6 +117,13 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions {
     override fun onPause() {
         super.onPause()
         viewModel.stopDiscovery()
+    }
+
+    /** 标题栏「刷新并立即同步」（被 SyncHubFragment 内嵌时由宿主派发给当前可见页） */
+    override fun onHubMenu(itemId: Int): Boolean {
+        if (itemId != R.id.action_sync_now) return false
+        viewModel.syncAllPaired()
+        return true
     }
 
     // ==================== 面板折叠 ====================
