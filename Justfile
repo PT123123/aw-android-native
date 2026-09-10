@@ -88,6 +88,6 @@ build-release:
 sign-release:
     bash scripts/sign_apk.sh "{{UNSIGNED_APK}}" "{{RELEASE_APK}}"
 
-# 安装 release APK（自动绕过 HyperOS/MIUI 的 adb 流式安装限制）
+# 安装 release APK（原生 adb install -r 覆盖安装）
 install-release:
-    bash scripts/adb_install.sh "{{RELEASE_APK}}"
+    {{ADB}} install -r {{RELEASE_APK}}
