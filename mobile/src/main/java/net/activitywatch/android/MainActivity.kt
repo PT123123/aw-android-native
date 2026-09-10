@@ -58,7 +58,7 @@ private const val CHANNEL_TODO_REMINDER = "todo_reminder"
 
 /**
  * 抽屉导航的可折叠分组。
- * - Inbox（笔记 / To Do）：默认展开
+ * - 收集箱（笔记 / 任务）：默认展开
  * - 专注 / 活动 / 同步：已合并为顶层单项（见 [buildNavRows]），页内用 Tab 分隔子模块
  * - 抽屉最底部固定一行「笔记设置」，回收站入口在设置页内（见 InboxSettingsFragment）
  */
@@ -335,7 +335,7 @@ class MainActivity : AppCompatActivity() {
 
     /** 可折叠分组（只剩 Inbox；专注 / 活动 / 同步已合并为 [buildNavRows] 里的顶层单项） */
     private fun buildNavGroups(): List<NavGroup> = listOf(
-        NavGroup("Inbox", true, listOf(
+        NavGroup("收集箱", true, listOf(
             NavRow(
                 R.id.nav_inbox,
                 ContextCompat.getDrawable(this, android.R.drawable.ic_menu_edit)!!,
@@ -345,7 +345,7 @@ class MainActivity : AppCompatActivity() {
             NavRow(
                 R.id.nav_todo_inbox,
                 ContextCompat.getDrawable(this, android.R.drawable.ic_menu_agenda)!!,
-                "To Do",
+                "任务",
                 TodoFragment::class.java,
                 todoArgs("inbox")
             )

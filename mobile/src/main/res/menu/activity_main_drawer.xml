@@ -3,6 +3,8 @@
   抽屉项 id 的唯一来源。
   注意：此 menu 已不再被 inflate，MainActivity.buildNavGroups()/buildNavRows()
   用代码动态构建视图，这里只负责提供 R.id.nav_* 常量。
+  ⚠️ android:title / android:icon 均不参与渲染，改这里不会生效——界面文案统一在
+  MainActivity.buildNavGroups()/buildNavRows() 里硬编码。这里的 title 只作语义标注。
   专注 / 活动 / 同步已各自合并为一项（页内用 Tab 分隔子模块），
   合并前的细项 id 保留（如 nav_focus_records）但已不被引用。
 -->
@@ -22,7 +24,7 @@
         <item
             android:id="@+id/nav_todo_inbox"
             android:icon="@android:drawable/ic_menu_agenda"
-            android:title="TODO" />
+            android:title="任务" />
         <item
             android:id="@+id/nav_focus_hub"
             android:icon="@drawable/ic_focus_timer"
