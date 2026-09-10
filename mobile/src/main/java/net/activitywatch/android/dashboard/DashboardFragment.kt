@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.google.android.material.tabs.TabLayoutMediator
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.FragmentDashboardBinding
+import net.activitywatch.android.hub.EmbeddedToolbar
 
 /**
  * 活动页宿主：时间范围选择 + 概览/时间线/趋势 三个 Tab。
@@ -41,6 +42,9 @@ class DashboardFragment : Fragment() {
 
         setupChips()
         setupTabs()
+
+        // 由 ActivityHubFragment 内嵌打开时隐藏自带标题栏，标题栏与 Tab 由宿主提供
+        EmbeddedToolbar.hideWhenEmbedded(this, binding.toolbar)
 
         binding.toolbar.setNavigationOnClickListener {
             requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)

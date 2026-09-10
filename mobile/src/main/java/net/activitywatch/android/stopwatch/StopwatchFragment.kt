@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import net.activitywatch.android.dashboard.formatHms
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.FragmentStopwatchBinding
+import net.activitywatch.android.hub.EmbeddedToolbar
 
 /**
  * 秒表页（对应 aw-webui 的 Stopwatch）。
@@ -46,6 +47,8 @@ class StopwatchFragment : Fragment() {
             requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
                 ?.openDrawer(GravityCompat.START)
         }
+        // 由 ActivityHubFragment 内嵌打开时隐藏自带标题栏
+        EmbeddedToolbar.hideWhenEmbedded(this, binding.toolbar)
 
         recordAdapter = StopwatchRecordAdapter()
         binding.rvRecords.adapter = recordAdapter
