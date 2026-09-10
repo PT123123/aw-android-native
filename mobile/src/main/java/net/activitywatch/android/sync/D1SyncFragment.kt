@@ -14,6 +14,7 @@ import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.FragmentD1SyncBinding
+import net.activitywatch.android.hub.EmbeddedToolbar
 
 /**
  * Cloudflare D1 云同步设置页。
@@ -52,6 +53,8 @@ class D1SyncFragment : Fragment() {
             requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
                 ?.openDrawer(GravityCompat.START)
         }
+        // 由 SyncHubFragment 内嵌打开时隐藏自带标题栏
+        EmbeddedToolbar.hideWhenEmbedded(this, binding.toolbar)
 
         // 优先从保存的状态恢复（用户未保存的输入），否则从服务器加载。
         // 仅当本页在栈顶时 onSaveInstanceState 才会写入这些 key；

@@ -12,7 +12,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.fragment.app.Fragment
 import net.activitywatch.android.R
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -23,7 +22,7 @@ import java.util.Locale
  * 日历页（契约 §5.8）：月历视图，格子里显示当日专注分钟数，
  * 点某天在下方列出当天的会话明细。
  */
-class FocusCalendarFragment : Fragment() {
+class FocusCalendarFragment : FocusPageFragment() {
 
     private var body: LinearLayout? = null
     private var month: Calendar = FocusDates.today().apply { set(Calendar.DAY_OF_MONTH, 1) }
@@ -38,12 +37,7 @@ class FocusCalendarFragment : Fragment() {
     ): View {
         FocusStore.init(requireContext())
         val (toolbar, content) = FocusUi.buildRoot(this, "日历")
-        toolbar.setOnMenuItemClickListener { item ->
-            if (item.itemId == R.id.action_focus_modules) {
-                FocusUi.showModulesDialog(this) { rebuild() }
-                true
-            } else false
-        }
+        bindToolbar(toolbar)
         body = content
         FocusStore.addListener(changed)
         rebuild()
@@ -55,6 +49,8 @@ class FocusCalendarFragment : Fragment() {
         body = null
         super.onDestroyView()
     }
+
+    override fun refreshPage() = rebuild()
 
     private fun rebuild() {
         val ctx = requireContext()

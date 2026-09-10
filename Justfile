@@ -55,7 +55,7 @@ install device="phone":
     @case "{{device}}" in phone|tab) ;; *) echo "用法: just install [phone|tab]"; exit 1;; esac; \
     serial=$(bash scripts/pick_device.sh {{device}}); \
     test -n "$serial" || (echo "未检测到{{if device == "tab" { "平板" } else { "手机" } }}设备（按型号 pad/tablet/TB 识别平板），请确认已连接 adb"; exit 1); \
-    {{ADB}} -s "$serial" install -r "{{DEBUG_APK}}"
+    bash scripts/adb_install.sh "{{DEBUG_APK}}" "$serial"
 
 # 两台都装
 install-all: (install "phone") (install "tab")
@@ -73,16 +73,21 @@ kotlinc:
 clean:
     {{GRADLE}} :mobile:clean
 
-# 编 release APK（versionName/versionCode 自动 +1，未签名）
+# 编 release APK（versionName/versionCode 自动 +1）
+# 注：mobile/build.gradle 的 release buildType 复用了 debug 签名，
+# 所以 assembleRelease 直接产出「已签名」的 mobile-release.apk（非 -unsigned）。
 build-release:
     bash scripts/bump_version.sh
     {{GRADLE}} :mobile:assembleRelease -x cargoBuild
 
-# 用 android.jks 签名 release APK
-# 前置：需在项目根放解密后的 android.jks，并导出 JKS_STOREPASS / JKS_KEYPASS
+# 用 android.jks 正式签名
+# 注意：当前配方不可用。release 已挂 signingConfig signingConfigs.debug，
+# assembleRelease 不会产出 *-unsigned.apk，下面的 UNSIGNED_APK 指向的文件不存在。
+# 需要正式签名（可上架）时，先删掉 build.gradle 里的 signingConfig signingConfigs.debug。
+# 前置：项目根放解密后的 android.jks，并导出 JKS_STOREPASS / JKS_KEYPASS
 sign-release:
     bash scripts/sign_apk.sh "{{UNSIGNED_APK}}" "{{RELEASE_APK}}"
 
-# adb 安装已签名 release APK
+# 安装 release APK（自动绕过 HyperOS/MIUI 的 adb 流式安装限制）
 install-release:
-    {{ADB}} install -r "{{RELEASE_APK}}"
+    bash scripts/adb_install.sh "{{RELEASE_APK}}"

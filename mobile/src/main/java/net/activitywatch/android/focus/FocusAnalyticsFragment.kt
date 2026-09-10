@@ -13,7 +13,6 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.fragment.app.Fragment
 import net.activitywatch.android.R
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -30,7 +29,7 @@ import kotlin.math.roundToInt
  *   - heatmap：热力图（近 26 周 GitHub 风格）
  *   - best：最佳专注时间（按小时聚合的柱状）
  */
-class FocusAnalyticsFragment : Fragment() {
+class FocusAnalyticsFragment : FocusPageFragment() {
 
     private var body: LinearLayout? = null
     private var mode = MODE_TIMELINE
@@ -55,12 +54,7 @@ class FocusAnalyticsFragment : Fragment() {
             else -> "专注时间线"
         }
         val (toolbar, content) = FocusUi.buildRoot(this, title)
-        toolbar.setOnMenuItemClickListener { item ->
-            if (item.itemId == R.id.action_focus_modules) {
-                FocusUi.showModulesDialog(this) { rebuild() }
-                true
-            } else false
-        }
+        bindToolbar(toolbar)
         body = content
         FocusStore.addListener(changed)
         rebuild()
@@ -72,6 +66,8 @@ class FocusAnalyticsFragment : Fragment() {
         body = null
         super.onDestroyView()
     }
+
+    override fun refreshPage() = rebuild()
 
     private fun rebuild() {
         val ctx = requireContext()
