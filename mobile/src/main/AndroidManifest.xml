@@ -67,6 +67,18 @@
             android:theme="@style/AppTheme.NoActionBar"
             android:exported="true"/>
 
+        <!-- 扫码页（WiFi 传输 · 被传送方）：继承 zxing 的 CaptureActivity，
+             只把对焦模式改成连续对焦（库默认的一次性对焦在部分机型上会卡住不动），
+             详见 AwCaptureActivity 注释。属性与库内 CaptureActivity 保持一致。 -->
+        <activity
+                android:name=".sync.wifi.AwCaptureActivity"
+                android:clearTaskOnLaunch="true"
+                android:exported="false"
+                android:screenOrientation="sensorLandscape"
+                android:stateNotNeeded="true"
+                android:theme="@style/zxing_CaptureTheme"
+                android:windowSoftInputMode="stateAlwaysHidden"/>
+
         <receiver
                 android:name=".watcher.AlarmReceiver"
                 android:enabled="true"

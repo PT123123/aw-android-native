@@ -308,6 +308,9 @@ class WifiTransferFragment : Fragment() {
             val options = ScanOptions().apply {
                 setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                 setPrompt("对准传送方出示的二维码")
+                // 用自定义扫码页：库默认的 AUTO 一次性对焦在部分机型上会「卡住不对焦」，
+                // 详见 AwCaptureActivity 的注释
+                setCaptureActivity(AwCaptureActivity::class.java)
                 setBeepEnabled(false)
                 setOrientationLocked(true)
             }
