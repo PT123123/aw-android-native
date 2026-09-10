@@ -31,26 +31,18 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import com.google.android.material.snackbar.Snackbar
 import net.activitywatch.android.databinding.ActivityMainBinding
-import net.activitywatch.android.focus.FocusAnalyticsFragment
-import net.activitywatch.android.focus.FocusCalendarFragment
-import net.activitywatch.android.focus.FocusCountdownFragment
-import net.activitywatch.android.focus.FocusRecordsFragment
-import net.activitywatch.android.focus.FocusTimerFragment
+import net.activitywatch.android.focus.FocusHubFragment
 import net.activitywatch.android.inbox.InboxFragment
 import net.activitywatch.android.inbox.InboxPrefs
 import net.activitywatch.android.inbox.InboxSettingsFragment
 import net.activitywatch.android.sync.LanSyncNetworkMonitor
-import net.activitywatch.android.sync.SyncFragment
+import net.activitywatch.android.sync.SyncHubFragment
 import net.activitywatch.android.sync.SyncSettingsFragment
 import net.activitywatch.android.sync.SyncDetailsFragment
 import net.activitywatch.android.sync.cloud.S3Fragment
-import net.activitywatch.android.sync.D1SyncFragment
-import net.activitywatch.android.sync.cloud.WebDavFragment
 import net.activitywatch.android.todo.TodoFragment
 import net.activitywatch.android.watcher.UsageStatsWatcher
-import net.activitywatch.android.dashboard.DashboardFragment
-import net.activitywatch.android.queryexplorer.QueryFragment
-import net.activitywatch.android.stopwatch.StopwatchFragment
+import net.activitywatch.android.dashboard.ActivityHubFragment
 
 // Firebase 导入
 import com.google.firebase.FirebaseApp
@@ -67,7 +59,7 @@ private const val CHANNEL_TODO_REMINDER = "todo_reminder"
 /**
  * 抽屉导航的可折叠分组。
  * - Inbox（笔记 / To Do）：默认展开
- * - 专注 / ActivityWatch / 同步：默认折叠
+ * - 专注 / 活动 / 同步：已合并为顶层单项（见 [buildNavRows]），页内用 Tab 分隔子模块
  * - 抽屉最底部固定一行「笔记设置」，回收站入口在设置页内（见 InboxSettingsFragment）
  */
 private data class NavRow(
@@ -294,7 +286,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ===================== 抽屉导航（可折叠分组）=====================
+    // ===================== 抽屉导航（可折叠分组 + 合并单项）=====================
 
     private fun setupDrawer() {
         val navList = binding.navList
@@ -305,6 +297,14 @@ class MainActivity : AppCompatActivity() {
             val (header, children) = buildGroup(group)
             navList.addView(header)
             navList.addView(children)
+        }
+        // 合并后的顶层单项：一行进一个 Tab 宿主页，页内再分 tab
+        for (row in buildNavRows()) {
+            val ui = buildRow(row)
+            // 与分组标题对齐（分组内行由 children 容器统一缩进，独立行需自行加内边距）
+            ui.container.setPaddingRelative(dp(16), 0, dp(16), 0)
+            rowUIs.add(ui)
+            navList.addView(ui.container)
         }
         // 抽屉最底部固定一行「笔记设置」（回收站入口在设置页内）
         val settingsRow = buildRow(NavRow(
@@ -333,6 +333,7 @@ class MainActivity : AppCompatActivity() {
         setBackgroundColor(color(R.color.aw_divider))
     }
 
+    /** 可折叠分组（只剩 Inbox；专注 / 活动 / 同步已合并为 [buildNavRows] 里的顶层单项） */
     private fun buildNavGroups(): List<NavGroup> = listOf(
         NavGroup("Inbox", true, listOf(
             NavRow(
@@ -348,82 +349,36 @@ class MainActivity : AppCompatActivity() {
                 TodoFragment::class.java,
                 todoArgs("inbox")
             )
-        )),
-        // 专注模块（契约 §5.8）：8 个模块，记录详情由点记录弹窗承载
-        NavGroup("专注", false, listOf(
-            NavRow(
-                R.id.nav_focus_timer,
-                ContextCompat.getDrawable(this, R.drawable.ic_focus_timer)!!,
-                "计时",
-                FocusTimerFragment::class.java
-            ),
-            NavRow(
-                R.id.nav_focus_records,
-                ContextCompat.getDrawable(this, R.drawable.ic_focus_records)!!,
-                "专注记录",
-                FocusRecordsFragment::class.java
-            ),
-            NavRow(
-                R.id.nav_focus_analytics,
-                ContextCompat.getDrawable(this, R.drawable.ic_focus_timeline)!!,
-                "专注分析",
-                FocusAnalyticsFragment::class.java,
-                focusArgs(FocusAnalyticsFragment.MODE_TIMELINE)
-            ),
-            NavRow(
-                R.id.nav_focus_calendar,
-                ContextCompat.getDrawable(this, R.drawable.ic_focus_calendar)!!,
-                "日历",
-                FocusCalendarFragment::class.java
-            ),
-            NavRow(
-                R.id.nav_focus_countdown,
-                ContextCompat.getDrawable(this, R.drawable.ic_focus_countdown)!!,
-                "倒数纪念日",
-                FocusCountdownFragment::class.java
-            )
-        )),
-        NavGroup("ActivityWatch", false, listOf(
-            NavRow(
-                R.id.nav_dashboard,
-                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_recent_history)!!,
-                "活动",
-                DashboardFragment::class.java
-            ),
-            NavRow(
-                R.id.nav_stopwatch,
-                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_today)!!,
-                "秒表",
-                StopwatchFragment::class.java
-            ),
-            NavRow(
-                R.id.nav_query,
-                ContextCompat.getDrawable(this, android.R.drawable.ic_menu_search)!!,
-                "Query Explorer",
-                QueryFragment::class.java
-            )
-        )),
-        NavGroup("同步", false, listOf(
-            NavRow(
-                R.id.nav_sync,
-                ContextCompat.getDrawable(this, R.drawable.ic_menu_manage)!!,
-                "Sync (LAN)",
-                SyncFragment::class.java
-            ),
-            NavRow(
-                R.id.nav_cloud_backup,
-                ContextCompat.getDrawable(this, R.drawable.ic_cloud_webdav)!!,
-                "云备份（冷备）",
-                WebDavFragment::class.java
-            ),
-            NavRow(
-                R.id.nav_d1,
-                ContextCompat.getDrawable(this, R.drawable.ic_cloud_d1)!!,
-                "CF同步设置 (D1)",
-                D1SyncFragment::class.java
-            )
         ))
     )
+
+    /**
+     * 合并后的三个顶层导航项：每项一个 Tab 宿主页，页内 TabLayout 再分隔子模块，
+     * 子模块自身若带 Tab（活动页的概览/时间线/趋势、云备份的 WebDAV/S3）即为「tab 内 tab」。
+     */
+    private fun buildNavRows(): List<NavRow> = listOf(
+        NavRow(
+            R.id.nav_focus_hub,
+            ContextCompat.getDrawable(this, R.drawable.ic_focus_timer)!!,
+            "专注",
+            FocusHubFragment::class.java
+        ),
+        NavRow(
+            R.id.nav_activity_hub,
+            ContextCompat.getDrawable(this, android.R.drawable.ic_menu_recent_history)!!,
+            "活动",
+            ActivityHubFragment::class.java
+        ),
+        NavRow(
+            R.id.nav_sync_hub,
+            ContextCompat.getDrawable(this, R.drawable.ic_menu_manage)!!,
+            "同步",
+            SyncHubFragment::class.java
+        )
+    )
+
+    /** 抽屉里全部可高亮的行（分组内 + 顶层单项） */
+    private fun allNavRows(): List<NavRow> = buildNavGroups().flatMap { it.rows } + buildNavRows()
 
     private fun buildGroup(group: NavGroup): Pair<View, View> {
         val children = LinearLayout(this).apply {
@@ -533,8 +488,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun syncSidebarHighlight() {
         val current = supportFragmentManager.findFragmentById(R.id.fragment_container) ?: return
-        val row = buildNavGroups().flatMap { it.rows }
-            .firstOrNull { it.fragmentClass == current.javaClass } ?: return
+        val row = allNavRows().firstOrNull { it.fragmentClass == current.javaClass } ?: return
         selectRow(row.id)
     }
 
@@ -550,10 +504,6 @@ class MainActivity : AppCompatActivity() {
     /** Todo 视图入口的参数包（与 TodoFragment.ARG_VIEW 对应） */
     private fun todoArgs(view: String): Bundle =
         Bundle().apply { putString(TodoFragment.ARG_VIEW, view) }
-
-    /** 专注分析页的模块参数（与 FocusAnalyticsFragment.ARG_MODE 对应） */
-    private fun focusArgs(mode: String): Bundle =
-        Bundle().apply { putString(FocusAnalyticsFragment.ARG_MODE, mode) }
 
     private fun navItemBg(): Drawable? = ContextCompat.getDrawable(this, R.drawable.nav_item_bg)
 

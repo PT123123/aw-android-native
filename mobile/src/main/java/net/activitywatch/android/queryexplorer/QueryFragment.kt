@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.dashboard.TimeRange
 import net.activitywatch.android.databinding.FragmentQueryBinding
+import net.activitywatch.android.hub.EmbeddedToolbar
 
 /**
  * Query Explorer 页面：手写 / 套用预置脚本，对本机 aw-server 的 /api/0/query 发起请求，
@@ -45,6 +46,8 @@ class QueryFragment : Fragment() {
             requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
                 ?.openDrawer(GravityCompat.START)
         }
+        // 由 ActivityHubFragment 内嵌打开时隐藏自带标题栏
+        EmbeddedToolbar.hideWhenEmbedded(this, binding.toolbar)
 
         setupRangeChips()
         setupPresets()

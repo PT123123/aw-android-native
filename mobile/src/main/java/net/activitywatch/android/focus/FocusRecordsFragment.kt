@@ -10,7 +10,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.fragment.app.Fragment
 import net.activitywatch.android.R
 import net.activitywatch.android.todo.TodoRepository
 
@@ -20,7 +19,7 @@ import net.activitywatch.android.todo.TodoRepository
  * 按天分组列出全部会话；点某条 → 专注记录详情弹窗（record_detail 模块）；
  * 长按 → 删除。数据变化由 FocusStore 的 onChange 驱动重渲染。
  */
-class FocusRecordsFragment : Fragment() {
+class FocusRecordsFragment : FocusPageFragment() {
 
     private var body: LinearLayout? = null
     private val changed: () -> Unit = { rebuild() }
@@ -32,12 +31,7 @@ class FocusRecordsFragment : Fragment() {
     ): View {
         FocusStore.init(requireContext())
         val (toolbar, content) = FocusUi.buildRoot(this, "专注记录")
-        toolbar.setOnMenuItemClickListener { item ->
-            if (item.itemId == R.id.action_focus_modules) {
-                FocusUi.showModulesDialog(this) { rebuild() }
-                true
-            } else false
-        }
+        bindToolbar(toolbar)
         body = content
         FocusStore.addListener(changed)
         rebuild()
@@ -49,6 +43,8 @@ class FocusRecordsFragment : Fragment() {
         body = null
         super.onDestroyView()
     }
+
+    override fun refreshPage() = rebuild()
 
     private fun rebuild() {
         val ctx = requireContext()

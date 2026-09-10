@@ -14,7 +14,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.Fragment
 import net.activitywatch.android.R
 import java.util.Calendar
 
@@ -22,7 +21,7 @@ import java.util.Calendar
  * 倒数纪念日页（契约 §5.8）：倒数日 + 每年重复的纪念日。
  * 支持新增（标题 + 日期 + 每年重复）与长按删除。
  */
-class FocusCountdownFragment : Fragment() {
+class FocusCountdownFragment : FocusPageFragment() {
 
     private var body: LinearLayout? = null
     private val changed: () -> Unit = { rebuild() }
@@ -34,12 +33,7 @@ class FocusCountdownFragment : Fragment() {
     ): View {
         FocusStore.init(requireContext())
         val (toolbar, content) = FocusUi.buildRoot(this, "倒数纪念日")
-        toolbar.setOnMenuItemClickListener { item ->
-            if (item.itemId == R.id.action_focus_modules) {
-                FocusUi.showModulesDialog(this) { rebuild() }
-                true
-            } else false
-        }
+        bindToolbar(toolbar)
         body = content
         FocusStore.addListener(changed)
         rebuild()
@@ -51,6 +45,8 @@ class FocusCountdownFragment : Fragment() {
         body = null
         super.onDestroyView()
     }
+
+    override fun refreshPage() = rebuild()
 
     private fun rebuild() {
         val ctx = requireContext()
