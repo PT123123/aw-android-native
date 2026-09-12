@@ -19,10 +19,10 @@ android {
         // Set in CI on tagged commit
         // FIXME: should be set before tagging, so that F-droid picks it up correctly
         //        https://gitlab.com/fdroid/fdroiddata/-/merge_requests/11786?commit_id=d2cedcbe3d26db59378d582a8cf952af16b6407f#note_1966750559
-        versionName "0.13.6"
+        versionName "0.13.8"
 
         // Set in CI by `bundle exec fastlane update_version`
-        versionCode 41
+        versionCode 43
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // NOTE: This only works for API level 28 and above
@@ -223,6 +223,26 @@ cargo {
 // 注意：rust-android-gradle 在 afterEvaluate 才创建 cargoBuild task，
 // 必须用字符串懒绑定，不能用直接属性引用（否则配置阶段报 unknown property）。
 preBuild.dependsOn 'cargoBuild'
+
+// ===== 让打包阶段真正跟踪 Rust .so 的变化 =====
+// 实测坑：把新编的 libaw_server.so 覆盖到 build/rustJniLibs/android 后重跑 assembleDebug，
+// mergeDebugJniFolders / mergeDebugNativeLibs / stripDebugDebugSymbols 仍被判为 UP-TO-DATE，
+// APK 里打进去的还是旧库 —— 新加的接口（如 /api/0/sync/discovery/burst）根本没进包，
+// 客户端调用只会 404，而构建日志一片绿，极难察觉。
+// 原因：jniLibs srcDir 是「目录型输入」，外部替换目录内文件后增量快照没有及时反映。
+// 这里把 .so 显式声明为这几个任务的输入文件，内容一变就强制重跑。
+def rustJniLibsSo = fileTree('build/rustJniLibs/android') { include '**/libaw_server.so' }
+['Debug', 'Release'].each { v ->
+    [
+        "merge${v}JniLibFolders",
+        "merge${v}NativeLibs",
+        "strip${v}DebugSymbols",
+    ].each { taskName ->
+        tasks.matching { it.name == taskName }.configureEach { t ->
+            t.inputs.files(rustJniLibsSo).withPropertyName('rustJniLibsSo').optional()
+        }
+    }
+}
 
 // ===== webui 已彻底移除：不再构建/打包 aw-webui，app 仪表盘入口 WebUIFragment 一并删除 =====
 

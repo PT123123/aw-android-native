@@ -3,6 +3,7 @@ package net.activitywatch.android.inbox
 import android.content.Context
 import com.google.gson.GsonBuilder
 import net.activitywatch.android.db.DeviceIdProvider
+import net.activitywatch.android.sync.LocalWriteWatcher
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -30,6 +31,8 @@ object LocalInboxApi {
         val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
         val client = OkHttpClient.Builder()
             .addInterceptor(deviceInterceptor)
+            // 本机业务写入（/inbox/* 的 POST/PUT/DELETE）成功后触发一次去抖局域网同步
+            .addInterceptor(LocalWriteWatcher.interceptor())
             .addInterceptor(logging)
             .connectTimeout(TIMEOUT, TimeUnit.SECONDS)
             .readTimeout(TIMEOUT, TimeUnit.SECONDS)

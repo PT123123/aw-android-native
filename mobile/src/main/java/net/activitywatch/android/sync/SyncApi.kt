@@ -30,6 +30,14 @@ interface SyncApi {
     @POST("api/0/sync/discovery/stop")
     suspend fun stopDiscovery(): Map<String, Boolean>
 
+    /**
+     * 后台自愈重发现窗口（秒）：不依赖「是否停留在同步界面」，短暂开启一轮 UDP 广播+监听，
+     * 让对端广播把设备记录里的 IP 刷新成当前真实地址（secs=0 表示立刻关闭）。
+     * 用于回到 Wi-Fi / 本机 IP 变化后立即纠正对端记录，避免自动同步一直按旧地址探测失败。
+     */
+    @POST("api/0/sync/discovery/burst")
+    suspend fun startDiscoveryBurst(@Query("secs") secs: Int = 5): Map<String, Int>
+
     // ---- 配对 ----
 
     @POST("api/0/sync/pair/initiate")
