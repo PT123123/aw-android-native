@@ -181,6 +181,14 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions, TabHub.MenuTarget {
                 .commit()
         }
 
+        // 同步权限 / 保活设置：后台不被系统回收所需的权限集中页 + 跳转入口
+        binding.btnSyncPermissions.setOnClickListener {
+            requireActivity().supportFragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, SyncPermissionsFragment())
+                .addToBackStack(null)
+                .commit()
+        }
+
         binding.btnClearAll.setOnClickListener {
             MaterialAlertDialogBuilder(requireContext())
                 .setTitle("清空所有配对信息")
