@@ -2,7 +2,7 @@
 #
 # 常用命令：
 #   just                列出全部命令
-#   just build          编译 debug APK（复用 jniLibs 里已编好的 libaw_server.so，跳过 Rust 重编）
+#   just build          编译 debug APK（自动 patch +1；复用 jniLibs 里已编好的 libaw_server.so，跳过 Rust 重编）
 #   just install        adb 安装 debug APK（默认装手机，按型号自动识别）
 #   just install phone  指定装到手机
 #   just install tab    指定装到平板
@@ -37,8 +37,10 @@ RELEASE_APK := "mobile/build/outputs/apk/release/mobile-release.apk"
 default:
     @just --list
 
-# 编译 debug APK（如果 .so 缺失则先编 Rust，否则跳过 Rust 重编）
+# 编译 debug APK（先 +1 patch 号；如果 .so 缺失则先编 Rust，否则跳过 Rust 重编）
+# 每次 build 都递增 versionName 的 patch 与 versionCode，这样「手机上是哪一版」一眼可查。
 build:
+    bash scripts/bump_version.sh
     @if [ ! -f mobile/build/rustJniLibs/android/arm64-v8a/libaw_server.so ]; then \
         echo "==> .so 缺失，先编 Rust..."; \
         {{GRADLE}} :mobile:cargoBuild; \
