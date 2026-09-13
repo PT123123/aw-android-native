@@ -26,4 +26,19 @@
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+
+    <!-- ===== 桌面小部件 ===== -->
+    <string name="widget_screen_time_label">今日屏幕使用</string>
+    <string name="widget_screen_time_desc">今日屏幕使用时长与最常用应用</string>
+    <string name="widget_screen_time_no_permission">需要授权</string>
+    <string name="widget_screen_time_grant_hint">点击打开应用，授予「使用情况访问」权限</string>
+    <string name="widget_updated_at">更新于 %1$s</string>
+    <string name="widget_calendar_title">%1$d年%2$d月</string>
+    <string name="widget_calendar_desc">月历视图，高亮今天</string>
+    <string name="widget_pin_screen_time_short">添加屏幕使用小部件</string>
+    <string name="widget_pin_screen_time_long">把「今日屏幕使用」添加到桌面</string>
+    <string name="widget_pin_calendar_short">添加日历小部件</string>
+    <string name="widget_pin_calendar_long">把「日历」添加到桌面</string>
+    <string name="widget_pin_confirm_hint">请在弹窗中确认，小部件就会添加到桌面</string>
+    <string name="widget_pin_unsupported">当前桌面不支持一键添加，请长按桌面 →「小部件」→ ActivityWatch</string>
 </resources>

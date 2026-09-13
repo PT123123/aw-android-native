@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 抽屉「权限设置」入口（行由 MainActivity 程序化构建，id 仅作稳定标识） -->
+    <item name="nav_permissions" type="id" />
+</resources>

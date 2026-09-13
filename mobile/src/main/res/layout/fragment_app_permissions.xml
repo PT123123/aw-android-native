@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 权限设置页：每项权限一张卡片，卡片由 AppPermissionsFragment 程序化构建 -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/aw_bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:id="@+id/ll_permissions_root"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="24dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="权限设置"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="@color/aw_text_primary" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="以下权限按功能列出，可随时在此开启；未开启的权限不影响应用启动。"
+            android:textSize="13sp"
+            android:textColor="@color/aw_text_secondary" />
+
+        <LinearLayout
+            android:id="@+id/ll_permission_rows"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:lineSpacingExtra="2dp"
+            android:text="澎湃OS / MIUI 提示：若后台记录中断或桌面小部件长时间不更新，请在 系统设置 → 应用设置 → 应用管理 → ActivityWatch → 自启动 中允许自启动；「桌面快捷方式」开关位于同一入口的 权限管理 内。"
+            android:textSize="12sp"
+            android:textColor="@color/aw_text_disabled" />
+    </LinearLayout>
+</ScrollView>
