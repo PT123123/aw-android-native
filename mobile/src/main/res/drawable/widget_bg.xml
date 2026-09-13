@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 小部件卡片背景：固定深色半透明圆角，与应用全局深色主题一致，任意壁纸上都可读 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="22dp" />
+    <solid android:color="@color/widget_card_bg" />
+</shape>

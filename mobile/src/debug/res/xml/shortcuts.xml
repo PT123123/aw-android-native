@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- debug 构建覆盖版（包名带 .debug 后缀）：仅 targetPackage 与 src/main 版不同，
+     其余保持一致。AGP 的 buildType sourceSet 资源优先级高于 main。 -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="pin_screen_time"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_screentime"
+        android:shortcutShortLabel="@string/widget_pin_screen_time_short"
+        android:shortcutLongLabel="@string/widget_pin_screen_time_long">
+        <intent
+            android:action="net.activitywatch.android.action.PIN_WIDGET"
+            android:targetPackage="net.activitywatch.android.debug"
+            android:targetClass="net.activitywatch.android.MainActivity">
+            <extra
+                android:name="pin_widget"
+                android:value="screen_time" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="pin_calendar"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_calendar"
+        android:shortcutShortLabel="@string/widget_pin_calendar_short"
+        android:shortcutLongLabel="@string/widget_pin_calendar_long">
+        <intent
+            android:action="net.activitywatch.android.action.PIN_WIDGET"
+            android:targetPackage="net.activitywatch.android.debug"
+            android:targetClass="net.activitywatch.android.MainActivity">
+            <extra
+                android:name="pin_widget"
+                android:value="calendar" />
+        </intent>
+    </shortcut>
+</shortcuts>
