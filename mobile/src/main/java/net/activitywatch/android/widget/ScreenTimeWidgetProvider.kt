@@ -19,9 +19,12 @@ import java.util.Locale
  * 「今日屏幕使用」小部件：显示今日总使用时长 + 常用应用图例，点击进 活动·概览。
  *
  * 尺寸自适应（onAppWidgetOptionsChanged + onUpdate 都会重算）：
- * - 高度不足（<110dp，约 1 行高）：隐藏图例，只留标题 + 大字时长；
- * - 宽度足够（≥320dp，约 4 列）：显示 top5 图例；其余显示 top3；
- * - 窄宽度（<170dp）：隐藏右上角「更新于」，避免标题换行。
+ * - 微缩（高度 <85dp，约 1 行）：隐藏标题行，只留大字时长；
+ * - 紧凑（高度 <115dp）或窄宽度（<140dp）：无图例；
+ * - 宽幅（宽度 ≥320dp，约 4 列）：top5 图例；其余 top3；
+ * - 窄宽度（<170dp）：隐藏右上角「更新于」。
+ * 字号不写死：布局启用 TextView autoSizeTextType，由系统按实际空间自动缩放，
+ * 缩到下限仍放不下才走 ellipsize 兜底。
  */
 class ScreenTimeWidgetProvider : AppWidgetProvider() {
 
@@ -55,18 +58,18 @@ class ScreenTimeWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        /** 图例行数：高度紧凑（<110dp）或过窄（<140dp）→ 0；宽度大（≥320dp）→ 5；默认 3 */
-        private const val COMPACT_MAX_HEIGHT_DP = 110
+        /**
+         * 档位（按系统上报的 dp 尺寸）：
+         * - 微缩：高度 <85dp（约 1 行）→ 隐藏标题行，只留大字时长（时长字号由 autofit 自适应）；
+         * - 紧凑：高度 <115dp 或宽度 <140dp → 无图例；
+         * - 宽幅：宽度 ≥320dp → top5 图例；其余 → top3。
+         * 字号不写死：布局启用 TextView autoSizeTextType，按实际空间自动缩放。
+         */
+        private const val MICRO_MAX_HEIGHT_DP = 85
+        private const val COMPACT_MAX_HEIGHT_DP = 115
         private const val NARROW_MAX_WIDTH_DP = 140
         private const val WIDE_MIN_WIDTH_DP = 320
         private const val HIDE_UPDATED_MAX_WIDTH_DP = 170
-
-        /** 大字时长按宽度降字号，防止溢出；再由 XML 的 ellipsize 兜底 */
-        private fun durationTextSizeSp(minWidth: Int): Float = when {
-            minWidth in 1 until 140 -> 16f
-            minWidth in 140 until 220 -> 24f
-            else -> 28f
-        }
 
         private val ROW_IDS = intArrayOf(
             R.id.ll_legend_0, R.id.ll_legend_1, R.id.ll_legend_2, R.id.ll_legend_3, R.id.ll_legend_4
@@ -104,6 +107,7 @@ class ScreenTimeWidgetProvider : AppWidgetProvider() {
             val minHeight = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
             val minWidth = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
             // 高度为 0 表示尚未拿到尺寸（初次放置前的占位），按标准档渲染
+            val micro = minHeight in 1 until MICRO_MAX_HEIGHT_DP
             val compactHeight = minHeight in 1 until COMPACT_MAX_HEIGHT_DP
             val narrow = minWidth in 1 until NARROW_MAX_WIDTH_DP
             val wide = minWidth >= WIDE_MIN_WIDTH_DP
@@ -112,12 +116,12 @@ class ScreenTimeWidgetProvider : AppWidgetProvider() {
                 wide -> 5
                 else -> 3
             }
-
-            if (minWidth in 1 until HIDE_UPDATED_MAX_WIDTH_DP) {
-                views.setViewVisibility(R.id.tv_widget_updated, View.GONE)
-            } else {
-                views.setViewVisibility(R.id.tv_widget_updated, View.VISIBLE)
-            }
+            // 微缩档：整个标题行隐藏，只留大字时长（字号由 autofit 自适应）
+            views.setViewVisibility(R.id.ll_header, if (micro) View.GONE else View.VISIBLE)
+            views.setViewVisibility(
+                R.id.tv_widget_updated,
+                if (!micro && minWidth in 1 until HIDE_UPDATED_MAX_WIDTH_DP) View.GONE else View.VISIBLE
+            )
 
             if (!result.permitted) {
                 views.setTextViewText(R.id.tv_widget_duration, context.getString(R.string.widget_screen_time_no_permission))
@@ -129,11 +133,6 @@ class ScreenTimeWidgetProvider : AppWidgetProvider() {
             }
 
             views.setTextViewText(R.id.tv_widget_duration, ScreenTimeStats.formatDuration(result.totalMs))
-            views.setTextViewTextSize(
-                R.id.tv_widget_duration,
-                android.util.TypedValue.COMPLEX_UNIT_SP,
-                durationTextSizeSp(minWidth)
-            )
             views.setTextViewText(R.id.tv_widget_updated, updatedText)
 
             for (i in ROW_IDS.indices) {
