@@ -22,6 +22,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:text="@string/widget_screen_time_label"
             android:textSize="13sp"
             android:textColor="@color/widget_text_secondary" />
@@ -30,6 +32,8 @@
             android:id="@+id/tv_widget_updated"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:textSize="11sp"
             android:textColor="@color/widget_text_secondary" />
     </LinearLayout>
@@ -39,6 +43,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
+        android:maxLines="1"
+        android:ellipsize="end"
         android:textSize="28sp"
         android:textStyle="bold"
         android:textColor="@color/widget_text_primary" />
@@ -58,9 +64,12 @@
 
         <TextView
             android:id="@+id/tv_legend_0"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:layout_marginStart="6dp"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:textSize="12sp"
             android:textColor="@color/widget_text_secondary" />
     </LinearLayout>
@@ -80,9 +89,12 @@
 
         <TextView
             android:id="@+id/tv_legend_1"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:layout_marginStart="6dp"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:textSize="12sp"
             android:textColor="@color/widget_text_secondary" />
     </LinearLayout>
@@ -102,9 +114,12 @@
 
         <TextView
             android:id="@+id/tv_legend_2"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:layout_marginStart="6dp"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:textSize="12sp"
             android:textColor="@color/widget_text_secondary" />
     </LinearLayout>
@@ -124,9 +139,12 @@
 
         <TextView
             android:id="@+id/tv_legend_3"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:layout_marginStart="6dp"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:textSize="12sp"
             android:textColor="@color/widget_text_secondary" />
     </LinearLayout>
@@ -146,9 +164,12 @@
 
         <TextView
             android:id="@+id/tv_legend_4"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:layout_marginStart="6dp"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:textSize="12sp"
             android:textColor="@color/widget_text_secondary" />
     </LinearLayout>
