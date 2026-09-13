@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「今日屏幕使用」小部件声明。
+     targetCellWidth/Height、previewLayout、description 为 Android 12+ 属性，
+     旧系统自动忽略，走 minWidth/minHeight + initialLayout -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:minWidth="180dp"
+    android:minHeight="100dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_screen_time"
+    android:previewLayout="@layout/widget_screen_time"
+    android:description="@string/widget_screen_time_desc"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    tools:targetApi="s" />

@@ -81,6 +81,8 @@ object TabHub {
         title: String,
         @MenuRes menuRes: Int = 0,
         pages: List<Page>,
+        /** 初始选中的页索引（桌面小部件等深链入口用），默认第一个 */
+        initialPage: Int = 0,
     ): Views {
         val ctx = fragment.requireContext()
         val root = LinearLayout(ctx).apply {
@@ -129,6 +131,10 @@ object TabHub {
         val mediator = TabLayoutMediator(tabLayout, pager) { tab, position ->
             tab.text = pages[position].title
         }.apply { attach() }
+
+        if (initialPage in 1..pages.lastIndex) {
+            pager.setCurrentItem(initialPage, false)
+        }
 
         return Views(root, toolbar, tabLayout, pager, mediator)
     }
