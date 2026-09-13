@@ -55,10 +55,18 @@ class ScreenTimeWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        /** 图例行数：高度紧凑 → 0；宽度大（≥320dp）→ 5；默认 3 */
+        /** 图例行数：高度紧凑（<110dp）或过窄（<140dp）→ 0；宽度大（≥320dp）→ 5；默认 3 */
         private const val COMPACT_MAX_HEIGHT_DP = 110
+        private const val NARROW_MAX_WIDTH_DP = 140
         private const val WIDE_MIN_WIDTH_DP = 320
         private const val HIDE_UPDATED_MAX_WIDTH_DP = 170
+
+        /** 大字时长按宽度降字号，防止溢出；再由 XML 的 ellipsize 兜底 */
+        private fun durationTextSizeSp(minWidth: Int): Float = when {
+            minWidth in 1 until 140 -> 16f
+            minWidth in 140 until 220 -> 24f
+            else -> 28f
+        }
 
         private val ROW_IDS = intArrayOf(
             R.id.ll_legend_0, R.id.ll_legend_1, R.id.ll_legend_2, R.id.ll_legend_3, R.id.ll_legend_4
@@ -97,9 +105,10 @@ class ScreenTimeWidgetProvider : AppWidgetProvider() {
             val minWidth = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
             // 高度为 0 表示尚未拿到尺寸（初次放置前的占位），按标准档渲染
             val compactHeight = minHeight in 1 until COMPACT_MAX_HEIGHT_DP
+            val narrow = minWidth in 1 until NARROW_MAX_WIDTH_DP
             val wide = minWidth >= WIDE_MIN_WIDTH_DP
             val legendCount = when {
-                compactHeight -> 0
+                compactHeight || narrow -> 0
                 wide -> 5
                 else -> 3
             }
@@ -120,6 +129,11 @@ class ScreenTimeWidgetProvider : AppWidgetProvider() {
             }
 
             views.setTextViewText(R.id.tv_widget_duration, ScreenTimeStats.formatDuration(result.totalMs))
+            views.setTextViewTextSize(
+                R.id.tv_widget_duration,
+                android.util.TypedValue.COMPLEX_UNIT_SP,
+                durationTextSizeSp(minWidth)
+            )
             views.setTextViewText(R.id.tv_widget_updated, updatedText)
 
             for (i in ROW_IDS.indices) {
