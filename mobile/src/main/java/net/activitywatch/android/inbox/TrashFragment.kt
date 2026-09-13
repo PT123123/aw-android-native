@@ -137,11 +137,14 @@ class TrashFragment : Fragment() {
                 if (items.isEmpty()) {
                     Toast.makeText(requireContext(), "回收站为空", Toast.LENGTH_SHORT).show()
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // 视图销毁（如小部件点击跳转替换本页）会取消本协程：透传取消，finally 不碰已置空的 binding
+                throw e
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "加载失败：${e.message}", Toast.LENGTH_LONG).show()
             } finally {
                 loadingNotes = false
-                binding.swipeNotes.isRefreshing = false
+                _binding?.swipeNotes?.isRefreshing = false
             }
         }
     }
@@ -186,11 +189,13 @@ class TrashFragment : Fragment() {
                 if (trashItems.isEmpty()) {
                     Toast.makeText(requireContext(), "暂无冲突归档", Toast.LENGTH_SHORT).show()
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Toast.makeText(requireContext(), "加载失败：${e.message}", Toast.LENGTH_LONG).show()
             } finally {
                 loadingTrash = false
-                binding.swipeTrash.isRefreshing = false
+                _binding?.swipeTrash?.isRefreshing = false
             }
         }
     }

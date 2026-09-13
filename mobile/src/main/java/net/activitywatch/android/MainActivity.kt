@@ -165,12 +165,16 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // 添加初始的 InboxFragment（原生收件箱作为初始页）
-        val firstFragment: Fragment = InboxFragment()
-        supportFragmentManager.beginTransaction()
-            .add(R.id.fragment_container, firstFragment)
-            .commit()
-        Log.d(TAG, "Fragment 事务执行完成")
+        // 小部件深链启动（点击控件/长按快捷方式）时直接进目标页，不再先建 InboxFragment
+        // 再替换——那会让收件箱的加载协程刚起就被取消，存在取消时序上的崩溃风险
+        if (savedInstanceState == null && this.intent?.getStringExtra(WidgetUpdater.EXTRA_OPEN_TARGET) == null) {
+            // 添加初始的 InboxFragment（原生收件箱作为初始页）
+            val firstFragment: Fragment = InboxFragment()
+            supportFragmentManager.beginTransaction()
+                .add(R.id.fragment_container, firstFragment)
+                .commit()
+            Log.d(TAG, "Fragment 事务执行完成")
+        }
 
         // 长按应用图标的快捷方式（添加小部件）拉起本页：处理钉到桌面的请求
         handlePinWidgetIntent(this.intent)
