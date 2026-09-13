@@ -4,8 +4,8 @@
      旧系统自动忽略，走 minWidth/minHeight + initialLayout -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:minWidth="220dp"
-    android:minHeight="200dp"
+    android:minWidth="170dp"
+    android:minHeight="165dp"
     android:targetCellWidth="3"
     android:targetCellHeight="3"
     android:updatePeriodMillis="1800000"
