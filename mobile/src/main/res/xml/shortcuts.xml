@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 长按桌面应用图标弹出的快捷方式菜单（App Shortcuts）：
+     一键把小部件钉到桌面 —— 点击后拉起 MainActivity 并调用
+     AppWidgetManager.requestPinAppWidget，由系统弹窗确认后添加，
+     无需去「桌面长按 → 小部件」选择器里翻找。
+     注意：targetPackage 必须显式声明！缺省时系统存储的 shortcut intent 没有
+     component，桌面启动时按 action 解析失败：MIUI 静默无反应、部分桌面报
+     「未安装此应用」。debug 构建由 src/debug/res 下的同名文件覆盖包名。 -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="pin_screen_time"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_screentime"
+        android:shortcutShortLabel="@string/widget_pin_screen_time_short"
+        android:shortcutLongLabel="@string/widget_pin_screen_time_long">
+        <intent
+            android:action="net.activitywatch.android.action.PIN_WIDGET"
+            android:targetPackage="net.activitywatch.android"
+            android:targetClass="net.activitywatch.android.MainActivity">
+            <extra
+                android:name="pin_widget"
+                android:value="screen_time" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="pin_calendar"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_calendar"
+        android:shortcutShortLabel="@string/widget_pin_calendar_short"
+        android:shortcutLongLabel="@string/widget_pin_calendar_long">
+        <intent
+            android:action="net.activitywatch.android.action.PIN_WIDGET"
+            android:targetPackage="net.activitywatch.android"
+            android:targetClass="net.activitywatch.android.MainActivity">
+            <extra
+                android:name="pin_widget"
+                android:value="calendar" />
+        </intent>
+    </shortcut>
+</shortcuts>

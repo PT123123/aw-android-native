@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「日历」小部件声明。
+     targetCellWidth/Height、previewLayout、description 为 Android 12+ 属性，
+     旧系统自动忽略，走 minWidth/minHeight + initialLayout -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:minWidth="220dp"
+    android:minHeight="200dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="3"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_calendar"
+    android:previewLayout="@layout/widget_calendar"
+    android:description="@string/widget_calendar_desc"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    tools:targetApi="s" />

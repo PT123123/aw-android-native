@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -42,6 +44,11 @@ import net.activitywatch.android.sync.SyncDetailsFragment
 import net.activitywatch.android.sync.cloud.S3Fragment
 import net.activitywatch.android.todo.TodoFragment
 import net.activitywatch.android.watcher.UsageStatsWatcher
+import net.activitywatch.android.permissions.AppPermissionsFragment
+import net.activitywatch.android.widget.CalendarWidgetProvider
+import net.activitywatch.android.widget.ScreenTimeWidgetProvider
+import net.activitywatch.android.widget.WidgetUpdater
+import net.activitywatch.android.dashboard.ActivityPagerAdapter
 import net.activitywatch.android.dashboard.ActivityHubFragment
 
 // Firebase 导入
@@ -49,6 +56,12 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 private const val TAG = "MainActivity"
+
+/** 快捷方式入口 action：把指定小部件钉到桌面（见 res/xml/shortcuts.xml） */
+private const val ACTION_PIN_WIDGET = "net.activitywatch.android.action.PIN_WIDGET"
+
+/** 快捷方式 extra：要钉的小部件（screen_time / calendar） */
+private const val EXTRA_PIN_WIDGET = "pin_widget"
 
 /** 通知权限运行时申请 requestCode */
 private const val REQ_POST_NOTIFICATIONS = 4101
@@ -88,6 +101,9 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
+    /** 「使用情况访问」未授权的提示每进程只弹一次 */
+    private var usageHintShown = false
+
     private val rowUIs = mutableListOf<RowUI>()
     private var selectedNavId = View.NO_ID
 
@@ -118,15 +134,8 @@ class MainActivity : AppCompatActivity() {
             Log.e(TAG, "Firebase 初始化失败 (FirebaseApp 或 Crashlytics) 在 MainActivity.onCreate 中", e)
         }
 
-        // 如果是第一次使用或未授权使用统计，启动 Onboarding Activity
-        val prefs = AWPreferences(this)
-        if (prefs.isFirstTime() || !UsageStatsWatcher.isUsageAllowed(this)) {
-            Log.i(TAG, "First time or usage not allowed, starting onboarding activity")
-            val intent = Intent(this, OnboardingActivity::class.java)
-            startActivity(intent)
-            return
-        }
-
+        // 首次启动不再强制走 OnboardingActivity 引导（原「不授权不让进」流程已移除），
+        // 各项权限集中到抽屉的「权限设置」页按需开启；未授权时使用记录自动跳过。
         // 设置 UI
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -162,6 +171,78 @@ class MainActivity : AppCompatActivity() {
             .add(R.id.fragment_container, firstFragment)
             .commit()
         Log.d(TAG, "Fragment 事务执行完成")
+
+        // 长按应用图标的快捷方式（添加小部件）拉起本页：处理钉到桌面的请求
+        handlePinWidgetIntent(this.intent)
+        // 小部件点击跳转（今日屏幕使用 → 活动·概览；日历 → 活动·趋势）
+        handleWidgetOpenIntent(this.intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        handlePinWidgetIntent(intent)
+        handleWidgetOpenIntent(intent)
+    }
+
+    // ===================== 快捷方式：一键添加小部件 =====================
+
+    /**
+     * 长按应用图标的快捷方式（res/xml/shortcuts.xml）拉起本页时，
+     * 调 [AppWidgetManager.requestPinAppWidget] 由系统弹窗把小部件钉到桌面。
+     * 必须由前台 Activity 发起；桌面不支持钉住时退回「去小部件选择器」的引导提示。
+     */
+    private fun handlePinWidgetIntent(launchIntent: Intent?) {
+        if (launchIntent?.action != ACTION_PIN_WIDGET) return
+        val which = launchIntent.getStringExtra(EXTRA_PIN_WIDGET)
+        Log.i(TAG, "handlePinWidgetIntent: which=$which")
+        val provider = when (which) {
+            "screen_time" -> ComponentName(this, ScreenTimeWidgetProvider::class.java)
+            "calendar" -> ComponentName(this, CalendarWidgetProvider::class.java)
+            else -> return
+        }
+
+        val awm = getSystemService(AppWidgetManager::class.java)
+        if (Build.VERSION.SDK_INT < 26 || awm == null || !awm.isRequestPinAppWidgetSupported) {
+            Log.w(
+                TAG,
+                "钉小部件不可用: sdk=${Build.VERSION.SDK_INT} awm=$awm " +
+                    "supported=${awm?.isRequestPinAppWidgetSupported}"
+            )
+            if (::binding.isInitialized) {
+                Snackbar.make(binding.coordinatorLayout, R.string.widget_pin_unsupported, Snackbar.LENGTH_LONG)
+                    .show()
+            }
+            return
+        }
+        try {
+            val accepted = awm.requestPinAppWidget(provider, null, null)
+            Log.i(TAG, "requestPinAppWidget($which) accepted=$accepted")
+            if (::binding.isInitialized) {
+                Snackbar.make(binding.coordinatorLayout, R.string.widget_pin_confirm_hint, Snackbar.LENGTH_LONG)
+                    .show()
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "requestPinAppWidget 失败", t)
+        }
+    }
+
+    /**
+     * 小部件点击跳转（WidgetUpdater.EXTRA_OPEN_TARGET）：
+     * 「今日屏幕使用」→ 活动·概览（今日总时长）；「日历」→ 活动·趋势（按天看使用分布）。
+     */
+    private fun handleWidgetOpenIntent(launchIntent: Intent?) {
+        val target = launchIntent?.getStringExtra(WidgetUpdater.EXTRA_OPEN_TARGET) ?: return
+        val subTab = when (target) {
+            WidgetUpdater.OPEN_ACTIVITY_OVERVIEW -> ActivityPagerAdapter.TAB_OVERVIEW
+            WidgetUpdater.OPEN_ACTIVITY_TRENDS -> ActivityPagerAdapter.TAB_TRENDS
+            else -> return
+        }
+        val args = Bundle().apply {
+            putInt(ActivityHubFragment.ARG_PAGE, 0)
+            putInt(ActivityHubFragment.ARG_SUB_TAB, subTab)
+        }
+        selectRow(R.id.nav_activity_hub)
+        navigateTo(ActivityHubFragment::class.java, args)
     }
 
     override fun onResume() {
@@ -169,6 +250,20 @@ class MainActivity : AppCompatActivity() {
         // 确保数据总是最新的
         val usw = UsageStatsWatcher(this)
         usw.sendHeartbeats()
+
+        // 打开 App 时顺带刷新桌面小部件（屏幕使用时间 / 日历），后台线程执行
+        WidgetUpdater.refreshAllAsync(this)
+
+        // 未授予「使用情况访问」时引导到权限设置页（每次进程只提示一次）
+        if (!UsageStatsWatcher.isUsageAllowed(this) && !usageHintShown) {
+            usageHintShown = true
+            Snackbar.make(binding.coordinatorLayout, "未授予「使用情况访问」，无法记录使用数据", Snackbar.LENGTH_LONG)
+                .setAction("去授权") {
+                    selectRow(R.id.nav_permissions)
+                    navigateTo(AppPermissionsFragment::class.java)
+                }
+                .show()
+        }
     }
 
     // ===================== 提醒权限 =====================
@@ -319,6 +414,16 @@ class MainActivity : AppCompatActivity() {
         navList.addView(bottomDivider())
         rowUIs.add(settingsRow)
         navList.addView(settingsRow.container)
+        // 抽屉最底部固定一行「权限设置」（首次启动不再强制引导，各权限统一在此管理）
+        val permsRow = buildRow(NavRow(
+            R.id.nav_permissions,
+            ContextCompat.getDrawable(this, android.R.drawable.ic_menu_info_details)!!,
+            "权限设置",
+            AppPermissionsFragment::class.java
+        ))
+        permsRow.container.setPaddingRelative(dp(16), 0, dp(16), 0)
+        rowUIs.add(permsRow)
+        navList.addView(permsRow.container)
         // 初始页是 Inbox，高亮对应项
         selectRow(R.id.nav_inbox)
     }

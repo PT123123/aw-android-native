@@ -61,6 +61,11 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- 长按应用图标的快捷方式菜单：一键把小部件钉到桌面 -->
+            <meta-data
+                    android:name="android.app.shortcuts"
+                    android:resource="@xml/shortcuts"/>
         </activity>
 
         <activity
@@ -102,6 +107,33 @@
                 <action android:name="android.intent.action.TIME_SET"/>
                 <action android:name="android.intent.action.TIMEZONE_CHANGED"/>
             </intent-filter>
+        </receiver>
+
+        <!-- 桌面小部件：今日屏幕使用时间（数据源为系统 UsageStatsManager，
+             不依赖应用内 Rust 服务器；APPWIDGET_UPDATE 由系统/桌面发出，exported=false 即可） -->
+        <receiver
+                android:name=".widget.ScreenTimeWidgetProvider"
+                android:enabled="true"
+                android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                    android:name="android.appwidget.provider"
+                    android:resource="@xml/screen_time_widget_info"/>
+        </receiver>
+
+        <!-- 桌面小部件：日历（月历，高亮今天） -->
+        <receiver
+                android:name=".widget.CalendarWidgetProvider"
+                android:enabled="true"
+                android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                    android:name="android.appwidget.provider"
+                    android:resource="@xml/calendar_widget_info"/>
         </receiver>
 
         <service android:name=".watcher.ChromeWatcher"

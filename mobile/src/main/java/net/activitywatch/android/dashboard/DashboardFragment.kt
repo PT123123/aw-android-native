@@ -20,6 +20,12 @@ import net.activitywatch.android.hub.EmbeddedToolbar
  * 所以切换时间范围只会触发一次事件拉取，三个 Tab 同时刷新。
  */
 class DashboardFragment : Fragment() {
+
+    companion object {
+        /** 初始选中的子 Tab（ActivityPagerAdapter.TAB_*，未传默认概览） */
+        const val ARG_TAB = "aw_dashboard_tab"
+    }
+
     private var _binding: FragmentDashboardBinding? = null
     private val binding get() = _binding!!
 
@@ -72,6 +78,12 @@ class DashboardFragment : Fragment() {
         tabMediator = TabLayoutMediator(binding.tabLayout, binding.vpActivity) { tab, position ->
             tab.text = ActivityPagerAdapter.TITLES[position]
         }.apply { attach() }
+        // 深链入口（如桌面「日历」小部件）可指定初始 Tab
+        val initialTab = arguments?.getInt(ARG_TAB, ActivityPagerAdapter.TAB_OVERVIEW)
+            ?: ActivityPagerAdapter.TAB_OVERVIEW
+        if (initialTab != ActivityPagerAdapter.TAB_OVERVIEW) {
+            binding.vpActivity.setCurrentItem(initialTab, false)
+        }
     }
 
     override fun onDestroyView() {
