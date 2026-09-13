@@ -700,6 +700,10 @@ class InboxFragment : Fragment() {
                 adapter.pinnedIds = PinStore.pinnedIdsSet(requireContext())
                 sortItems()
                 hydrateRelations()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // 视图销毁（如小部件点击跳转替换本页）会取消本协程：透传取消，
+                // 不走重试/Toast 分支，finally 里也不能再碰已置空的 binding
+                throw e
             } catch (e: Exception) {
                 if (!append && items.isEmpty()) {
                     retryCount++
@@ -713,7 +717,7 @@ class InboxFragment : Fragment() {
                 }
             } finally {
                 loading = false
-                binding.swipe.isRefreshing = false
+                _binding?.swipe?.isRefreshing = false
             }
         }
     }
