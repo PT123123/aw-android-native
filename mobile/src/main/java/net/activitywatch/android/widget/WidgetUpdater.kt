@@ -22,6 +22,20 @@ object WidgetUpdater {
     const val OPEN_ACTIVITY_OVERVIEW = "activity_overview" // 「今日屏幕使用」→ 活动·概览
     const val OPEN_ACTIVITY_TRENDS = "activity_trends"     // 「日历」→ 活动·趋势
 
+    /**
+     * ⚠️ 每个「打开主界面」的 PendingIntent 必须带各自唯一的 action。
+     *
+     * Android 判定两条 PendingIntent 是否为同一条记录，只比对
+     * `requestCode` + `Intent.filterEquals()`（action / data / type / component / categories），
+     * **完全不看 extras**。早先屏幕使用小部件与「待办到期」通知都用
+     * `requestCode=0 + Intent(context, MainActivity)`，被系统当成同一条记录；
+     * FLAG_UPDATE_CURRENT 下后创建者会用自己（空）的 extras 覆盖前者，
+     * 于是点小部件时 open_target 丢失 → MainActivity 回落到默认的笔记页。
+     * 加唯一 action 即彻底隔离，requestCode 也一并区分以免将来再撞。
+     */
+    const val ACTION_OPEN_SCREEN_TIME = "net.activitywatch.android.action.WIDGET_OPEN_SCREEN_TIME"
+    const val ACTION_OPEN_CALENDAR = "net.activitywatch.android.action.WIDGET_OPEN_CALENDAR"
+
     // 单线程串行执行，避免两个 Provider 同时触发导致重复计算
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
 
