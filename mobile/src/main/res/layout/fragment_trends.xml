@@ -18,6 +18,12 @@
             android:padding="12dp"
             android:paddingBottom="24dp">
 
+            <include
+                android:id="@+id/chips"
+                layout="@layout/view_range_chips"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
             <com.google.android.material.card.MaterialCardView
                 style="@style/AwCard"
                 android:layout_width="match_parent"
@@ -45,7 +51,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:text="柱高为当天总时长，柱内按当天 Top 3 应用堆叠着色"/>
+                        android:text="柱高为当天屏幕时长（系统口径），柱内按当天 Top 3 应用堆叠着色"/>
 
                     <TextView
                         android:id="@+id/tv_empty"
@@ -88,7 +94,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="总记录"
+                            android:text="屏幕时间"
                             android:textColor="@color/aw_text_secondary"
                             android:textSize="11sp"/>
                     </LinearLayout>

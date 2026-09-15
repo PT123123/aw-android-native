@@ -41,6 +41,9 @@ class OverviewFragment : Fragment() {
         // 与宿主、时间线、趋势共用同一份数据
         viewModel = ViewModelProvider(requireParentFragment())[DashboardViewModel::class.java]
 
+        // 时间范围 chips（页面内容内嵌，随 VM 状态跨 Tab 同步）
+        bindRangeChips(binding.chips.chipGroup, viewLifecycleOwner, viewModel)
+
         appAdapter = RankAdapter()
         webAdapter = RankAdapter()
         bucketAdapter = BucketAdapter()
@@ -95,6 +98,11 @@ class OverviewFragment : Fragment() {
 
     private fun buildSummary(s: DashboardState): String {
         val parts = mutableListOf<String>()
+        // 屏幕时间 = 系统口径（UsageStatsManager 聚合，与系统设置一致）；
+        // 已记录 = 事件流口径（AW 采集），两者差值即漏采损耗
+        if (s.sysTotalSec != null) {
+            parts.add("屏幕时间 ${formatDuration(s.sysTotalSec)}（系统口径）")
+        }
         parts.add("已记录 ${formatDuration(s.totalTrackedSec)}")
         if (s.activeSec != null || s.afkSec != null) {
             parts.add("专注 ${formatDuration(s.activeSec ?: 0.0)}")
