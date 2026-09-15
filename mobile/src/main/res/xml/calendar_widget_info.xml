@@ -3,8 +3,9 @@
      targetCellWidth/Height、previewLayout、description 为 Android 12+ 属性，
      旧系统自动忽略，走 minWidth/minHeight + initialLayout。
      minWidth/minHeight 按启动器换算公式 70*cells-30 取 2x2 = 110dp（最小尺寸），
-     可拖拽放大到 3x3/4x4；CalendarWidgetProvider 按实际尺寸在
-     标准档（标题「2026年9月」+ 12sp 日期）与紧凑档（「9月」+ 9sp 日期）之间切换。 -->
+     可拖拽放大到 3x3/4x4；CalendarWidgetProvider 按实际尺寸切换内边距与标题文案
+     （紧凑档「9月」/标准档「2026年9月」），字号一律按实际尺寸以 dp 反推、
+     按当月实际周数撑满高度（不受系统字体缩放影响）。 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:minWidth="110dp"

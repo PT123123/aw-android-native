@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 日历日期行：7 列等宽，颜色/背景由代码设置 -->
+<!-- 日历日期行。height=0dp + weight=1：由父容器 ll_cal_grid（已 weight=1）把可用高度
+     等分给各行，行高的不确定性全部由这里吸收——字号估小了也不会把最后一行挤到部件
+     外面；行比字高时文本垂直居中，不会出现底部留白。颜色/字号由代码设置。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="0dp"
+    android:layout_weight="1"
     android:orientation="horizontal">
 
     <TextView
@@ -10,10 +13,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 
@@ -22,10 +25,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 
@@ -34,10 +37,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 
@@ -46,10 +49,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 
@@ -58,10 +61,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 
@@ -70,10 +73,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 
@@ -82,10 +85,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 </LinearLayout>

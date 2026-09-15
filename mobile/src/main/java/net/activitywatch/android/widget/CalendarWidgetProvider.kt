@@ -21,10 +21,14 @@ import java.util.Locale
  * 点击打开主界面。纯 RemoteViews 绘制，逐行 addView 生成周行。
  *
  * 尺寸分档（onAppWidgetOptionsChanged / onUpdate 都会重算）：
- * - 紧凑档（任一方向 < [COMPACT_MAX_DP]，即 2x2 级别）：换用紧凑行布局
- *   （无 minHeight、0.5dp 行距）、内边距收到 6/5dp、标题缩成「9月」11sp、
- *   日期 9sp——6 周（42 格）合计约 92dp，能完整塞进 110dp 的 2x2 区域；
- * - 标准档（3x3 及以上）：维持原字号与内边距。
+ * - 档位（任一方向 < [COMPACT_MAX_DP] 为紧凑档，否则标准档）只决定内边距
+ *   （5/10dp）、标题文案（「9月」/「2026年9月」）与今天高亮形状；尺寸未知
+ *   （澎湃OS/MIUI 可能不上报，恒为 0）按 2x2 兜底走紧凑档。
+ * - 字号不分档，一律按实际尺寸以 **dp** 反推（sp 会被 fontScale 放大：大字体下
+ *   两位数折行、个位被裁）：标题约占高度 14%、表头 10%（大部件里标题自然放大填充
+ *   空白，小部件里缩到下限），其余全部留给日期行，保证每个日期都完整显示。
+ * - 日期网格与日期行都用 weight 分配高度（见 widget_calendar.xml / widget_calendar_row.xml），
+ *   所以「上报尺寸比实际可视区偏大」时最多是字略小，不会把最后一行挤到部件外面。
  * 字号统一走 setTextViewTextSize（布局里的 textSize 只是预览兜底）。
  *
  * 用 java.util.Calendar 而非 ThreeTenBP：项目未全局调 AndroidThreeTen.init()，
@@ -62,44 +66,64 @@ class CalendarWidgetProvider : AppWidgetProvider() {
 
     companion object {
         /**
-         * 紧凑档阈值（dp）：启动器按 cell 换算的可用区，2x2 约 110dp、3x3 约 250dp，
-         * 取 150 作分界能可靠区分两者（同时兼容 2x1 / 4x2 这类非方形尺寸）。
+         * 紧凑档阈值（dp）：启动器按 cell 换算的可用区，2x2 约 110-165dp（澎湃OS
+         * 5 列网格偏大）、3x3 约 230-250dp，取 170 作分界。字号已改为按实际尺寸
+         * 撑满，档位只影响内边距/标题文案/高亮形状，误判档位也不会溢出。
          */
-        private const val COMPACT_MAX_DP = 150
+        private const val COMPACT_MAX_DP = 170
 
-        /** 紧凑档内边距（dp）。必须与 [measureCompact] 的可用区计算保持一致 */
+        /** 紧凑档 / 标准档内边距（dp）。必须与 [measureTexts] 的可用区计算保持一致 */
         private const val PAD_H_COMPACT = 5
         private const val PAD_V_COMPACT = 5
+        private const val PAD_H_STD = 10
+        private const val PAD_V_STD = 8
 
-        /** 一组字号（紧凑档单位为 dp，标准档为 sp） */
+        /** 一组字号（单位 dp，不受系统字体缩放影响） */
         private class Texts(val title: Float, val header: Float, val day: Float)
 
-        /** 标准档（3x3 及以上）：空间充裕，沿用 sp，跟随系统字体缩放无妨 */
-        private val STANDARD_TEXTS = Texts(14f, 10f, 12f)
+        /** 单行文本「高度 / 字号」经验比（includeFontPadding 已关，CJK 略矮于数字） */
+        private const val LINE_H = 1.2
+
+        /** 日期行「行高 / 字号」：MiSans 等字体行盒明显高于 Roboto，估小了下半会被裁 */
+        private const val DAY_LINE_H = 1.32
+
+        /** 两位数占宽「em / 字号」：2 字 × 0.6em（数字字宽取宽值，防宽字体折行） */
+        private const val TWO_DIGIT_EM = 1.2
+
+        /** 标题行与表头行之间的固定间距（2dp + 1dp 的 layout_marginTop） */
+        private const val GAP = 3.0
+
+        private const val MIN_DAY = 6.5
+        private const val MAX_DAY = 40.0
 
         /**
-         * 按实例尺寸反推紧凑档字号，单位 **dp**。
+         * 按实例尺寸反推字号，单位 **dp**。
          *
-         * 为什么不用 sp：sp 会被系统字体缩放（fontScale）放大，而格子宽度是按 dp 死的。
-         * 本机实测 fontScale=1.45 时，9sp 实渲 ≈13dp、「10」这种两位数宽 ≈14.4dp，
-         * 而 2x2 的格子只有 ≈14dp —— 刚好差一点，于是两位数被迫折行、下半被裁掉
-         * （表现为「10」的 0 掉到 1 下面、14 的 4 / 18 的 8 / 20 的 0 看不见）。
-         * 改用 dp 后字号与格子宽度同尺度，可精确计算。
+         * 为什么不用 sp：sp 会被系统字体缩放（fontScale）放大，而格子宽度是按 dp 死的，
+         * 大字体下两位数会折行（个位被裁）、行数会溢出。dp 与格子同尺度，可精确计算。
          *
-         * 横向：7 列等宽，两位数占 2×0.56em（Roboto 数字字宽），两侧留 4% 余量；
-         * 纵向：6 周 × 行高 + 标题 + 表头 + 两处行距（行高按 1.18em 估）。
-         * 取两者较小值；上限 10dp（高度放不下更大的）、下限 6.5dp（再小看不清）。
+         * 高度按比例分配，而不是让标题/表头跟着日期字号浮动——后者在「宽而矮」的
+         * 3x2 里会让标题挤掉日期行的空间、最后一行被裁：
+         * - 标题 ≈ 14%、表头 ≈ 10%（各自夹在上下限内，大部件里标题自然放大填充空白，
+         *   小部件里缩到下限），余下全部给日期行；
+         * - 再压 6% 余量：启动器上报的 min 尺寸可能大于实际可视区（cell 间距、圆角内缩
+         *   都算进去了），宁可整体小一档，也不能让最后一行看不见；
+         * - 宽度上限保证两位数不折行（横向才是真正的硬约束）。
+         * 字号下限 6.5dp（再小看不清）、上限 40dp。
          */
-        private fun measureCompact(minWidth: Int, minHeight: Int): Texts {
-            val w = (if (minWidth > 0) minWidth else 110) - 2 * PAD_H_COMPACT
-            val h = (if (minHeight > 0) minHeight else 110) - 2 * PAD_V_COMPACT
-            val cellW = w.coerceAtLeast(42) / 7.0
-            val byWidth = cellW / (2 * 0.56 * 1.04)
-            val byHeight = (h.coerceAtLeast(60) - 9.0 - 10.0 - 4.0) / 6.0 / 1.18
-            val day = minOf(byWidth, byHeight, 10.0).coerceAtLeast(6.5)
+        private fun measureTexts(minWidth: Int, minHeight: Int, weekRows: Int, padH: Int, padV: Int): Texts {
+            val wAvail = ((if (minWidth > 0) minWidth else 110) - 2 * padH).coerceAtLeast(42).toDouble()
+            val hRaw = ((if (minHeight > 0) minHeight else 110) - 2 * padV).coerceAtLeast(40).toDouble()
+            val hAvail = (hRaw - maxOf(3.5, hRaw * 0.06)).coerceAtLeast(30.0)
+
+            val dayByWidth = wAvail / 7.0 / (TWO_DIGIT_EM * 1.05)
+            val titleH = (hAvail * 0.14).coerceIn(11.0, 22.0)
+            val headerH = (hAvail * 0.10).coerceIn(9.0, 14.0)
+            val rowsH = (hAvail - titleH - headerH - GAP).coerceAtLeast(0.0)
+            val day = minOf(dayByWidth, rowsH / (weekRows * DAY_LINE_H)).coerceIn(MIN_DAY, MAX_DAY)
             return Texts(
-                title = minOf(day + 2.0, 11.5).toFloat(),
-                header = minOf(day, 8.5).toFloat(),
+                title = (titleH / LINE_H).toFloat(),
+                header = (headerH / LINE_H).toFloat(),
                 day = day.toFloat(),
             )
         }
@@ -126,24 +150,43 @@ class CalendarWidgetProvider : AppWidgetProvider() {
         private fun buildViews(context: Context, opts: Bundle): RemoteViews {
             val minWidth = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
             val minHeight = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
-            // 尺寸为 0 表示尚未拿到实际尺寸（初次放置前的占位），按标准档渲染
-            val compact = (minWidth in 1 until COMPACT_MAX_DP) || (minHeight in 1 until COMPACT_MAX_DP)
+            // 档位判断：任一方向 < COMPACT_MAX_DP（2x2 级别）走紧凑档；尺寸未知
+            // （澎湃OS/MIUI 可能不上报，恒为 0）时按 2x2 兜底走紧凑档。
+            // 档位只影响内边距、标题文案与高亮形状——字号不分档，一律按实际
+            // 尺寸以 dp 反推并撑满，误判档位也不会溢出。
+            val compact = (minWidth in 1 until COMPACT_MAX_DP) ||
+                (minHeight in 1 until COMPACT_MAX_DP) ||
+                (minWidth <= 0 && minHeight <= 0)
 
             val views = RemoteViews(context.packageName, R.layout.widget_calendar)
             views.setOnClickPendingIntent(R.id.widget_calendar_root, openAppIntent(context))
 
             // 内边距：RemoteViews 覆盖不了 layout 里的 padding，只能代码设
-            val padH = dp(context, if (compact) PAD_H_COMPACT else 10)
-            val padV = dp(context, if (compact) PAD_V_COMPACT else 8)
-            views.setViewPadding(R.id.widget_calendar_root, padH, padV, padH, padV)
-
-            // 紧凑档字号走 dp（不受 fontScale 放大），标准档走 sp
-            val texts = if (compact) measureCompact(minWidth, minHeight) else STANDARD_TEXTS
-            val unit = if (compact) TypedValue.COMPLEX_UNIT_DIP else TypedValue.COMPLEX_UNIT_SP
+            val padH = if (compact) PAD_H_COMPACT else PAD_H_STD
+            val padV = if (compact) PAD_V_COMPACT else PAD_V_STD
+            views.setViewPadding(
+                R.id.widget_calendar_root,
+                dp(context, padH), dp(context, padV), dp(context, padH), dp(context, padV)
+            )
 
             val now = Calendar.getInstance()
+
+            // 先算当月网格结构（周数随月份 4-6 行浮动），字号才能精确撑满高度
+            val cal = now.clone() as Calendar
+            cal.set(Calendar.DAY_OF_MONTH, 1)
+            val firstDow = cal.get(Calendar.DAY_OF_WEEK)              // 本月 1 号是周几
+            val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+            // 周起始日跟随系统设置（Calendar.SUNDAY=1..SATURDAY=7）
+            val weekStart = Calendar.getInstance(Locale.getDefault()).firstDayOfWeek
+            val leadingBlanks = (firstDow - weekStart + 7) % 7
+            val weekRows = (leadingBlanks + daysInMonth + 6) / 7
+
+            // 字号按实际尺寸反推（dp，不受 fontScale 放大），按当月实际周数撑满高度
+            val texts = measureTexts(minWidth, minHeight, weekRows, padH, padV)
+            val unit = TypedValue.COMPLEX_UNIT_DIP
+
             if (compact) {
-                // 2x2 里「2026年9月」一行太占高度，缩成「9月」并把字降一档
+                // 2x2 里「2026年9月」太长，缩成「9月」
                 views.setTextViewText(
                     R.id.tv_cal_title,
                     context.getString(R.string.widget_calendar_title_short, now.get(Calendar.MONTH) + 1)
@@ -159,23 +202,14 @@ class CalendarWidgetProvider : AppWidgetProvider() {
             }
             views.setTextViewTextSize(R.id.tv_cal_title, unit, texts.title)
 
-            val cal = now.clone() as Calendar
-            cal.set(Calendar.DAY_OF_MONTH, 1)
-            val firstDow = cal.get(Calendar.DAY_OF_WEEK)              // 本月 1 号是周几
-            val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
-            // 周起始日跟随系统设置（Calendar.SUNDAY=1..SATURDAY=7）
-            val weekStart = Calendar.getInstance(Locale.getDefault()).firstDayOfWeek
-            val leadingBlanks = (firstDow - weekStart + 7) % 7
-
             val primary = ContextCompat.getColor(context, R.color.widget_text_primary)
             val dim = ContextCompat.getColor(context, R.color.widget_dim_text)
             val onAccent = ContextCompat.getColor(context, R.color.widget_text_on_accent)
             val secondary = ContextCompat.getColor(context, R.color.widget_text_secondary)
 
-            val headerRes = if (compact) R.layout.widget_calendar_row_header_compact
-            else R.layout.widget_calendar_row_header
-            val rowRes = if (compact) R.layout.widget_calendar_row_compact
-            else R.layout.widget_calendar_row
+            // 行布局：日期行 weight=1（等分网格高度），表头行 wrap_content
+            val headerRes = R.layout.widget_calendar_row_header
+            val rowRes = R.layout.widget_calendar_row
             val daySize = texts.day
             val headSize = texts.header
             // 紧凑档格子是扁的，oval 会被拉成椭圆，换成小圆角方块
