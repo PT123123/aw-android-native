@@ -150,11 +150,15 @@ class ScreenTimeWidgetProvider : AppWidgetProvider() {
             return views
         }
 
+        /** 本小部件专用的 PendingIntent 请求码（与日历、待办通知区分开） */
+        private const val REQ_OPEN = 1001
+
         private fun openAppIntent(context: Context): PendingIntent =
             PendingIntent.getActivity(
                 context,
-                0,
+                REQ_OPEN,
                 Intent(context, MainActivity::class.java)
+                    .setAction(WidgetUpdater.ACTION_OPEN_SCREEN_TIME)
                     .putExtra(WidgetUpdater.EXTRA_OPEN_TARGET, WidgetUpdater.OPEN_ACTIVITY_OVERVIEW),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )

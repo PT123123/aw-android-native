@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 日历小部件「今天」的高亮底（紧凑档专用）。
+     标准档格子接近正方形，用 oval 是正圆；紧凑档格子扁（约 14x11.6dp），
+     oval 会被拉成扁椭圆，改用小圆角方块看着才正常。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="3dp" />
+    <solid android:color="@color/widget_accent" />
+</shape>

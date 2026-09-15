@@ -20,6 +20,13 @@ private const val REMINDER_CHANNEL = "todo_reminder"
 /** 私有广播 action：闹钟触发 */
 private const val ACTION_FIRE = "net.activitywatch.android.todo.ACTION_FIRE_REMINDER"
 
+/**
+ * 到期通知点击「打开主界面」的 action。
+ * 必须是独立的 action：无 action 的 Intent(context, MainActivity) 会被系统判定为
+ * 与桌面小部件那条 PendingIntent 记录相同（filterEquals 不看 extras），二者互相覆盖。
+ */
+private const val ACTION_OPEN_FROM_REMINDER = "net.activitywatch.android.todo.ACTION_OPEN_FROM_REMINDER"
+
 /** 登记表 prefs：task_<id> → "<dueDate>|<title>"，开机/时间变更后据此重挂闹钟 */
 private const val PREFS = "todo_reminder_prefs"
 
@@ -179,9 +186,13 @@ class TodoReminderReceiver : BroadcastReceiver() {
             context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
         if (granted) {
+            // ⚠️ action 不能省：没有 action 时本 Intent 与桌面小部件的「打开主界面」Intent
+            // 在 filterEquals() 下完全等价（同 requestCode 即同一条 PendingIntent 记录），
+            // 双方都用 FLAG_UPDATE_CURRENT 会互相覆盖 extras，导致点小部件跳错页面。
             val contentPi = PendingIntent.getActivity(
-                context, 0,
+                context, 2001,
                 Intent(context, MainActivity::class.java).apply {
+                    setAction(ACTION_OPEN_FROM_REMINDER)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,

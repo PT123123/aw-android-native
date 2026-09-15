@@ -110,9 +110,11 @@
         </receiver>
 
         <!-- 桌面小部件：今日屏幕使用时间（数据源为系统 UsageStatsManager，
-             不依赖应用内 Rust 服务器；APPWIDGET_UPDATE 由系统/桌面发出，exported=false 即可） -->
+             不依赖应用内 Rust 服务器；APPWIDGET_UPDATE 由系统/桌面发出，exported=false 即可）。
+             label 必填：缺省会回落成应用名，两个小部件在启动器的选择列表里同名无法区分 -->
         <receiver
                 android:name=".widget.ScreenTimeWidgetProvider"
+                android:label="@string/widget_screen_time_label"
                 android:enabled="true"
                 android:exported="false">
             <intent-filter>
@@ -126,6 +128,7 @@
         <!-- 桌面小部件：日历（月历，高亮今天） -->
         <receiver
                 android:name=".widget.CalendarWidgetProvider"
+                android:label="@string/widget_calendar_label"
                 android:enabled="true"
                 android:exported="false">
             <intent-filter>
