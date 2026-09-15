@@ -1,8 +1,8 @@
-# aw-android —— 用 just 驱动构建与安装
+# aw-android —— 用 just + PowerShell 驱动构建与安装
 #
 # 常用命令：
 #   just                列出全部命令
-#   just build          编译 debug APK（自动 patch +1；复用 jniLibs 里已编好的 libaw_server.so，跳过 Rust 重编）
+#   just build          编译 debug APK（自动 patch +1；复用已编好的 libaw_server.so，跳过 Rust 重编）
 #   just install        adb 安装 debug APK（默认装手机，按型号自动识别）
 #   just install phone  指定装到手机
 #   just install tab    指定装到平板
@@ -10,62 +10,70 @@
 #   just run            编译 + 安装 + 启动
 #   just kotlinc        只快速校验 Kotlin/资源改动（不重建 .so、离线）
 #   just build-release  编 release APK（自动 versionName/versionCode +1）
-#   just sign-release   用 android.jks 签名（需先准备 keystore 与 JKS_* 环境变量）
 #   just install-release adb 安装已签名的 release APK
 #
 # 说明：
-#   - 本机用 Gradle 8.1 二进制（非 gradlew，因 Git Bash 下 gradlew 会 ClassNotFound），JDK 17。
-#   - preBuild 依赖 cargoBuild（Rust 重编），耗时且非交互 shell 里易卡 openssl-sys；
-#     因此 build/install/run 统一 `-x cargoBuild`，复用 jniLibs 下已有的 .so。
-#     若要真正重编 Rust 库，请先 `make -C aw-server-rust android` 或单独跑 cargoBuild。
+#   - Windows 上配方统一用 pwsh（PowerShell 7）执行，辅助脚本为 scripts/*.ps1；
+#     旧 scripts/*.sh 保留（Gradle 的 buildApk/buildBundle/bumpVersion 任务与 Linux CI 仍引用）。
+#   - 正式签名流程见 scripts/sign_apk.sh（原 sign-release 配方本就不可用，已移除）。
+#   - preBuild 依赖 cargoBuild（Rust 重编），耗时；因此 build/install/run 统一 -x cargoBuild，
+#     复用 mobile/build/rustJniLibs 下已有的 .so。重编 Rust：gradle :mobile:cargoBuildArm64。
+
+set windows-shell := ["pwsh.exe", "-NoLogo", "-NoProfile", "-Command"]
 
 # ---- 工具链路径（按需修改）----
-# 以下三个导出给 gradle / adb / sign_apk.sh 使用
-export JAVA_HOME   := "/c/Users/ted/Tools/jdk-17/zulu17.68.203-ca-jdk17.0.20.1-win_x64"
-export ANDROID_HOME := "/c/Users/ted/AppData/Local/Android/Sdk"
+export JAVA_HOME    := "C:/Users/ted/Tools/jdk-17/zulu17.68.203-ca-jdk17.0.20.1-win_x64"
+export ANDROID_HOME := "C:/Users/ted/AppData/Local/Android/Sdk"
 # Gradle JVM 走本机 HTTP 代理（大文件会被代理掐断，但 Gradle 依赖体积极小，正常）
-export GRADLE_OPTS := "-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=10809 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=10809"
+export GRADLE_OPTS  := "-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=10809 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=10809"
 
-GRADLE      := "/c/Users/ted/.gradle/wrapper/dists/gradle-8.1-bin/2eyty4r6kz6fpakefpk52nbbm/gradle-8.1/bin/gradle"
-export ADB        := "/c/Users/ted/AppData/Local/Android/Sdk/platform-tools/adb"
+GRADLE       := "C:/Users/ted/.gradle/wrapper/dists/gradle-8.1-bin/2eyty4r6kz6fpakefpk52nbbm/gradle-8.1/bin/gradle.bat"
+export ADB   := "C:/Users/ted/AppData/Local/Android/Sdk/platform-tools/adb.exe"
 
-DEBUG_APK   := "mobile/build/outputs/apk/debug/mobile-debug.apk"
+DEBUG_APK    := "mobile/build/outputs/apk/debug/mobile-debug.apk"
 UNSIGNED_APK := "mobile/build/outputs/apk/release/mobile-release-unsigned.apk"
-RELEASE_APK := "mobile/build/outputs/apk/release/mobile-release.apk"
+RELEASE_APK  := "mobile/build/outputs/apk/release/mobile-release.apk"
+# 目标设备不在线时的等待秒数（HyperOS 息屏 / USB 挂起会让 adb 短暂返回空列表）
+ADB_WAIT_DEV := env_var_or_default("ADB_WAIT_DEV", "10")
 
 # 默认：列出命令
 default:
     @just --list
 
-# 编译 debug APK（先 +1 patch 号；如果 .so 缺失则先编 Rust，否则跳过 Rust 重编）
 # 每次 build 都递增 versionName 的 patch 与 versionCode，这样「手机上是哪一版」一眼可查。
+# 编译 debug APK（先 +1 patch 号；.so 缺失时先编 Rust）
 build:
-    bash scripts/bump_version.sh
-    @if [ ! -f mobile/build/rustJniLibs/android/arm64-v8a/libaw_server.so ]; then \
-        echo "==> .so 缺失，先编 Rust..."; \
+    @pwsh -NoLogo -NoProfile -File scripts/bump_version.ps1; exit $LASTEXITCODE
+    @if (-not (Test-Path "mobile/build/rustJniLibs/android/arm64-v8a/libaw_server.so")) { \
+        Write-Host "==> .so 缺失，先编 Rust..."; \
         {{GRADLE}} :mobile:cargoBuild; \
-    fi
+    }
     {{GRADLE}} :mobile:assembleDebug -x cargoBuild
 
+# 动态识别设备：型号含 pad/tablet 或 TB 开头视为平板，Justfile 不写死序列号。
+# 目标设备不在线时：adb 完全没设备就等 ADB_WAIT_DEV 秒；有别的设备在线则立刻放弃。
+# **绝不拿空 serial 去装**，否则 adb 会把 APK 装到另一台唯一在线的设备上。
 # adb 安装 debug APK（-r 覆盖安装；默认装手机，`just install phone|tab` 指定设备）
-# 动态识别设备：型号含 pad/tablet 或 TB 开头视为平板，Justfile 不写死序列号
-# 顶层不执行反引号，避免 parse 时脚本 exit 1 炸掉所有命令
-export PHONE_SERIAL := ""
-export TAB_SERIAL := ""
-
 install device="phone":
-    @case "{{device}}" in phone|tab) ;; *) echo "用法: just install [phone|tab]"; exit 1;; esac; \
-    serial=$(bash scripts/pick_device.sh {{device}}); \
-    test -n "$serial" || (echo "未检测到{{if device == "tab" { "平板" } else { "手机" } }}设备（按型号 pad/tablet/TB 识别平板），请确认已连接 adb"; exit 1); \
-    bash scripts/adb_install.sh "{{DEBUG_APK}}" "$serial"
+    @if (@("phone", "tab") -notcontains "{{device}}") { Write-Host "用法: just install [phone|tab]"; exit 1 }; \
+    $target = if ("{{device}}" -eq "tab") { "平板" } else { "手机" }; \
+    $serial = pwsh -NoLogo -NoProfile -File scripts/pick_device.ps1 -Kind "{{device}}" -WaitSecs {{ADB_WAIT_DEV}}; \
+    if (-not $serial) { \
+        Write-Host "==> 未检测到 $target 设备（判定规则：型号含 pad/tablet 或以 TB 开头算平板）。当前 adb 设备："; \
+        pwsh -NoLogo -NoProfile -File scripts/pick_device.ps1 -List; \
+        exit 1; \
+    }; \
+    pwsh -NoLogo -NoProfile -File scripts/adb_install.ps1 -Apk "{{DEBUG_APK}}" -Serial "$serial"; exit $LASTEXITCODE
 
 # 两台都装
 install-all: (install "phone") (install "tab")
 
-# 编译 + 安装 + 启动到红米手机
+# 依赖 build / install 均已中止式校验，这里再兜一次，避免 -s "" 落到别的设备上
+# 编译 + 安装 + 启动到手机
 run: build (install "phone")
-    @serial=$(bash scripts/pick_device.sh phone); \
-    {{ADB}} -s "$serial" shell am start -n net.activitywatch.android.debug/net.activitywatch.android.MainActivity
+    @$serial = pwsh -NoLogo -NoProfile -File scripts/pick_device.ps1 -Kind phone; \
+    if (-not $serial) { Write-Host "==> 未检测到手机设备"; pwsh -NoLogo -NoProfile -File scripts/pick_device.ps1 -List; exit 1 }; \
+    & "{{ADB}}" -s "$serial" shell am start -n net.activitywatch.android.debug/net.activitywatch.android.MainActivity; exit $LASTEXITCODE
 
 # 只快速校验 Kotlin/资源改动（不重建 .so、离线，依赖已缓存）
 kotlinc:
@@ -75,21 +83,13 @@ kotlinc:
 clean:
     {{GRADLE}} :mobile:clean
 
-# 编 release APK（versionName/versionCode 自动 +1）
 # 注：mobile/build.gradle 的 release buildType 复用了 debug 签名，
 # 所以 assembleRelease 直接产出「已签名」的 mobile-release.apk（非 -unsigned）。
+# 编 release APK（versionName/versionCode 自动 +1）
 build-release:
-    bash scripts/bump_version.sh
+    @pwsh -NoLogo -NoProfile -File scripts/bump_version.ps1; exit $LASTEXITCODE
     {{GRADLE}} :mobile:assembleRelease -x cargoBuild
-
-# 用 android.jks 正式签名
-# 注意：当前配方不可用。release 已挂 signingConfig signingConfigs.debug，
-# assembleRelease 不会产出 *-unsigned.apk，下面的 UNSIGNED_APK 指向的文件不存在。
-# 需要正式签名（可上架）时，先删掉 build.gradle 里的 signingConfig signingConfigs.debug。
-# 前置：项目根放解密后的 android.jks，并导出 JKS_STOREPASS / JKS_KEYPASS
-sign-release:
-    bash scripts/sign_apk.sh "{{UNSIGNED_APK}}" "{{RELEASE_APK}}"
 
 # 安装 release APK（原生 adb install -r 覆盖安装）
 install-release:
-    {{ADB}} install -r {{RELEASE_APK}}
+    & "{{ADB}}" install -r "{{RELEASE_APK}}"; exit $LASTEXITCODE
