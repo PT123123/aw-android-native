@@ -52,6 +52,9 @@ class TimelineFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         viewModel = ViewModelProvider(requireParentFragment())[DashboardViewModel::class.java]
 
+        // 时间范围 chips（页面内容内嵌，随 VM 状态跨 Tab 同步）
+        bindRangeChips(binding.chips.chipGroup, viewLifecycleOwner, viewModel)
+
         rowAdapter = TimelineRowAdapter()
         legendAdapter = LegendAdapter()
         binding.rvHours.adapter = rowAdapter
