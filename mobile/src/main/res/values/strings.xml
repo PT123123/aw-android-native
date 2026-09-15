@@ -34,7 +34,10 @@
     <string name="widget_screen_time_grant_hint">点击打开应用，授予「使用情况访问」权限</string>
     <string name="widget_updated_at">更新于 %1$s</string>
     <string name="widget_calendar_title">%1$d年%2$d月</string>
+    <!-- 2x2 紧凑档用短标题（去掉年份，省一行高度） -->
+    <string name="widget_calendar_title_short">%1$d月</string>
     <string name="widget_calendar_desc">月历视图，高亮今天</string>
+    <string name="widget_calendar_label">日历</string>
     <string name="widget_pin_screen_time_short">添加屏幕使用小部件</string>
     <string name="widget_pin_screen_time_long">把「今日屏幕使用」添加到桌面</string>
     <string name="widget_pin_calendar_short">添加日历小部件</string>

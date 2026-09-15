@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 日历日期行：7 列等宽，颜色/背景由代码设置 -->
+<!-- 日历日期行（紧凑档，2x2 级别）：与标准行同构，但去掉 minHeight、
+     收窄行距，让 6 周（42 格）能完整放进 110dp 高的区域。颜色/字号由代码设置。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -10,10 +11,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 
@@ -22,10 +23,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 
@@ -34,10 +35,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 
@@ -46,10 +47,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 
@@ -58,10 +59,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 
@@ -70,10 +71,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 
@@ -82,10 +83,10 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_margin="1dp"
+        android:layout_margin="0dp"
         android:gravity="center"
-        android:minHeight="22dp"
-        android:textSize="12sp"
+        android:minHeight="0dp"
+        android:textSize="9sp"
         android:maxLines="1"
         android:includeFontPadding="false" />
 </LinearLayout>
