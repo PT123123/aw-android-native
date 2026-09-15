@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 「日历」小部件：标题 + 表头行 + 日期网格（行由 CalendarWidgetProvider 程序化 addView） -->
+<!-- 「日历」小部件：标题 + 表头行 + 日期网格（行由 CalendarWidgetProvider 程序化 addView）。
+     日期网格 height=0dp + weight=1：它吃掉标题/表头之外的全部高度，
+     行再等分网格高度（见 widget_calendar_row.xml），这样既不会溢出被裁，
+     也不会在底部留白。padding 由代码按档位设置，这里只是预览兜底。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_calendar_root"
     android:layout_width="match_parent"
@@ -32,7 +35,8 @@
     <LinearLayout
         android:id="@+id/ll_cal_grid"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:layout_marginTop="1dp"
         android:orientation="vertical" />
 </LinearLayout>
