@@ -11,6 +11,7 @@ aw-android（增强版 / Native UI Fork）
 - 内置 **Inbox 快速笔记**，支持 Markdown、置顶、历史、回收站；
 - 新增 **标签 Day 时间线**、**多日统计**、**按天活动浏览**等原生页面；
 - 用原生 Kotlin 重写 **局域网同步（LAN Sync）**，移除了原先的 Flutter 依赖；
+- 新增两个**原生桌面小部件**（今日屏幕使用、日历），数据直读系统 UsageStats，支持快捷方式一键添加与尺寸自适应；
 - 集成 Firebase Analytics / Crashlytics，修复了 SQLite 崩溃与 JNI 内存安全问题；
 - 完善构建体系：以 **Gradle 为唯一顶层编排**（`rust-android-gradle` 插件编译 Rust 原生库），国内镜像加速、Android 15 的 16KB 页对齐，以及**原生 Windows 构建**支持；
 - **已移除内嵌 WebUI（aw-webui）**：不再通过 WebView 加载仪表盘，应用界面完全原生。
@@ -68,6 +69,22 @@ Inbox 是本分支的核心功能之一，背后由 [`aw-server-rust` 子模块]
 
 同步能力由子模块中的 `aw-sync-rust` 提供。
 
+### 桌面小部件（App Widgets）
+
+两个**纯原生**（`RemoteViews`）桌面小部件，数据直读系统 `UsageStatsManager`，**不依赖应用进程存活，也不依赖内嵌 Rust 服务器**——广播拉起进程后即可更新。
+
+| 小部件 | 内容 | 点击跳转 |
+| --- | --- | --- |
+| **今日屏幕使用** | 今日总使用时长 + 常用应用图例（配色圆点 + 应用名 · 时长）；未授予「使用情况访问」时显示授权引导 | 活动 · 概览 |
+| **日历** | 当月月历（周起始日跟随系统地区设置），今天用主题色高亮 | 活动 · 趋势 |
+
+- **一键添加**：长按应用图标弹出的快捷方式（`res/xml/shortcuts.xml`）里有「添加屏幕使用小部件 / 添加日历小部件」，点击后由 `AppWidgetManager.requestPinAppWidget` 拉起系统弹窗确认；桌面不支持钉住时退回引导提示。
+- **刷新时机**：系统按 `updatePeriodMillis`（30 分钟）广播 `APPWIDGET_UPDATE`，应用 `onResume` 时也会顺带刷新一次。UsageStats 查询是 binder 调用，统一丢到 `WidgetUpdater` 的单线程池执行，并配合 `goAsync()` 保证广播不被系统提前回收。
+- **尺寸自适应**（`onAppWidgetOptionsChanged` / `onUpdate` 均按当前实例尺寸重算，同一桌面可同时存在多个不同尺寸的实例）：
+  - **屏幕使用**：按上报尺寸分档——微缩档隐藏标题行、只留大字时长；紧凑/窄宽档不显示图例；宽幅档显示 top5、其余 top3，窄宽档隐藏「更新于」。字号不写死，交给 `TextView` 的 `autoSizeTextType` 按实际空间自动缩放。
+  - **日历**：档位只决定内边距、标题文案（「9月」/「2026年9月」）与今天的高亮形状；字号一律按实际尺寸以 **dp** 反推（`sp` 会被系统字体缩放放大，导致两位数折行）。高度按比例分配：标题约占 14%、星期表头约 10%、其余全部留给日期行，并额外压 6% 余量以抵消启动器上报尺寸与实际可视区的偏差；日期网格与日期行都用 `layout_weight` 等分实际高度，因此「宽而矮」的 3×2 也不会裁掉最后一行，也不会在底部留白。
+- **跳转正确性**：每个「打开主界面」的 `PendingIntent` 都必须带各自唯一的 `action`——系统判定两条 PendingIntent 是否相同只比对 `requestCode` + `Intent.filterEquals()`（action / data / type / component / categories），**完全不看 extras**；否则多个小部件/通知会互相覆盖 `open_target`，点击后落到默认页面。
+
 ---
 
 ## 架构
@@ -75,6 +92,7 @@ Inbox 是本分支的核心功能之一，背后由 [`aw-server-rust` 子模块]
 - **内嵌服务器**：应用通过 JNI 启动 [`aw-server-rust`](https://github.com/PT123123/aw-server-rust)（本仓库的 `aw-server-rust` 子模块，亦为定制分支），监听 `127.0.0.1:5600`。`RustInterface` 负责启动与生命周期管理。
 - **数据采集**：`UsageStatsWatcher`（基于 UsageStats）与 `ChromeWatcher` 采集应用 / 浏览器使用数据并以心跳上报。
 - **原生页面数据流**：原生 Fragment 通过 `common/` 下的 API 客户端（`AwApiClient` 等）调用本地服务器；`inbox/` 使用独立的本地 API 与 Room 缓存。
+- **桌面小部件**：`widget/` 下两个 `AppWidgetProvider`（屏幕使用 / 日历）、统一刷新入口 `WidgetUpdater`，以及系统口径数据源 `ScreenTimeStats`（与仪表盘「概览」共用同一个 `queryUsageStats` 口径）；见[上文](#桌面小部件app-widgets)。
 - **子模块定制点**：`aw-server-rust` 分支集成了 `aw-inbox-rust`（Inbox 服务）、`aw-sync-rust`（局域网同步）、CORS 放开（便于局域网访问），并做了 JNI 内存安全、SQLite 崩溃修复、日志系统完善等加固。
 
 ---
