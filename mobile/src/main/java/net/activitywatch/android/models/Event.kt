@@ -13,10 +13,12 @@ data class Event(val timestamp: Instant, val duration: Double = 0.0, val data: J
         fun fromUsageEvent(usageEvent: UsageEvents.Event, context: Context, includeClassname: Boolean = true): Event {
             val timestamp = DateTimeUtils.toInstant(java.util.Date(usageEvent.timeStamp))
             val pm = context.packageManager
+            // 解析失败（双开/工作资料、卸载残留、ROM 系统包等）时用包名兜底，
+            // 不再写 "Unknown (包名)"；真实包名始终保留在 data.package 字段
             val appName = try {
                 pm.getApplicationLabel(pm.getApplicationInfo(usageEvent.packageName, PackageManager.GET_META_DATA or PackageManager.MATCH_UNINSTALLED_PACKAGES))
             } catch(e: PackageManager.NameNotFoundException) {
-                "Unknown (${usageEvent.packageName})"
+                usageEvent.packageName
             }
 
             // Construct the data object in an exception-safe manner
