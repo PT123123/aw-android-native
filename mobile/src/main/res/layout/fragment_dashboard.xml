@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  活动页宿主布局：时间范围选择 + Tab + ViewPager2。
+  活动页宿主布局：Tab + ViewPager2。
   三个 Tab（概览 / 时间线 / 趋势）共享宿主的 DashboardViewModel，
-  切换范围只拉取一次事件。下拉刷新放在各 Tab 自己的布局里，
-  避免和 ViewPager2 的横向滑动抢手势。
+  时间范围 chips 下放到各 Tab 内容里（碎片页按天翻天，不用范围选择）。
+  下拉刷新放在各 Tab 自己的布局里，避免和 ViewPager2 的横向滑动抢手势。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -21,59 +21,6 @@
         app:titleTextColor="@color/aw_text_primary"
         app:navigationIcon="@drawable/ic_menu"
         app:navigationIconTint="@color/aw_text_primary" />
-
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:scrollbars="none"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:paddingTop="10dp">
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/chip_group"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:singleLine="true"
-            app:singleSelection="true"
-            app:selectionRequired="true">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_today"
-                style="@style/AwChipChoice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="今天"/>
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_yesterday"
-                style="@style/AwChipChoice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="昨天"/>
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_last7"
-                style="@style/AwChipChoice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="近 7 天"/>
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_last30"
-                style="@style/AwChipChoice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="近 30 天"/>
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_all"
-                style="@style/AwChipChoice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="全部"/>
-        </com.google.android.material.chip.ChipGroup>
-    </HorizontalScrollView>
 
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tab_layout"

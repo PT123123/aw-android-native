@@ -1,8 +1,10 @@
 package net.activitywatch.android.dashboard
 
+import android.app.Application
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import net.activitywatch.android.widget.ScreenTimeStats
+import net.activitywatch.android.watcher.UsageStatsWatcher
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -75,6 +79,8 @@ data class DashboardState(
     val windowStartMs: Long? = null,
     val windowEndMs: Long? = null,
     val totalTrackedSec: Double = 0.0,
+    /** 聚合（系统口径）总屏幕时长（秒）。null = 未授予「使用情况访问」权限或查询失败 */
+    val sysTotalSec: Double? = null,
     val activeSec: Double? = null,
     val afkSec: Double? = null,
     val apps: List<RankItem> = emptyList(),
@@ -102,7 +108,8 @@ enum class TimeRange(val label: String) {
  * 概览 / 时间线 / 趋势 三个子 Fragment 通过 parentFragment 取到同一实例，
  * 因此切换时间范围只拉取一次事件，三个视图同时刷新。
  */
-class DashboardViewModel : ViewModel() {
+class DashboardViewModel(app: Application) : AndroidViewModel(app) {
+    private val appContext = app.applicationContext
     private val _state = MutableStateFlow(DashboardState())
     val state: StateFlow<DashboardState> = _state.asStateFlow()
 
@@ -137,16 +144,26 @@ class DashboardViewModel : ViewModel() {
                 val afkEvents = afkBuckets.flatMap { safeFetch(it.id, startIso, endIso, limit) }
                 val stopEvents = stopBuckets.flatMap { safeFetch(it.id, startIso, endIso, limit) }
 
-                // 颜色按「全区间总时长」的排名分配，保证跨 Tab 同色；秒表标签也参与排名
+                // 聚合（系统口径）数据：直读 UsageStatsManager，不受采集进程存活影响
+                val sysPermitted = UsageStatsWatcher.isUsageAllowed(appContext)
+                val sysDaily = if (sysPermitted) querySysUsage(range) else emptyList()
+                val sysPerPkgSec = sysPerLabelSec(sysDaily, appContext.packageManager)
+                val sysTotalSec: Double? = if (sysPermitted) sysPerPkgSec.values.sum() else null
+
+                // 颜色按「全区间总时长」的排名分配，保证跨 Tab 同色；秒表标签也参与排名；
+                // 聚合榜单的标签一并参与，漏采-only 的应用也能拿到与时间线一致的颜色
                 val colors = buildColorIndex(
                     listOf(
-                        appEvents to ::activityLabel,
-                        webEvents to ::websiteLabel,
-                        stopEvents to ::stopwatchLabel,
+                        labelTotals(appEvents, ::activityLabel),
+                        labelTotals(webEvents, ::websiteLabel),
+                        labelTotals(stopEvents, ::stopwatchLabel),
+                        sysPerPkgSec,
                     )
                 )
 
-                val apps = rank(appEvents, ::activityLabel, colors).take(10)
+                // 概览/趋势的 App 榜单：聚合（系统口径）优先，未授权/无数据时回退事件流榜单
+                val apps = buildSysRank(sysPerPkgSec, colors)
+                    .ifEmpty { rank(appEvents, ::activityLabel, colors).take(10) }
                 val websites = rank(webEvents, ::websiteLabel, colors).take(10)
 
                 val (activeSec, afkSec) = aggregateAfk(afkEvents)
@@ -158,7 +175,7 @@ class DashboardViewModel : ViewModel() {
                     if (appEvents.isNotEmpty()) ::activityLabel else ::websiteLabel
 
                 val hours = buildHours(timelineSrc, timelineLabel, colors)
-                val trendDays = buildTrendDays(timelineSrc, timelineLabel, afkEvents, colors)
+                val trendDays = buildTrendDays(sysDaily, timelineSrc, timelineLabel, afkEvents, colors, appContext.packageManager)
 
                 // 分桶时间线：每个桶各自一条泳道；合并时按优先级（应用>网页>离开>秒表）解决重叠
                 val afkColors = mapOf(
@@ -188,6 +205,7 @@ class DashboardViewModel : ViewModel() {
                     it.copy(
                         loading = false,
                         totalTrackedSec = totalTracked,
+                        sysTotalSec = sysTotalSec,
                         activeSec = activeSec,
                         afkSec = afkSec,
                         apps = apps,
@@ -245,21 +263,78 @@ class DashboardViewModel : ViewModel() {
         }
     }
 
-    /** 时长前 RANKED 名的标签各自拿一个颜色，其余统一灰色。 */
-    private fun buildColorIndex(
-        groups: List<Pair<List<EventDto>, (EventDto) -> String?>>,
-    ): Map<String, Int> {
+    /** 时长前 RANKED 名的标签各自拿一个颜色，其余统一灰色。输入为各数据源的 label→秒数聚合。 */
+    private fun buildColorIndex(groups: List<Map<String, Double>>): Map<String, Int> {
         val totals = LinkedHashMap<String, Double>()
-        for ((group, labelFn) in groups) {
-            for (e in group) {
-                val key = labelFn(e) ?: continue
-                totals[key] = (totals[key] ?: 0.0) + e.duration
+        for (group in groups) {
+            for ((key, sec) in group) {
+                totals[key] = (totals[key] ?: 0.0) + sec
             }
         }
         return totals.entries.sortedByDescending { it.value }
             .take(ActivityPalette.RANKED)
             .mapIndexed { index, entry -> entry.key to index }
             .toMap()
+    }
+
+    /** 事件流按 label 聚合出秒数表（颜色排名用）。 */
+    private fun labelTotals(events: List<EventDto>, label: (EventDto) -> String?): Map<String, Double> {
+        val map = LinkedHashMap<String, Double>()
+        for (e in events) {
+            val key = label(e) ?: continue
+            map[key] = (map[key] ?: 0.0) + e.duration
+        }
+        return map
+    }
+
+    // ---------- 聚合（系统口径） ----------
+
+    /**
+     * 当前范围的聚合按天数据：直读 UsageStatsManager 的 totalTimeInForeground。
+     * 未授权/异常返回空列表，调用方回退事件流口径。
+     */
+    private fun querySysUsage(range: TimeRange): List<ScreenTimeStats.DailyUsage> {
+        return try {
+            val (startMs, endMs) = rangeWindowMs(range)
+            val daily = ScreenTimeStats.queryDailyUsage(appContext, startMs, endMs)
+            // TODAY/YESTERDAY 只取对应自然日；LAST7/LAST30 取含今天的 N 个自然日；ALL 取全部日桶
+            val minDay = when (range) {
+                TimeRange.TODAY -> startOfDayMs(System.currentTimeMillis())
+                TimeRange.YESTERDAY -> startOfDayMs(System.currentTimeMillis()) - 24 * 3600_000L
+                TimeRange.LAST7 -> startOfDayMs(System.currentTimeMillis()) - 6 * 24 * 3600_000L
+                TimeRange.LAST30 -> startOfDayMs(System.currentTimeMillis()) - 29 * 24 * 3600_000L
+                TimeRange.ALL -> null
+            }
+            if (minDay == null) daily else daily.filter { it.dayStartMs >= minDay }
+        } catch (e: Exception) {
+            Log.w(TAG, "querySysUsage failed", e)
+            emptyList()
+        }
+    }
+
+    /** 聚合按天数据按应用名合并成 label→秒数表（包名先解析成应用名，同标签跨包合并）。 */
+    private fun sysPerLabelSec(
+        sysDaily: List<ScreenTimeStats.DailyUsage>,
+        pm: PackageManager,
+    ): LinkedHashMap<String, Double> {
+        val out = LinkedHashMap<String, Double>()
+        for (d in sysDaily) {
+            for ((pkg, ms) in d.perPkgMs) {
+                val label = ScreenTimeStats.resolveLabel(pm, pkg)
+                out[label] = (out[label] ?: 0.0) + ms / 1000.0
+            }
+        }
+        return out
+    }
+
+    /** 聚合口径的 App 榜单：按秒数降序取 Top 10，ratio 按最大值归一。 */
+    private fun buildSysRank(perLabelSec: Map<String, Double>, colors: Map<String, Int>): List<RankItem> {
+        if (perLabelSec.isEmpty()) return emptyList()
+        val sorted = perLabelSec.entries.sortedByDescending { it.value }
+        val max = sorted.first().value
+        return sorted.take(10).map { (label, sec) ->
+            RankItem(label, sec, (sec / max).toFloat().coerceIn(0f, 1f), colors[label] ?: ActivityPalette.OTHER)
+        }
     }
 
     private data class RawSegment(val start: Long, val end: Long, val label: String)
@@ -342,24 +417,40 @@ class DashboardViewModel : ViewModel() {
         }
     }
 
-    /** 按自然日分桶，同时把 AFK 事件的专注/闲置时长摊到每一天。 */
+    /**
+     * 按自然日出趋势数据：每日总量与 Top 应用用聚合（系统口径）数据，
+     * 未授权/无数据时回退事件流；专注/闲置（AFK）始终由事件流 AFK 事件摊到每天。
+     */
     private fun buildTrendDays(
+        sysDaily: List<ScreenTimeStats.DailyUsage>,
         events: List<EventDto>,
         label: (EventDto) -> String?,
         afkEvents: List<EventDto>,
         colors: Map<String, Int>,
+        pm: PackageManager,
         topN: Int = 3,
     ): List<TrendDay> {
         val totals = LinkedHashMap<Long, Double>()
         val perLabel = LinkedHashMap<Long, LinkedHashMap<String, Double>>()
-        for (e in events) {
-            val l = label(e) ?: continue
-            val start = parseIsoToMillis(e.timestamp) ?: continue
-            if (e.duration <= 0) continue
-            forEachDaySlot(start, e.duration) { dayStart, sec ->
-                totals[dayStart] = (totals[dayStart] ?: 0.0) + sec
-                val bucket = perLabel.getOrPut(dayStart) { LinkedHashMap() }
-                bucket[l] = (bucket[l] ?: 0.0) + sec
+        if (sysDaily.isNotEmpty()) {
+            for (d in sysDaily) {
+                val bucket = perLabel.getOrPut(d.dayStartMs) { LinkedHashMap() }
+                for ((pkg, ms) in d.perPkgMs) {
+                    val l = ScreenTimeStats.resolveLabel(pm, pkg)
+                    bucket[l] = (bucket[l] ?: 0.0) + ms / 1000.0
+                }
+                totals[d.dayStartMs] = bucket.values.sum()
+            }
+        } else {
+            for (e in events) {
+                val l = label(e) ?: continue
+                val start = parseIsoToMillis(e.timestamp) ?: continue
+                if (e.duration <= 0) continue
+                forEachDaySlot(start, e.duration) { dayStart, sec ->
+                    totals[dayStart] = (totals[dayStart] ?: 0.0) + sec
+                    val bucket = perLabel.getOrPut(dayStart) { LinkedHashMap() }
+                    bucket[l] = (bucket[l] ?: 0.0) + sec
+                }
             }
         }
 
@@ -535,8 +626,8 @@ class DashboardViewModel : ViewModel() {
                 val todayStart = startOfDayMs(now)
                 Pair(startOfDayMs(todayStart - 24 * 3600_000L), todayStart)
             }
-            TimeRange.LAST7 -> Pair(now - 7 * 24 * 3600_000L, now)
-            TimeRange.LAST30 -> Pair(now - 30L * 24 * 3600_000L, now)
+            // 与聚合口径一致：按自然日（含今天）的 N 天
+            TimeRange.LAST7, TimeRange.LAST30 -> rangeWindowMs(this)
             TimeRange.ALL -> {
                 val min = segments.minByOrNull { it.startMs }?.startMs
                 val max = segments.maxByOrNull { it.endMs }?.endMs
@@ -582,14 +673,8 @@ class DashboardViewModel : ViewModel() {
                 }
                 Pair(fmt.format(start.time), fmt.format(end.time))
             }
-            TimeRange.LAST7 -> {
-                val start = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, -7) }
-                Pair(fmt.format(start.time), endIso)
-            }
-            TimeRange.LAST30 -> {
-                val start = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, -30) }
-                Pair(fmt.format(start.time), endIso)
-            }
+            // 与聚合口径一致：按自然日（含今天）的 N 天
+            TimeRange.LAST7, TimeRange.LAST30 -> Pair(isoOf(rangeWindowMs(this).first), endIso)
             TimeRange.ALL -> Pair(null, null)
         }
     }
