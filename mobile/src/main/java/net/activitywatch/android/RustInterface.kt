@@ -163,7 +163,8 @@ class RustInterface constructor(context: Context? = null) {
         }
     }
 
-    fun createBucketHelper(bucket_id: String, type: String, hostname: String = "unknown", client: String = "aw-android") {
+    // hostname 传 "!local" 时服务端（JNI createBucket）会展开为本机名并写入 device_id，与 HTTP 建桶路径一致
+    fun createBucketHelper(bucket_id: String, type: String, hostname: String = "!local", client: String = "aw-android") {
         Log.d(TAG, "调用 createBucketHelper 方法，参数: bucket_id=$bucket_id, type=$type, hostname=$hostname, client=$client")
         if(bucket_id in getBucketsJSON().keys().asSequence()) {
             Log.i(TAG, "Bucket with ID '$bucket_id', already existed. Not creating.")
