@@ -18,6 +18,12 @@
             android:padding="12dp"
             android:paddingBottom="24dp">
 
+            <include
+                android:id="@+id/chips"
+                layout="@layout/view_range_chips"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
             <com.google.android.material.card.MaterialCardView
                 style="@style/AwCard"
                 android:layout_width="match_parent"

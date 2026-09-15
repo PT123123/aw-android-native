@@ -46,7 +46,9 @@ class DashboardFragment : Fragment() {
         ActivityApi.init()
         viewModel = ViewModelProvider(this)[DashboardViewModel::class.java]
 
-        setupChips()
+        // 时间范围 chips 已下放到概览/时间线/趋势各 Tab 内容里（bindRangeChips），
+        // 碎片页按天翻天，不参与范围选择
+
         setupTabs()
 
         // 由 ActivityHubFragment 内嵌打开时隐藏自带标题栏，标题栏与 Tab 由宿主提供
@@ -55,21 +57,6 @@ class DashboardFragment : Fragment() {
         binding.toolbar.setNavigationOnClickListener {
             requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
                 ?.openDrawer(GravityCompat.START)
-        }
-    }
-
-    private fun setupChips() {
-        binding.chipToday.isChecked = true
-        val map = mapOf(
-            binding.chipToday to TimeRange.TODAY,
-            binding.chipYesterday to TimeRange.YESTERDAY,
-            binding.chipLast7 to TimeRange.LAST7,
-            binding.chipLast30 to TimeRange.LAST30,
-            binding.chipAll to TimeRange.ALL,
-        )
-        binding.chipGroup.setOnCheckedChangeListener { _, checkedId ->
-            val range = map.entries.firstOrNull { it.key.id == checkedId }?.value ?: return@setOnCheckedChangeListener
-            viewModel.load(range)
         }
     }
 
