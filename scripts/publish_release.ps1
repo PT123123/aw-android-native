@@ -11,6 +11,17 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
+# ---- 目标仓库：必须显式 -R，不能让 gh 自己推断 ----
+# 本仓库有 origin(aw-android-native) 和 upstream(aw-android) 两个 remote。
+# gh 在 fork 工作流中优先选 upstream → 会把 release 发到错误的仓库，
+# 实测报 "HTTP 422: Validation Failed ... Release.target_commitish is invalid"
+# （upstream 的默认分支上没有本地这个提交）。
+$originUrl = (git config --get remote.origin.url).Trim()
+if ($originUrl -notmatch 'github\.com[:/]([^/]+)/(.+?)(\.git)?$') {
+    throw "无法从 origin 的 URL 解析出 owner/repo：$originUrl"
+}
+$repoSlug = "$($Matches[1])/$($Matches[2])"
+
 # ---- gh ----
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw "没找到 gh（GitHub CLI）。装一个，或用网页手动上传 dist/aw-android.apk" }
 & gh auth status *> $null
@@ -40,8 +51,8 @@ if ($head -ne $remote.Trim()) {
 # ---- tag 是否已存在 ----
 git rev-parse -q --verify "refs/tags/$tag" *> $null
 if ($LASTEXITCODE -eq 0) { throw "本地已有 tag $tag —— 版本号需要 +1（跑 just release）" }
-& gh release view $tag *> $null
-if ($LASTEXITCODE -eq 0) { throw "远端已有 release $tag" }
+& gh release view $tag -R $repoSlug *> $null
+if ($LASTEXITCODE -eq 0) { throw "远端已有 release $tag（$repoSlug）" }
 
 # ---- 说明 ----
 if (-not $Notes) {
@@ -51,7 +62,7 @@ aw-android $ver (versionCode $vcode)
 - 覆盖安装即可，数据保留（同签名、同包名）。
 - 需要 Android 7.0+（minSdk 24），内置 arm64-v8a / armeabi-v7a。
 - 如果装不上：先卸载手机里签名的旧版本/官方 ActivityWatch（包名不同则为其它冲突）。
-- 下载地址（永久直链）：https://github.com/PT123123/aw-android-native/releases/latest/download/aw-android.apk
+- 下载地址（永久直链）：https://github.com/$repoSlug/releases/latest/download/aw-android.apk
 "@
 }
 New-Item -ItemType Directory -Force -Path "dist" | Out-Null
@@ -63,10 +74,10 @@ $assets = @("dist/aw-android.apk")
 $archived = "dist/aw-android-$ver.apk"
 if (Test-Path $archived) { $assets += $archived }
 
-& gh release create $tag @assets --title $tag --notes-file $notesFile --target $head
+& gh release create $tag @assets -R $repoSlug --title $tag --notes-file $notesFile --target $head
 if ($LASTEXITCODE -ne 0) { throw "gh release create 失败" }
 
 Write-Host ""
-Write-Host "已发布 $tag"
-Write-Host "  给朋友的直链: https://github.com/PT123123/aw-android-native/releases/latest/download/aw-android.apk"
-Write-Host "  想改说明:     gh release edit $tag --notes-file $notesFile"
+Write-Host "已发布 $tag  ($repoSlug)"
+Write-Host "  给朋友的直链: https://github.com/$repoSlug/releases/latest/download/aw-android.apk"
+Write-Host "  想改说明:     gh release edit $tag -R $repoSlug --notes-file $notesFile"
