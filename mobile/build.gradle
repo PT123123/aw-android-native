@@ -2,6 +2,22 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
 
+// ======================
+// release 签名材料：仓库根 keystore.properties（不入 git，见 .gitignore）
+//   storeFile / storePassword / keyAlias / keyPassword
+// 文件缺失时（裸 clone、别人拿去构建）不配 release 签名 —— assembleRelease 出未签名包，
+// 但 assembleDebug / 单测 / cargoBuild 完全不受影响。
+// 刻意**不**回退到 debug 签名：那种包能直装、看着正常，但换台机器/清掉 ~/.android/ 就换了 key，
+// 已安装的人只能卸载重装（数据全丢），是踩过的坑。
+// ======================
+def keystorePropFile = rootProject.file('keystore.properties')
+def hasReleaseSigning = keystorePropFile.exists()
+def releaseSigningProps = new Properties()
+if (hasReleaseSigning) {
+    keystorePropFile.withInputStream { releaseSigningProps.load(it) }
+} else {
+    logger.warn("[aw] 未找到 ${keystorePropFile}：release 包将不签名（不影响 debug 构建与单测）")
+}
 
 android {
     // 与最新平台 API 保持对齐（AGP 8.1.1 最高支持 compileSdk 34，故用 34）
@@ -12,17 +28,22 @@ android {
         baseline = file("lint-baseline.xml") // 添加这一行
     }
     defaultConfig {
-        applicationId "net.activitywatch.android"
+        // 自己的包名（上游是 net.activitywatch.android）：避免与官方 ActivityWatch 签名冲突
+        // —— 同包名不同签名 = 装不上；改掉后可与官方版共存。
+        // 只改 applicationId，**不动 namespace / Kotlin 包名**，
+        // 否则 JNI 符号 Java_net_activitywatch_android_RustInterface_* 全部失配。
+        // res/xml/shortcuts.xml 的 targetPackage 用 ${applicationId} 占位符自动跟随。
+        applicationId "dev.pt123123.awandroid"
         minSdkVersion 24
         targetSdkVersion 34
 
         // Set in CI on tagged commit
         // FIXME: should be set before tagging, so that F-droid picks it up correctly
         //        https://gitlab.com/fdroid/fdroiddata/-/merge_requests/11786?commit_id=d2cedcbe3d26db59378d582a8cf952af16b6407f#note_1966750559
-        versionName "0.13.25"
+        versionName "0.13.26"
 
         // Set in CI by `bundle exec fastlane update_version`
-        versionCode 60
+        versionCode 61
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // NOTE: This only works for API level 28 and above
@@ -36,13 +57,25 @@ android {
             abiFilters "armeabi-v7a", "arm64-v8a" // 按需选择架构
         }
     }
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile rootProject.file(releaseSigningProps['storeFile'])
+                storePassword releaseSigningProps['storePassword']
+                keyAlias releaseSigningProps['keyAlias']
+                keyPassword releaseSigningProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            // 复用 debug 签名（~/.android/debug.keystore），无需额外管理 keystore，
-            // 使 Release 包可直接安装到设备
-            signingConfig signingConfigs.debug
+            // 正式签名（aw-release.p12，见 keystore.properties）。
+            // 本地出的包和将来 CI/换机出的包签名一致 → 已安装的人可以直接覆盖升级。
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             ndk {
                 debugSymbolLevel 'SYMBOL_TABLE'
             }

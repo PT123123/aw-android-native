@@ -11,7 +11,7 @@
         android:shortcutLongLabel="@string/widget_pin_screen_time_long">
         <intent
             android:action="net.activitywatch.android.action.PIN_WIDGET"
-            android:targetPackage="net.activitywatch.android.debug"
+            android:targetPackage="dev.pt123123.awandroid.debug"
             android:targetClass="net.activitywatch.android.MainActivity">
             <extra
                 android:name="pin_widget"
@@ -27,7 +27,7 @@
         android:shortcutLongLabel="@string/widget_pin_calendar_long">
         <intent
             android:action="net.activitywatch.android.action.PIN_WIDGET"
-            android:targetPackage="net.activitywatch.android.debug"
+            android:targetPackage="dev.pt123123.awandroid.debug"
             android:targetClass="net.activitywatch.android.MainActivity">
             <extra
                 android:name="pin_widget"
@@ -43,7 +43,7 @@
         android:shortcutLongLabel="@string/widget_pin_fragments_long">
         <intent
             android:action="net.activitywatch.android.action.PIN_WIDGET"
-            android:targetPackage="net.activitywatch.android.debug"
+            android:targetPackage="dev.pt123123.awandroid.debug"
             android:targetClass="net.activitywatch.android.MainActivity">
             <extra
                 android:name="pin_widget"

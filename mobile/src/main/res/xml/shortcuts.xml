@@ -5,7 +5,13 @@
      无需去「桌面长按 → 小部件」选择器里翻找。
      注意：targetPackage 必须显式声明！缺省时系统存储的 shortcut intent 没有
      component，桌面启动时按 action 解析失败：MIUI 静默无反应、部分桌面报
-     「未安装此应用」。debug 构建由 src/debug/res 下的同名文件覆盖包名。 -->
+     「未安装此应用」。
+     targetPackage 必须写**实际包名（applicationId）**，且只能硬编码：
+     实测 res 下的 XML **不会**替换 ${applicationId}（只有 AndroidManifest.xml 会），
+     写了占位符会被原样打进包里 → 快捷方式全失效。所以 debug 的 .debug 后缀
+     靠 src/debug/res/xml/shortcuts.xml 覆盖版来实现（buildType sourceSet 优先级高于 main）。
+     改 applicationId 时这三处（main 3 个 + debug 3 个）要一起改。
+     targetClass 是 Kotlin 包名（namespace），与 applicationId 无关，保持不变。 -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
 
     <shortcut
@@ -16,7 +22,7 @@
         android:shortcutLongLabel="@string/widget_pin_screen_time_long">
         <intent
             android:action="net.activitywatch.android.action.PIN_WIDGET"
-            android:targetPackage="net.activitywatch.android"
+            android:targetPackage="dev.pt123123.awandroid"
             android:targetClass="net.activitywatch.android.MainActivity">
             <extra
                 android:name="pin_widget"
@@ -32,7 +38,7 @@
         android:shortcutLongLabel="@string/widget_pin_calendar_long">
         <intent
             android:action="net.activitywatch.android.action.PIN_WIDGET"
-            android:targetPackage="net.activitywatch.android"
+            android:targetPackage="dev.pt123123.awandroid"
             android:targetClass="net.activitywatch.android.MainActivity">
             <extra
                 android:name="pin_widget"
@@ -48,7 +54,7 @@
         android:shortcutLongLabel="@string/widget_pin_fragments_long">
         <intent
             android:action="net.activitywatch.android.action.PIN_WIDGET"
-            android:targetPackage="net.activitywatch.android"
+            android:targetPackage="dev.pt123123.awandroid"
             android:targetClass="net.activitywatch.android.MainActivity">
             <extra
                 android:name="pin_widget"

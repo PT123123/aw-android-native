@@ -15,7 +15,9 @@
 # 说明：
 #   - Windows 上配方统一用 pwsh（PowerShell 7）执行，辅助脚本为 scripts/*.ps1；
 #     旧 scripts/*.sh 保留（Gradle 的 buildApk/buildBundle/bumpVersion 任务与 Linux CI 仍引用）。
-#   - 正式签名流程见 scripts/sign_apk.sh（原 sign-release 配方本就不可用，已移除）。
+#   - 正式签名走 mobile/build.gradle 的 signingConfigs.release：材料是仓库根的
+#     keystore.properties + aw-release.p12（都不入 git；缺失时 release 包不签名、只出 -unsigned）。
+#     旧的 scripts/sign_apk.sh 是上游 Play 流程残留（依赖 age 解密的 android.jks），本项目已不用。
 #   - preBuild 依赖 cargoBuild（Rust 重编），耗时；因此 build/install/run 统一 -x cargoBuild，
 #     复用 mobile/build/rustJniLibs 下已有的 .so。重编 Rust：gradle :mobile:cargoBuildArm64。
 
@@ -31,8 +33,8 @@ GRADLE       := "C:/Users/ted/.gradle/wrapper/dists/gradle-8.1-bin/2eyty4r6kz6fp
 export ADB   := "C:/Users/ted/AppData/Local/Android/Sdk/platform-tools/adb.exe"
 
 DEBUG_APK    := "mobile/build/outputs/apk/debug/mobile-debug.apk"
-UNSIGNED_APK := "mobile/build/outputs/apk/release/mobile-release-unsigned.apk"
 RELEASE_APK  := "mobile/build/outputs/apk/release/mobile-release.apk"
+DIST_APK     := "dist/aw-android.apk"
 # 目标设备不在线时的等待秒数（HyperOS 息屏 / USB 挂起会让 adb 短暂返回空列表）
 ADB_WAIT_DEV := env_var_or_default("ADB_WAIT_DEV", "10")
 
@@ -83,12 +85,24 @@ kotlinc:
 clean:
     {{GRADLE}} :mobile:clean
 
-# 注：mobile/build.gradle 的 release buildType 复用了 debug 签名，
-# 所以 assembleRelease 直接产出「已签名」的 mobile-release.apk（非 -unsigned）。
+# 注：release 用 keystore.properties 里的 aw-release.p12 正式签名（signingConfigs.release），
+# 所以 assembleRelease 直接产出「已签名」的 mobile-release.apk；没配 keystore 时才是 -unsigned。
 # 编 release APK（versionName/versionCode 自动 +1）
 build-release:
     @pwsh -NoLogo -NoProfile -File scripts/bump_version.ps1; exit $LASTEXITCODE
     {{GRADLE}} :mobile:assembleRelease -x cargoBuild
+
+# 出一个「可发布」的包：版本 +1 → assembleRelease（正式签名）→ 整理成 dist/aw-android.apk（固定名）
+# → apksigner 自检（拒收 debug 证书）→ 打印给朋友的永久直链与发布命令。
+# 发布前记着把版本 bump 提交并 push（publish 会检查，不 push 会拒绝）。
+release:
+    @pwsh -NoLogo -NoProfile -File scripts/bump_version.ps1; exit $LASTEXITCODE
+    {{GRADLE}} :mobile:assembleRelease -x cargoBuild
+    @pwsh -NoLogo -NoProfile -File scripts/make_release.ps1; exit $LASTEXITCODE
+
+# 上传 dist/aw-android.apk 到 GitHub Release（自动打 tag v<versionName>；需 gh auth login + 已 push）
+publish:
+    @pwsh -NoLogo -NoProfile -File scripts/publish_release.ps1; exit $LASTEXITCODE
 
 # 安装 release APK（原生 adb install -r 覆盖安装）
 install-release:

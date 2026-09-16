@@ -16,7 +16,7 @@ aw-android（增强版 / Native UI Fork）
 - 完善构建体系：以 **Gradle 为唯一顶层编排**（`rust-android-gradle` 插件编译 Rust 原生库），国内镜像加速、Android 15 的 16KB 页对齐，以及**原生 Windows 构建**支持；
 - **已移除内嵌 WebUI（aw-webui）**：不再通过 WebView 加载仪表盘，应用界面完全原生。
 
-当前版本：`0.13.0`（versionCode 35）。
+当前版本：`0.13.26`（versionCode 61）。
 
 ---
 
@@ -136,7 +136,7 @@ Gradle 是唯一编排者：它通过 `rust-android-gradle` 插件交叉编译 R
 
 ```sh
 ./gradlew build                 # debug APK（等价于旧的 make build）
-./gradlew buildApk             # release APK  -> dist/aw-android.apk（设了 JKS_* 环境变量则自动签名）
+./gradlew buildApk             # release APK  -> dist/aw-android.apk（用 signingConfigs.release 正式签名；缺 keystore.properties 则输出未签名包）
 ./gradlew buildBundle          # release AAB  -> dist/aw-android.aab
 ./gradlew install              # 通过 adb 安装 debug APK
 ./gradlew :mobile:cargoBuild   # 仅编译 Rust .so
@@ -158,14 +158,26 @@ Windows 上的注意事项 / 常见坑：
 
 ### 发布
 
-制作发布版：打一个签名 tag 并推送到 GitHub：
+本项目**不使用 CI**：release 包在本机出，传到 GitHub Release，给朋友一个固定直链直接下载安装（侧载，不上架 Play）。
 
 ```sh
-git tag -s v0.1.0
-git push origin refs/tags/v0.1.0
+just release    # 版本 +1 → assembleRelease（正式签名）→ 整理 dist/aw-android.apk（固定名）+ 签名/包名自检
+git add -A && git commit -m "release: v0.13.26" && git push
+just publish    # gh release create v0.13.26，上传 dist/aw-android.apk（需先 gh auth login）
 ```
 
-这会触发 GitHub Actions 工作流：构建应用、上传到 GitHub Releases，并发布到 Play Store（含 `./fastlane/metadata/android` 中的元数据）。
+给朋友的永久下载直链（永远指向最新一版，所以资产名固定为 `aw-android.apk`）：
+
+```
+https://github.com/PT123123/aw-android-native/releases/latest/download/aw-android.apk
+```
+
+- 包名 `dev.pt123123.awandroid`（改自上游 `net.activitywatch.android`，避免与官方 ActivityWatch 同包名不同签名而装不上）；debug 变体带 `.debug` 后缀，可与 release 版共存。
+- 签名材料在仓库根：`keystore.properties` + `aw-release.p12`，**都不入 git**。缺失时 release 包退化为未签名（刻意不回退 debug 签名——debug key 换台机器就变，会让已安装的人无法覆盖升级）。
+- **keystore 丢了 = 所有已安装设备以后都无法覆盖升级**，只能卸载重装。备份见 `C:\Users\ted\Tools\keystores\aw-android-20260917\`。
+- 每次发版 `versionCode` 必须递增：覆盖安装时 Android 会拒装 versionCode 未增的包（`INSTALL_FAILED_VERSION_DOWNGRADE`），`just release` 已内置 +1。
+
+> 上游遗留、本项目不再使用：`.github/workflows/build.yml`（需 ubicloud runner + Play 密钥，已删除）、`scripts/sign_apk.sh`、`android.jks.age`、`fastlane/`（Play 流程）。
 
 ---
 

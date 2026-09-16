@@ -21,7 +21,8 @@ class BasicTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("net.activitywatch.android.debug", appContext.packageName)
+        // 断言当前构建的包名（debug 变体 = applicationId + ".debug"）
+        assertEquals(BuildConfig.APPLICATION_ID, appContext.packageName)
     }
 
     @Test
