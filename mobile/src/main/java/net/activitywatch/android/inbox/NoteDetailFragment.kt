@@ -33,6 +33,7 @@ import net.activitywatch.android.R
 import net.activitywatch.android.databinding.NoteDetailBinding
 import net.activitywatch.android.databinding.NoteHistoryItemBinding
 import net.activitywatch.android.todo.TodoApi
+import net.activitywatch.android.ui.GradientBackground
 
 /**
  * 笔记详情面板：展示元数据 + 嵌入式历史版本列表。
@@ -95,6 +96,9 @@ class NoteDetailFragment : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         LocalInboxApi.init(requireContext())
+
+        // 界面主题：铺渐变背景，工具栏透明以透出顶部渐变
+        GradientBackground.applyPage(requireContext(), binding.root, binding.toolbar)
 
         binding.toolbar.setNavigationOnClickListener { dismiss() }
         binding.btnClose.setOnClickListener { dismiss() }

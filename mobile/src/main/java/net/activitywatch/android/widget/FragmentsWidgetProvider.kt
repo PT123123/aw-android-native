@@ -34,8 +34,11 @@ import kotlin.math.min
  *
  * 尺寸档位（minWidth/minHeight 为 0 表示还没拿到尺寸，按标准档渲染）：
  * - 微缩（高度 <75dp）：隐藏标题行与统计行，只留点阵；
+ * - 窄宽（宽度 <150dp，即 2×2）：统计行整行放不下，一并收掉把高度让给点阵；
  * - 标准（高度 ≥115dp）：底部显示「起床 … · 入睡 …」；
  * - 窄宽度（<170dp）：隐藏右上角「更新于」。
+ *
+ * 最小尺寸 2×2（110×110dp）：24 列点阵在该宽度下每列约 3.7dp，是仍能分辨的下限。
  */
 class FragmentsWidgetProvider : AppWidgetProvider() {
 
@@ -73,6 +76,9 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
         private const val STATS_MIN_HEIGHT_DP = 115
         private const val HIDE_UPDATED_MAX_WIDTH_DP = 170
 
+        /** 2 格宽（<150dp）视为窄宽档：统计行放不下，收掉留给点阵 */
+        private const val NARROW_MAX_WIDTH_DP = 150
+
         /** 点阵位图上限：RemoteViews 走 Binder（单次事务约 1MB），不能按大部件的原始像素出图 */
         private const val MAX_BITMAP_W = 480
         private const val MAX_BITMAP_H = 260
@@ -98,8 +104,8 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
             val updatedText = context.getString(R.string.widget_updated_at, HM_FMT.format(Date()))
             val statsText = when {
                 !permitted -> context.getString(R.string.widget_fragments_grant_hint)
-                day == null || (day.wakeMs == null && day.sleepMs == null) ->
-                    context.getString(R.string.widget_fragments_no_record)
+                // 当天没有任何记录：不留占位文案，统计行整行收掉，把高度让给点阵
+                day == null || (day.wakeMs == null && day.sleepMs == null) -> ""
                 else -> context.getString(
                     R.string.widget_fragments_stats,
                     day.wakeMs?.let { HM_FMT.format(Date(it)) } ?: "—",
@@ -127,8 +133,10 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
             val minHeight = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
             val minWidth = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
             val micro = minHeight in 1 until MICRO_MAX_HEIGHT_DP
+            val narrow = minWidth in 1 until NARROW_MAX_WIDTH_DP
             val showHeader = !micro
-            val showStats = minHeight == 0 || minHeight >= STATS_MIN_HEIGHT_DP
+            val showStats = !narrow && statsText.isNotEmpty() &&
+                (minHeight == 0 || minHeight >= STATS_MIN_HEIGHT_DP)
 
             views.setViewVisibility(R.id.ll_frag_header, if (showHeader) View.VISIBLE else View.GONE)
             views.setViewVisibility(
@@ -136,6 +144,7 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
                 if (!micro && minWidth in 1 until HIDE_UPDATED_MAX_WIDTH_DP) View.GONE else View.VISIBLE
             )
             views.setViewVisibility(R.id.tv_frag_stats, if (showStats) View.VISIBLE else View.GONE)
+            views.setTextViewText(R.id.tv_frag_updated, updatedText)
             views.setTextViewText(R.id.tv_frag_stats, statsText)
 
             // 点阵位图按「部件实际 dp 尺寸 − 内边距/标题/统计行」推算像素尺寸
