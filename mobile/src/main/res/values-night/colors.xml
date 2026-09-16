@@ -10,6 +10,9 @@
     <color name="aw_bg">#0E1116</color>
     <color name="aw_surface">#171A21</color>
     <color name="aw_surface_2">#1F232B</color>
+    <!-- 玻璃面层：铺在渐变背景上的卡片 / 行，半透明才能透出底下的渐变主题 -->
+    <color name="aw_surface_glass">#15FFFFFF</color>
+    <color name="aw_border_glass">#1FFFFFFF</color>
     <color name="aw_border">#2A2F38</color>
     <color name="aw_text_primary">#E6E8EB</color>
     <color name="aw_text_secondary">#9AA0A6</color>

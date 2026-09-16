@@ -20,6 +20,7 @@ import net.activitywatch.android.R
 import net.activitywatch.android.databinding.TrashFragmentBinding
 import net.activitywatch.android.sync.SyncApiClient
 import net.activitywatch.android.sync.TrashEntry
+import net.activitywatch.android.ui.GradientBackground
 import android.text.TextUtils
 
 /**
@@ -56,6 +57,9 @@ class TrashFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         LocalInboxApi.init(requireContext())
+
+        // 界面主题：铺渐变背景，工具栏透明以透出顶部渐变
+        GradientBackground.applyPage(requireContext(), binding.root, binding.toolbar)
 
         binding.toolbar.title = "回收站"
         binding.toolbar.setNavigationOnClickListener {
