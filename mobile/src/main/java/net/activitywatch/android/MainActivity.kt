@@ -43,6 +43,7 @@ import net.activitywatch.android.sync.SyncSettingsFragment
 import net.activitywatch.android.sync.SyncDetailsFragment
 import net.activitywatch.android.sync.cloud.S3Fragment
 import net.activitywatch.android.todo.TodoFragment
+import net.activitywatch.android.ui.GradientBackground
 import net.activitywatch.android.watcher.UsageStatsWatcher
 import net.activitywatch.android.permissions.AppPermissionsFragment
 import net.activitywatch.android.widget.CalendarWidgetProvider
@@ -118,6 +119,15 @@ class MainActivity : AppCompatActivity() {
         binding.drawerLayout.edgeZoneRatio = InboxPrefs.drawerEdgeRatio(this)
     }
 
+    /**
+     * 抽屉（侧边栏）跟随界面主题：整块铺垂直渐变，头部（nav_header_main）已去掉自带背景，
+     * 渐变能一直透到顶。主题在笔记设置页随时可换，而抽屉是常驻视图不会重建，
+     * 所以在每次拉开前重算一遍。
+     */
+    private fun applyDrawerTheme() {
+        GradientBackground.applyPage(this, binding.navView)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.i(TAG, "启动 onCreate, starting onboarding activity")
@@ -143,6 +153,12 @@ class MainActivity : AppCompatActivity() {
 
         // 按设置应用抽屉的左滑热区宽度（0=关闭右滑开抽屉）
         applyDrawerEdgeZone()
+
+        // 抽屉（侧边栏）跟随界面主题；主题随时可换，所以每次拉开前都重算
+        applyDrawerTheme()
+        binding.drawerLayout.addDrawerListener(object : DrawerLayout.SimpleDrawerListener() {
+            override fun onDrawerOpened(drawerView: View) = applyDrawerTheme()
+        })
 
         // 设置心跳发送的闹钟
         val usw = UsageStatsWatcher(this)
