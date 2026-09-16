@@ -34,4 +34,20 @@
                 android:value="calendar" />
         </intent>
     </shortcut>
+
+    <shortcut
+        android:shortcutId="pin_fragments"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_fragments"
+        android:shortcutShortLabel="@string/widget_pin_fragments_short"
+        android:shortcutLongLabel="@string/widget_pin_fragments_long">
+        <intent
+            android:action="net.activitywatch.android.action.PIN_WIDGET"
+            android:targetPackage="net.activitywatch.android.debug"
+            android:targetClass="net.activitywatch.android.MainActivity">
+            <extra
+                android:name="pin_widget"
+                android:value="fragments" />
+        </intent>
+    </shortcut>
 </shortcuts>

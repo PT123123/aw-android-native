@@ -65,7 +65,7 @@ class DashboardFragment : Fragment() {
         tabMediator = TabLayoutMediator(binding.tabLayout, binding.vpActivity) { tab, position ->
             tab.text = ActivityPagerAdapter.TITLES[position]
         }.apply { attach() }
-        // 深链入口（如桌面「日历」小部件）可指定初始 Tab
+        // 深链入口（如桌面「日历」小部件 → 趋势、「今日碎片」→ 碎片）可指定初始 Tab
         val initialTab = arguments?.getInt(ARG_TAB, ActivityPagerAdapter.TAB_OVERVIEW)
             ?: ActivityPagerAdapter.TAB_OVERVIEW
         if (initialTab != ActivityPagerAdapter.TAB_OVERVIEW) {

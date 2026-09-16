@@ -139,6 +139,20 @@
                     android:resource="@xml/calendar_widget_info"/>
         </receiver>
 
+        <!-- 桌面小部件：今日碎片（当天 24 时 × 5 分钟点阵热力，点击进 活动·碎片） -->
+        <receiver
+                android:name=".widget.FragmentsWidgetProvider"
+                android:label="@string/widget_fragments_label"
+                android:enabled="true"
+                android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                    android:name="android.appwidget.provider"
+                    android:resource="@xml/fragments_widget_info"/>
+        </receiver>
+
         <service android:name=".watcher.ChromeWatcher"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true">

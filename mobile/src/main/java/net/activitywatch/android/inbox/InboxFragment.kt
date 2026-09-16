@@ -298,7 +298,7 @@ class InboxFragment : Fragment() {
                     return
                 }
 
-                // 刚打下 #（前缀为空）→ 直接给全量建议（按使用频率排序）；
+                // 刚打下 #（前缀为空）→ 直接给全量建议（按最近使用排序）；
                 // 但退格删到只剩 # 时不弹，避免整个标签列表还挂在输入框上方
                 if (prefix.isEmpty()) {
                     if (lastChangeWasDeletion) {
@@ -385,12 +385,12 @@ class InboxFragment : Fragment() {
                 return@launch
             }
 
-            // 按使用频率降序（近 300 条笔记中出现次数，次数相同按最近使用时间新者优先），
-            // 取前 N 条后整体反转：列表显示在输入框上方，反转后频率最高的贴着输入行（最下面）
+            // 按最近使用时间降序（同一时间再按出现次数，都没用过按名称），
+            // 取前 N 条后整体反转：列表显示在输入框上方，反转后最近用过的贴着输入行（最下面）
             val sorted = matches
                 .sortedWith(
-                    compareByDescending<String> { usage[it]?.count ?: 0 }
-                        .thenByDescending { usage[it]?.lastUsed ?: "" }
+                    compareByDescending<String> { usage[it]?.lastUsed ?: "" }
+                        .thenByDescending { usage[it]?.count ?: 0 }
                         .thenBy { it }
                 )
                 .take(MAX_SUGGESTIONS)
