@@ -30,6 +30,7 @@ import net.activitywatch.android.R
 import net.activitywatch.android.databinding.InboxFragmentBinding
 import net.activitywatch.android.sync.LanPull
 import net.activitywatch.android.todo.TodoApi
+import net.activitywatch.android.ui.GradientBackground
 
 class InboxFragment : Fragment() {
 
@@ -99,6 +100,9 @@ class InboxFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         LocalInboxApi.init(requireContext())
+
+        // 界面主题：铺渐变背景，工具栏透明以透出顶部渐变
+        GradientBackground.applyPage(requireContext(), binding.root, binding.toolbar)
 
         binding.toolbar.setNavigationOnClickListener {
             requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)

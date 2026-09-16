@@ -7,7 +7,8 @@
 
     <!-- Inbox (native) dark theme -->
     <color name="inbox_bg">#0f131a</color>
-    <color name="inbox_card">#1a1d24</color>
+    <!-- 笔记卡片：白色 8% 玻璃蒙层，能透出页面渐变主题的底色（不再是写死的深灰） -->
+    <color name="inbox_card">#15FFFFFF</color>
     <color name="inbox_text">#e6e8eb</color>
     <color name="inbox_sub">#9aa0a6</color>
     <color name="inbox_accent">#4f8cff</color>
@@ -32,6 +33,9 @@
     <color name="aw_bg">#F4F5F7</color>
     <color name="aw_surface">#FFFFFF</color>
     <color name="aw_surface_2">#E9EBEF</color>
+    <!-- 玻璃面层：铺在渐变背景上的卡片 / 行，半透明才能透出底下的渐变主题 -->
+    <color name="aw_surface_glass">#0F000000</color>
+    <color name="aw_border_glass">#14000000</color>
     <color name="aw_border">#D6D9DE</color>
     <color name="aw_text_primary">#1B1F24</color>
     <color name="aw_text_secondary">#61676E</color>

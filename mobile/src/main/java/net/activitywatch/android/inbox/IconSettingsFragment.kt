@@ -17,6 +17,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import com.google.android.material.snackbar.Snackbar
 import net.activitywatch.android.R
+import net.activitywatch.android.ui.GradientBackground
 
 /**
  * 图标版本切换设置页。
@@ -43,13 +44,12 @@ class IconSettingsFragment : Fragment() {
         val ctx = requireContext()
         val layout = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(ContextCompat.getColor(ctx, R.color.aw_bg))
         }
 
         // Toolbar
         val toolbar = com.google.android.material.appbar.MaterialToolbar(ctx).apply {
             title = "图标设置"
-            setBackgroundColor(ContextCompat.getColor(ctx, R.color.aw_bg))
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
             setNavigationIcon(R.drawable.ic_menu)
             setNavigationOnClickListener {
                 requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
@@ -58,6 +58,9 @@ class IconSettingsFragment : Fragment() {
             setTitleTextColor(ContextCompat.getColor(ctx, R.color.aw_text_primary))
         }
         layout.addView(toolbar)
+
+        // 界面主题：铺渐变背景（工具栏已置透明，顶部渐变能透出来）
+        GradientBackground.applyPage(ctx, layout, toolbar)
 
         // Scrollable content
         val scroll = android.widget.ScrollView(ctx).apply {

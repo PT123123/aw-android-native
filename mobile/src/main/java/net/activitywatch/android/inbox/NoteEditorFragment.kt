@@ -20,6 +20,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.NoteEditorBinding
+import net.activitywatch.android.ui.GradientBackground
 
 class NoteEditorFragment : BottomSheetDialogFragment() {
 
@@ -69,6 +70,9 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         LocalInboxApi.init(requireContext())
+
+        // 界面主题：铺渐变背景，工具栏透明以透出顶部渐变
+        GradientBackground.applyPage(requireContext(), binding.root, binding.toolbar)
 
         binding.toolbar.setNavigationOnClickListener {
             dismiss()

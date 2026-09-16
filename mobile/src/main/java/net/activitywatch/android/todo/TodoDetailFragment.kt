@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.TodoDetailFragmentBinding
+import net.activitywatch.android.ui.GradientBackground
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -97,6 +98,9 @@ class TodoDetailFragment : DialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // 界面主题：铺渐变背景，工具栏透明以透出顶部渐变
+        GradientBackground.applyPage(requireContext(), b.root, b.detailToolbar)
 
         subtaskAdapter = TodoSubtaskAdapter(
             onToggle = { sub -> source.toggleSubtask(taskId, sub.id) },

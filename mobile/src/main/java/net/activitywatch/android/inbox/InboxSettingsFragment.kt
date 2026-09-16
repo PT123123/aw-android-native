@@ -2,20 +2,27 @@ package net.activitywatch.android.inbox
 
 import android.os.Bundle
 import android.view.ContextThemeWrapper
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import net.activitywatch.android.MainActivity
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.InboxSettingsFragmentBinding
+import net.activitywatch.android.ui.GradientBackground
+import net.activitywatch.android.ui.GradientTheme
+import net.activitywatch.android.ui.GradientThemes
+import net.activitywatch.android.ui.ThemePrefs
 
 /**
- * 笔记设置页（原 Inbox 设置）：为单击/双击/长按分别选择执行的动作（编辑/评论/置顶/删除等），
- * 并提供回收站（笔记回收站 / 冲突归档）入口。
+ * 笔记设置页（原 Inbox 设置）：界面主题（渐变背景）+ 为单击/双击/长按分别选择执行的动作
+ * （编辑/评论/置顶/删除等），并提供回收站（笔记回收站 / 冲突归档）入口。
  */
 class InboxSettingsFragment : Fragment() {
 
@@ -37,6 +44,8 @@ class InboxSettingsFragment : Fragment() {
         binding.toolbar.setNavigationOnClickListener {
             parentFragmentManager.popBackStack()
         }
+
+        setupThemePicker()
 
         setupRow(binding.rowDouble, binding.valueDouble, InboxPrefs.Gesture.DOUBLE, "双击行为")
         setupRow(binding.rowLong, binding.valueLong, InboxPrefs.Gesture.LONG, "长按行为")
@@ -61,6 +70,81 @@ class InboxSettingsFragment : Fragment() {
                 .commit()
         }
     }
+
+    // ── 界面主题（笔记 / 任务模块共用的渐变背景）────────────────────────────
+
+    /** 铺当前主题的渐变背景，并生成一行色卡 */
+    private fun setupThemePicker() {
+        applyTheme()
+        renderThemeSwatches()
+    }
+
+    private fun applyTheme() {
+        GradientBackground.applyPage(requireContext(), binding.root, binding.toolbar)
+    }
+
+    /** 每种主题一张渐变色卡：点一下即保存、立即换背景，选中项加白描边 */
+    private fun renderThemeSwatches() {
+        val ctx = requireContext()
+        val currentId = ThemePrefs.themeId(ctx)
+        binding.themeValue.text = GradientThemes.byId(currentId).name
+        binding.themeRow.removeAllViews()
+
+        GradientThemes.ALL.forEach { theme ->
+            val selected = theme.id == currentId
+
+            val swatch = View(ctx).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(56), dp(40))
+                background = GradientThemes.swatchDrawable(
+                    theme,
+                    selected,
+                    dp(10).toFloat(),
+                    dp(2).toFloat(),
+                )
+            }
+
+            val label = TextView(ctx).apply {
+                text = theme.name
+                textSize = 11f
+                gravity = Gravity.CENTER
+                setTextColor(
+                    ContextCompat.getColor(
+                        ctx,
+                        if (selected) R.color.inbox_text else R.color.inbox_sub,
+                    )
+                )
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = dp(5) }
+            }
+
+            val item = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                isClickable = true
+                isFocusable = true
+                setPadding(dp(3), dp(3), dp(3), dp(3))
+            }
+            item.addView(swatch)
+            item.addView(label)
+            item.setOnClickListener { selectTheme(theme) }
+
+            binding.themeRow.addView(item)
+        }
+    }
+
+    private fun selectTheme(theme: GradientTheme) {
+        val ctx = requireContext()
+        if (ThemePrefs.themeId(ctx) == theme.id) return
+        ThemePrefs.setThemeId(ctx, theme.id)
+        applyTheme()
+        renderThemeSwatches()
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    // ── 其余设置项 ────────────────────────────────────────────────────────
 
     /** 进入 Inbox 时是否直接弹出记录输入框 */
     private fun setupAutoInputSwitch() {

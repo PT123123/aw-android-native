@@ -32,6 +32,7 @@ import net.activitywatch.android.inbox.TagSuggestionView
 import net.activitywatch.android.inbox.buildMarkdownToolbar
 import net.activitywatch.android.inbox.formatTagBreadcrumb
 import net.activitywatch.android.inbox.tagParentPath
+import net.activitywatch.android.ui.GradientBackground
 
 /**
  * 任务页 —— aw-qtui TodoPage 的手机端映射（契约 §5）。
@@ -98,6 +99,9 @@ class TodoFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // 界面主题：铺渐变背景，工具栏透明以透出顶部渐变
+        GradientBackground.applyPage(requireContext(), binding.root, binding.toolbar)
 
         binding.toolbar.setNavigationOnClickListener {
             requireActivity().findViewById<DrawerLayout>(R.id.drawer_layout)
