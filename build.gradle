@@ -58,24 +58,32 @@ task clean(type: Delete) {
 task build(group: "build", description: "等价 make build：编 Rust + debug APK") {
     dependsOn ':mobile:assembleDebug'
 }
-task buildApk(group: "build", description: "Release APK：assemble + 复制/签名到 dist/aw-android.apk") {
+task buildApk(group: "build", description: "Release APK：assembleRelease + 复制到 dist/aw-android.apk（签名由 signingConfigs.release 完成）") {
     dependsOn ':mobile:assembleRelease'
     doLast {
-        def unsigned = file('mobile/build/outputs/apk/release/mobile-release-unsigned.apk')
-        copy { from unsigned into 'dist' rename { 'aw-android.apk' } }
-        if (System.getenv('JKS_STOREPASS') != null) {
-            exec { commandLine 'bash', 'scripts/sign_apk.sh', 'dist/aw-android.apk', 'dist/aw-android.apk' }
+        // 配了 keystore.properties → mobile-release.apk（已签名）；没配 → mobile-release-unsigned.apk
+        def releaseDir = file('mobile/build/outputs/apk/release')
+        def signedApk = new File(releaseDir, 'mobile-release.apk')
+        def unsignedApk = new File(releaseDir, 'mobile-release-unsigned.apk')
+        def src = signedApk.exists() ? signedApk : unsignedApk
+        if (!src.exists()) {
+            throw new GradleException("找不到 release APK：${releaseDir}")
         }
+        if (src == unsignedApk) {
+            logger.warn("[aw] 产出的是**未签名** APK —— 缺 keystore.properties，无法安装分发")
+        }
+        copy { from src into 'dist' rename { 'aw-android.apk' } }
     }
 }
-task buildBundle(group: "build", description: "Release AAB：bundle + 复制/签名到 dist/aw-android.aab") {
+task buildBundle(group: "build", description: "Release AAB：bundleRelease + 复制到 dist/aw-android.aab") {
     dependsOn ':mobile:bundleRelease'
     doLast {
-        def unsigned = file('mobile/build/outputs/bundle/release/mobile-release.aab')
-        copy { from unsigned into 'dist' rename { 'aw-android.aab' } }
-        if (System.getenv('JKS_STOREPASS') != null) {
-            exec { commandLine 'bash', 'scripts/sign_apk.sh', 'dist/aw-android.aab', 'dist/aw-android.aab' }
+        def bundleDir = file('mobile/build/outputs/bundle/release')
+        def aab = new File(bundleDir, 'mobile-release.aab')
+        if (!aab.exists()) {
+            throw new GradleException("找不到 release AAB：${bundleDir}")
         }
+        copy { from aab into 'dist' rename { 'aw-android.aab' } }
     }
 }
 task install(group: "install", description: "安装 debug APK 到设备") {
