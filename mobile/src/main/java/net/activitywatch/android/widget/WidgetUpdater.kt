@@ -21,6 +21,7 @@ object WidgetUpdater {
     const val EXTRA_OPEN_TARGET = "open_target"
     const val OPEN_ACTIVITY_OVERVIEW = "activity_overview" // 「今日屏幕使用」→ 活动·概览
     const val OPEN_ACTIVITY_TRENDS = "activity_trends"     // 「日历」→ 活动·趋势
+    const val OPEN_ACTIVITY_FRAGMENTS = "activity_fragments" // 「今日碎片」→ 活动·碎片
 
     /**
      * ⚠️ 每个「打开主界面」的 PendingIntent 必须带各自唯一的 action。
@@ -35,6 +36,7 @@ object WidgetUpdater {
      */
     const val ACTION_OPEN_SCREEN_TIME = "net.activitywatch.android.action.WIDGET_OPEN_SCREEN_TIME"
     const val ACTION_OPEN_CALENDAR = "net.activitywatch.android.action.WIDGET_OPEN_CALENDAR"
+    const val ACTION_OPEN_FRAGMENTS = "net.activitywatch.android.action.WIDGET_OPEN_FRAGMENTS"
 
     // 单线程串行执行，避免两个 Provider 同时触发导致重复计算
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -56,6 +58,7 @@ object WidgetUpdater {
         execute {
             ScreenTimeWidgetProvider.pushUpdate(app)
             CalendarWidgetProvider.pushUpdate(app)
+            FragmentsWidgetProvider.pushUpdate(app)
         }
     }
 }

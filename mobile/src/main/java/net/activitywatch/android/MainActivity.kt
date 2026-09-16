@@ -46,6 +46,7 @@ import net.activitywatch.android.todo.TodoFragment
 import net.activitywatch.android.watcher.UsageStatsWatcher
 import net.activitywatch.android.permissions.AppPermissionsFragment
 import net.activitywatch.android.widget.CalendarWidgetProvider
+import net.activitywatch.android.widget.FragmentsWidgetProvider
 import net.activitywatch.android.widget.ScreenTimeWidgetProvider
 import net.activitywatch.android.widget.WidgetUpdater
 import net.activitywatch.android.dashboard.ActivityPagerAdapter
@@ -202,6 +203,7 @@ class MainActivity : AppCompatActivity() {
         val provider = when (which) {
             "screen_time" -> ComponentName(this, ScreenTimeWidgetProvider::class.java)
             "calendar" -> ComponentName(this, CalendarWidgetProvider::class.java)
+            "fragments" -> ComponentName(this, FragmentsWidgetProvider::class.java)
             else -> return
         }
 
@@ -232,13 +234,15 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * 小部件点击跳转（WidgetUpdater.EXTRA_OPEN_TARGET）：
-     * 「今日屏幕使用」→ 活动·概览（今日总时长）；「日历」→ 活动·趋势（按天看使用分布）。
+     * 「今日屏幕使用」→ 活动·概览（今日总时长）；「日历」→ 活动·趋势（按天看使用分布）；
+     * 「今日碎片」→ 活动·碎片（当天 24×5 分钟热力与作息推断）。
      */
     private fun handleWidgetOpenIntent(launchIntent: Intent?) {
         val target = launchIntent?.getStringExtra(WidgetUpdater.EXTRA_OPEN_TARGET) ?: return
         val subTab = when (target) {
             WidgetUpdater.OPEN_ACTIVITY_OVERVIEW -> ActivityPagerAdapter.TAB_OVERVIEW
             WidgetUpdater.OPEN_ACTIVITY_TRENDS -> ActivityPagerAdapter.TAB_TRENDS
+            WidgetUpdater.OPEN_ACTIVITY_FRAGMENTS -> ActivityPagerAdapter.TAB_FRAGMENTS
             else -> return
         }
         val args = Bundle().apply {
@@ -345,6 +349,8 @@ class MainActivity : AppCompatActivity() {
             if (!isFinishing && !isDestroyed) {
                 // 弹栈可能切回了上一页（如 TODO → 笔记），同步侧边栏高亮
                 syncSidebarHighlight()
+                // 小部件深链冷启动时容器里只有目标页，弹栈后容器会空掉（黑屏），补回初始页
+                ensureRootFragment()
                 return
             }
         }
@@ -353,6 +359,7 @@ class MainActivity : AppCompatActivity() {
         if (supportFragmentManager.backStackEntryCount > 0) {
             supportFragmentManager.popBackStackImmediate()
             syncSidebarHighlight()
+            ensureRootFragment()
             return
         }
 
@@ -599,6 +606,20 @@ class MainActivity : AppCompatActivity() {
         val current = supportFragmentManager.findFragmentById(R.id.fragment_container) ?: return
         val row = allNavRows().firstOrNull { it.fragmentClass == current.javaClass } ?: return
         selectRow(row.id)
+    }
+
+    /**
+     * 容器空掉时补回初始的收集箱页，避免返回后整屏空白（只能重启应用）。
+     *
+     * 小部件深链冷启动时容器里只有目标页，返回键弹栈后下面什么都没有；
+     * 正常路径下容器非空，这里是空操作。
+     */
+    private fun ensureRootFragment() {
+        if (supportFragmentManager.findFragmentById(R.id.fragment_container) != null) return
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, InboxFragment())
+            .commit()
+        selectRow(R.id.nav_inbox)
     }
 
     private fun navigateTo(fragmentClass: Class<out Fragment>, args: Bundle? = null) {
