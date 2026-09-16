@@ -132,7 +132,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="起床 ≈ 当天凌晨 4 点后首次拿起手机；入睡 ≈ 当天最后一次放下手机。均为按使用记录的估算值"/>
+                        android:text="作息按空闲推断：连续 2 小时以上没碰手机即视为睡了一觉，空档前一刻 = 入睡、后一刻 = 起床。此刻还在用手机时不给入睡时间"/>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

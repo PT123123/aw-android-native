@@ -69,6 +69,8 @@
     <color name="widget_text_secondary">#9AA0A6</color>
     <color name="widget_text_on_accent">#FFFFFF</color>
     <color name="widget_dim_text">#6B7280</color>
+    <!-- 「今日碎片」点阵里没有使用记录的格子（深色轨道色） -->
+    <color name="widget_heat_empty">#2A2F38</color>
     <color name="widget_accent">#4F8CFF</color>
     <!-- 图例圆点：取自深色主题分类色板（aw_cat_1/3/2/5/6 的深色取值） -->
     <color name="widget_dot_color_1">#5B93FF</color>

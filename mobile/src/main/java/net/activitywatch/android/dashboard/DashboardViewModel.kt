@@ -148,7 +148,11 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val sysPermitted = UsageStatsWatcher.isUsageAllowed(appContext)
                 val sysDaily = if (sysPermitted) querySysUsage(range) else emptyList()
                 val sysPerPkgSec = sysPerLabelSec(sysDaily, appContext.packageManager)
-                val sysTotalSec: Double? = if (sysPermitted) sysPerPkgSec.values.sum() else null
+                // 「屏幕时长」总量走事件并集（同一时刻只算一次，与系统「屏幕使用时间」同口径）；
+                // 逐包 totalTimeInForeground 只用来出逐包榜单——它会把同时处于前台的多个包重复累加
+                val sysUnionByDay = if (sysPermitted) querySysUnion(range) else emptyMap()
+                val sysTotalsByDay = sysDayTotals(sysDaily, sysUnionByDay)
+                val sysTotalSec: Double? = if (sysPermitted) sysTotalsByDay.values.sum() else null
 
                 // 颜色按「全区间总时长」的排名分配，保证跨 Tab 同色；秒表标签也参与排名；
                 // 聚合榜单的标签一并参与，漏采-only 的应用也能拿到与时间线一致的颜色
@@ -175,7 +179,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     if (appEvents.isNotEmpty()) ::activityLabel else ::websiteLabel
 
                 val hours = buildHours(timelineSrc, timelineLabel, colors)
-                val trendDays = buildTrendDays(sysDaily, timelineSrc, timelineLabel, afkEvents, colors, appContext.packageManager)
+                val trendDays = buildTrendDays(
+                    sysDaily, sysUnionByDay, timelineSrc, timelineLabel, afkEvents, colors, appContext.packageManager
+                )
 
                 // 分桶时间线：每个桶各自一条泳道；合并时按优先级（应用>网页>离开>秒表）解决重叠
                 val afkColors = mapOf(
@@ -312,6 +318,40 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * 逐日「屏幕使用时长」（并集口径，秒）：同一时刻只算一次，与系统设置的
+     * 「屏幕使用时间」同口径。逐包 totalTimeInForeground 会把同时处于前台的
+     * 多个包重复累加（本机实测虚高约 20%），因此只用来出逐包榜单、不参与总量。
+     *
+     * 系统的事件只保留最近 [ScreenTimeStats.EVENT_LOOKBACK_DAYS] 天左右，
+     * 更早的日子查不到事件，由调用方回退逐包求和。
+     */
+    private fun querySysUnion(range: TimeRange): Map<Long, Double> {
+        return try {
+            val (startMs, endMs) = rangeWindowMs(range)
+            val from = maxOf(startMs, ScreenTimeStats.unionEarliestMs())
+            ScreenTimeStats.queryDailyUnion(appContext, ScreenTimeStats.startOfDayMs(from), endMs)
+                .mapValues { (_, ms) -> ms / 1000.0 }
+        } catch (e: Exception) {
+            Log.w(TAG, "querySysUnion failed", e)
+            emptyMap()
+        }
+    }
+
+    /**
+     * 逐日总量（秒）：并集优先；没有并集的日子（超出事件保留期）回退逐包求和。
+     * 两边的日子取并集，趋势图里每个有数据的日子都不缺格。
+     */
+    private fun sysDayTotals(
+        sysDaily: List<ScreenTimeStats.DailyUsage>,
+        unionByDay: Map<Long, Double>,
+    ): Map<Long, Double> {
+        val out = LinkedHashMap<Long, Double>()
+        for (d in sysDaily) out[d.dayStartMs] = d.perPkgMs.values.sum() / 1000.0
+        for ((day, sec) in unionByDay) out[day] = sec
+        return out
+    }
+
     /** 聚合按天数据按应用名合并成 label→秒数表（包名先解析成应用名，同标签跨包合并）。 */
     private fun sysPerLabelSec(
         sysDaily: List<ScreenTimeStats.DailyUsage>,
@@ -418,11 +458,13 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * 按自然日出趋势数据：每日总量与 Top 应用用聚合（系统口径）数据，
-     * 未授权/无数据时回退事件流；专注/闲置（AFK）始终由事件流 AFK 事件摊到每天。
+     * 按自然日出趋势数据：每日总量走事件并集（与系统「屏幕使用时间」一致，
+     * 没有并集数据的日子回退逐包求和），Top 应用用聚合（系统口径）数据；
+     * 未授权/无数据时回退事件流。专注/闲置（AFK）始终由事件流 AFK 事件摊到每天。
      */
     private fun buildTrendDays(
         sysDaily: List<ScreenTimeStats.DailyUsage>,
+        unionByDay: Map<Long, Double>,
         events: List<EventDto>,
         label: (EventDto) -> String?,
         afkEvents: List<EventDto>,
@@ -439,7 +481,15 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
                     val l = ScreenTimeStats.resolveLabel(pm, pkg)
                     bucket[l] = (bucket[l] ?: 0.0) + ms / 1000.0
                 }
-                totals[d.dayStartMs] = bucket.values.sum()
+                // 逐包求和会把并发前台的包重复计时，有并集就用并集
+                totals[d.dayStartMs] = unionByDay[d.dayStartMs] ?: bucket.values.sum()
+            }
+            // 并集覆盖到、UsageStats 却没返回的日子（少见）也补上，趋势不缺格
+            for ((day, sec) in unionByDay) {
+                if (day !in totals) {
+                    totals[day] = sec
+                    perLabel.getOrPut(day) { LinkedHashMap() }
+                }
             }
         } else {
             for (e in events) {
