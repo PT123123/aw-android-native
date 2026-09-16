@@ -38,10 +38,17 @@
     <string name="widget_calendar_title_short">%1$d月</string>
     <string name="widget_calendar_desc">月历视图，高亮今天</string>
     <string name="widget_calendar_label">日历</string>
+    <string name="widget_fragments_label">今日碎片</string>
+    <string name="widget_fragments_desc">当天使用碎片热力与推断作息</string>
+    <string name="widget_fragments_stats">起床 %1$s · 入睡 %2$s</string>
+    <string name="widget_fragments_no_record">当天暂无使用记录</string>
+    <string name="widget_fragments_grant_hint">需要授权「使用情况访问」，点按打开应用</string>
     <string name="widget_pin_screen_time_short">添加屏幕使用小部件</string>
     <string name="widget_pin_screen_time_long">把「今日屏幕使用」添加到桌面</string>
     <string name="widget_pin_calendar_short">添加日历小部件</string>
     <string name="widget_pin_calendar_long">把「日历」添加到桌面</string>
+    <string name="widget_pin_fragments_short">添加碎片小部件</string>
+    <string name="widget_pin_fragments_long">把「今日碎片」添加到桌面</string>
     <string name="widget_pin_confirm_hint">请在弹窗中确认，小部件就会添加到桌面</string>
     <string name="widget_pin_unsupported">当前桌面不支持一键添加，请长按桌面 →「小部件」→ ActivityWatch</string>
 </resources>
