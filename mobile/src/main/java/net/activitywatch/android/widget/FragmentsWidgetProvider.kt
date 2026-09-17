@@ -26,7 +26,8 @@ import kotlin.math.min
 
 /**
  * 桌面「今日碎片」小部件：把当天的使用记录画成 24 时 × 每时 5 分钟的点阵热力，
- * 底部给出推断的起床 / 入睡时间。点整块 → 活动 · 碎片 Tab（可翻看历史、看启动次数）。
+ * 纵向 **自下而上 :00→:55**（最底行 :00、最顶行 :55），底部给出推断的起床 / 入睡时间。
+ * 点整块 → 活动 · 碎片 Tab（可翻看历史、看启动次数）。
  *
  * 数据与「活动 · 碎片」Tab 同源（[DayFragments]），逐格一致；热力用一张位图推送
  * （RemoteViews 塞不下 288 个 View），尺寸随部件实际大小重算：拖拽缩放会走
@@ -37,6 +38,10 @@ import kotlin.math.min
  * - 窄宽（宽度 <150dp，即 2×2）：统计行整行放不下，一并收掉把高度让给点阵；
  * - 标准（高度 ≥115dp）：底部显示「起床 … · 入睡 …」；
  * - 窄宽度（<170dp）：隐藏右上角「更新于」。
+ *
+ * 刻度同样自适应，空间不够就自动省掉、把位置让给点阵：
+ * - 底部小时刻度（0/6/12/18）要位图高度 ≥90dp；
+ * - 左侧分钟刻度（:15/:45）还要每行 ≥6dp、且留出刻度栏后每列仍 ≥3dp。
  *
  * 最小尺寸 2×2（110×110dp）：24 列点阵在该宽度下每列约 3.7dp，是仍能分辨的下限。
  */
@@ -85,6 +90,12 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
 
         private const val COLS = 24
         private const val ROWS = 12
+
+        /** 纵轴分钟刻度：数据行（0 = :00）× 文案；行自下而上，故 :45 在上、:15 在下 */
+        private val Y_TICKS = listOf(3 to ":15", 9 to ":45")
+
+        /** 纵轴刻度栏占位后每列仍要 ≥3dp 才画刻度，否则点阵被挤得太小反而看不清 */
+        private const val MIN_COL_DP = 3f
 
         /** 本小部件专用的 PendingIntent 请求码（屏幕使用 1001、日历 1002，各自唯一） */
         private const val REQ_OPEN = 1003
@@ -162,9 +173,9 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
         }
 
         /**
-         * 画点阵热力图：行 = 每小时内的 5 分钟槽（自上而下 :00→:55），列 = 24 小时，
-         * 颜色越深该 5 分钟用得越多（与碎片页热力图同一套配色）。
-         * 位图够高时在底部标 0/6/12/18 时刻度。
+         * 画点阵热力图：列 = 24 小时，行 = 每小时内的 5 分钟槽 —— **自下而上 :00→:55**，
+         * 即 :00 在最底行、:55 在最顶行（与应用内「使用碎片」一致）。颜色越深该 5 分钟用得越多。
+         * 空间够时底部标 0/6/12/18 小时刻度、左侧标 :15/:45 分钟刻度，不够就自动省掉刻度栏。
          */
         private fun heatBitmap(
             context: Context,
@@ -189,10 +200,27 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
             )
             val maxSec = slots.maxOrNull() ?: 0.0
 
-            // 够高才留 12dp 给时刻度，否则整张都画点阵
+            // 够高才留 12dp 给小时刻度，否则整张都画点阵
             val axisH = if (h >= (90 * density).toInt()) 12f * density else 0f
             val gridH = h - axisH
-            val colW = w / COLS.toFloat()
+
+            // 刻度字号跟着格子大小走（6~9dp），位图越小字越小
+            val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = ContextCompat.getColor(context, R.color.widget_dim_text)
+                textSize = (min(w / COLS.toFloat(), gridH / ROWS) * 0.95f)
+                    .coerceIn(6f * density, 9f * density)
+            }
+            // 纵轴刻度栏：行太矮、或留完栏每列不足 3dp 就不留（自适应，空间让给点阵）
+            val yAxisW = Y_TICKS.maxOf { tickPaint.measureText(it.second) }
+            val gutter = if (gridH / ROWS >= 6f * density &&
+                w - (yAxisW + 2f * density) >= COLS * MIN_COL_DP * density
+            ) {
+                yAxisW + 2f * density
+            } else {
+                0f
+            }
+
+            val colW = (w - gutter) / COLS.toFloat()
             val rowH = gridH / ROWS.toFloat()
             val cell = min(colW, rowH)
             val gap = maxOf(1f, cell * 0.18f)
@@ -201,33 +229,38 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
             val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
             val cx = FloatArray(COLS)
             val cy = FloatArray(ROWS)
-            for (c in 0 until COLS) cx[c] = c * colW + colW / 2f
-            for (r in 0 until ROWS) cy[r] = r * rowH + rowH / 2f
+            for (c in 0 until COLS) cx[c] = gutter + c * colW + colW / 2f
+            for (d in 0 until ROWS) cy[d] = d * rowH + rowH / 2f
 
-            for (r in 0 until ROWS) {
+            // 显示行 d（0 = 最顶）对应数据行 ROWS-1-d（0 = :00），所以 :00 落在最底
+            for (d in 0 until ROWS) {
+                val r = ROWS - 1 - d
                 for (c in 0 until COLS) {
                     val sec = slots.getOrElse(r * COLS + c) { 0.0 }
                     val level = if (sec <= 0.0 || maxSec <= 0.0) 0
                     else ceil(sec / maxSec * 4).toInt().coerceIn(1, 4)
                     dotPaint.color = levels[level]
                     if (radius >= 1.6f) {
-                        canvas.drawCircle(cx[c], cy[r], radius, dotPaint)
+                        canvas.drawCircle(cx[c], cy[d], radius, dotPaint)
                     } else {
                         // 太小就画方块，免得圆点糊成一团
-                        canvas.drawRect(cx[c] - cell / 2f, cy[r] - cell / 2f, cx[c] + cell / 2f, cy[r] + cell / 2f, dotPaint)
+                        canvas.drawRect(cx[c] - cell / 2f, cy[d] - cell / 2f, cx[c] + cell / 2f, cy[d] + cell / 2f, dotPaint)
                     }
                 }
             }
 
-            if (axisH > 0f) {
-                val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = ContextCompat.getColor(context, R.color.widget_dim_text)
-                    textSize = 8f * density
+            // 左侧分钟刻度：:15 / :45 各画在对应行的垂直中心
+            if (gutter > 0f) {
+                for ((slot, label) in Y_TICKS) {
+                    canvas.drawText(label, 0f, cy[ROWS - 1 - slot] + tickPaint.textSize * 0.36f, tickPaint)
                 }
+            }
+
+            if (axisH > 0f) {
                 val baseline = h - 2f * density
                 for (hour in intArrayOf(0, 6, 12, 18)) {
                     val label = hour.toString()
-                    canvas.drawText(label, cx[hour] - textPaint.measureText(label) / 2f, baseline, textPaint)
+                    canvas.drawText(label, cx[hour] - tickPaint.measureText(label) / 2f, baseline, tickPaint)
                 }
             }
             return bmp
