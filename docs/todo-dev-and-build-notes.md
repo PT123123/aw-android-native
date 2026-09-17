@@ -285,6 +285,26 @@ cd C:\Users\<user>\Desktop\aw-android
   - TODO 快速添加弹层同步紧凑化：单行输入 + 按钮行紧随其下，弹层 wrap_content（不再固定半屏）。
 - 规划中「基于标签树的段级输入自动补全」为可选项，本次未实现。
 
+### ⑦-E · 编辑并入全屏查看页（2026-09-18 用户要求）
+
+需求：编辑笔记不要卡片式弹出，**改用查看笔记那个全屏页**；且编辑时能**同时编辑标签**。
+
+- 删掉 `NoteEditorFragment`（BottomSheet）+ `res/layout/note_editor.xml`：编辑态并入
+  `NoteViewFragment` + `note_view.xml`，同一个全屏页做「查看态 ↔ 编辑态」切换（visibility 切换 + 菜单/标题同步）。
+- 入口：列表手势 `EDIT`、item 菜单「编辑」、评论卡片的 `openParent()` → 统一
+  `openViewer(note, startEditing = true)` → `NoteViewFragment.newInstance(id, true)`（`ARG_START_EDITING`，
+  拉到笔记后自动进编辑态）。
+- 编辑态视图：正文换成 `binding.editor`（EditText，minLines 8 / maxLines 16），底部 `binding.editBar`
+  = Markdown 工具栏（#、B、/、•、1.）+ ➤ 保存；工具栏菜单切为「保存 / 取消编辑」。
+- **编辑态可同时改标签**：chip 后缀 `✕` 点即移除；「＋ 添加标签」弹窗可手输（支持 `项目/工作` 层级，
+  `normalizeTag()` 去空白/去开头 #/折叠 `/`）或点 `GET /inbox/tags` 里的常用标签（最多 40 条）。
+  标签改动只存在 `editTags`，**保存时随正文一起 PUT**，不重新 `parseTags`。
+- 退出编辑：导航箭头 / 系统返回（`OnBackPressedCallback`，仅编辑态 enable）/ 菜单「取消编辑」
+  → 正文或标签有改动先弹「放弃这次修改？」确认，再退回查看态。
+- 「扫描标签」只在查看态可用；`NoteDetailFragment` 恢复历史版本的结果改为
+  「编辑态回填 `editor`，查看态 `reload()`」（原来由 `NoteEditorFragment` 监听）。
+- 旧的编辑草稿缓存（prefs `inbox_editor_draft`）随 `NoteEditorFragment` 一并废弃。
+
 **验证**：`cargo check -p aw-inbox-rust` 通过；`cargo test --test tag_tree_test` 3/3 通过；`gradlew :mobile:compileDebugKotlin` BUILD SUCCESSFUL；随后重跑 `cargoBuildArm + cargoBuildArm64 + assembleDebug` 产出含修复的 .so 与 APK。
 > ⚠️ 新坑：rustJniLibs 里换了新 .so 后，AGP 的 merge/strip native libs 任务可能仍报 UP-TO-DATE（输入快照未失效），**APK 打进的是旧库**。验证方法：`sha1sum build/rustJniLibs/android/<abi>/libaw_server.so` 对比 `build/intermediates/stripped_native_libs/.../libaw_server.so`，不一致即中招；解法：删 `build/intermediates/{merged_jni_libs,merged_native_libs,stripped_native_libs}` 后重新 `assembleDebug`。
 

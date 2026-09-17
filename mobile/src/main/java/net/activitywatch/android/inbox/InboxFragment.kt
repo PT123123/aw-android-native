@@ -762,18 +762,19 @@ class InboxFragment : Fragment() {
         }
     }
 
-    /** 打开全屏「查看笔记」页（双击默认动作）：查看页里再轻点正文才进编辑 */
-    private fun openViewer(note: NoteResponse) {
+    /**
+     * 打开全屏「查看笔记」页（双击默认动作）：查看页里再轻点正文才进编辑。
+     * [startEditing] = true 时直接落在该页的编辑态（编辑与查看共用同一个全屏页，不再弹卡片）。
+     */
+    private fun openViewer(note: NoteResponse, startEditing: Boolean = false) {
         parentFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, NoteViewFragment.newInstance(note.id))
+            .replace(R.id.fragment_container, NoteViewFragment.newInstance(note.id, startEditing))
             .addToBackStack(null)
             .commit()
     }
 
-    private fun openEditor(note: NoteResponse?) {
-        NoteEditorFragment.newInstance(note)
-            .show(parentFragmentManager, "note_editor")
-    }
+    /** 编辑笔记 = 打开查看页的编辑态（正文与标签都在那一页里改） */
+    private fun openEditor(note: NoteResponse) = openViewer(note, startEditing = true)
 
     private fun showItemMenu(note: NoteResponse, anchor: View) {
         val pinned = PinStore.isPinned(requireContext(), note.id)
