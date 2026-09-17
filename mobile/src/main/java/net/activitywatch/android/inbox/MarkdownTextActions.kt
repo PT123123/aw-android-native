@@ -134,7 +134,7 @@ object MarkdownTextActions {
 }
 
 /**
- * 快速输入弹窗底部的 Markdown 工具栏（与 note_editor.xml 中的样式一致）。
+ * 快速输入弹窗底部的 Markdown 工具栏（与 note_view.xml 编辑态里的样式一致）。
  * 笔记页与任务页的快速输入共用；[dp] 由调用方按屏幕密度给出。
  */
 fun buildMarkdownToolbar(
