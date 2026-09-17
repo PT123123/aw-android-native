@@ -33,6 +33,8 @@
             android:textSize="13sp"
             android:textColor="@color/widget_text_secondary" />
 
+        <!-- 「更新于 HH:mm」：窄宽档（2×2）标题收起时靠标题占住的权重空白保持在右上角，
+             位置不随尺寸变化；放不下时由 ellipsize 兜底，不做整块隐藏。 -->
         <TextView
             android:id="@+id/tv_frag_updated"
             android:layout_width="wrap_content"
@@ -52,12 +54,15 @@
         android:scaleType="fitXY"
         android:contentDescription="@string/widget_fragments_label" />
 
+    <!-- 「起床 … · 入睡 …」：常驻不隐藏。宽部件一行放得下，2 格宽放不下——
+         那时由 provider 改送带换行的两行文案（见 widget_fragments_stats_stacked），
+         所以 maxLines 必须留到 2；放不下才走 ellipsize 兜底。 -->
     <TextView
         android:id="@+id/tv_frag_stats"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="3dp"
-        android:maxLines="1"
+        android:maxLines="2"
         android:ellipsize="end"
         android:autoSizeTextType="uniform"
         android:autoSizeMinTextSize="9sp"
