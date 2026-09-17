@@ -13,8 +13,8 @@ import kotlin.math.min
 
 /**
  * 「碎片」热力图：单日的二维时间块。
- * 横轴 = 一天的 24 小时（24 列），纵轴 = 每小时内的 5 分钟槽（12 行，自上而下 :00→:55），
- * 每个圆点代表当天一个 5 分钟的使用强度，颜色越深越密集（GitHub 热力图风格）。
+ * 横轴 = 一天的 24 小时（24 列），纵轴 = 每小时内的 5 分钟槽（12 行，**自下而上 :00→:55**，
+ * 即最底行 :00、最顶行 :55），每个圆点代表当天一个 5 分钟的使用强度，颜色越深越密集（GitHub 热力图风格）。
  * 左侧标分钟刻度，底部标小时刻度与「少→多」图例。
  */
 class UsageHeatmapView @JvmOverloads constructor(
@@ -83,9 +83,10 @@ class UsageHeatmapView @JvmOverloads constructor(
         val colW = gridW / COLS
         val radius = (min(colW, rowH) - dotGap) / 2f
 
-        // 圆点阵：行 = 5 分钟槽（上 :00 下 :55），列 = 小时
-        for (r in 0 until ROWS) {
-            val cy = padTop + r * rowH + rowH / 2f
+        // 圆点阵：行 = 5 分钟槽（**自下而上 :00→:55**，最底行 :00），列 = 小时
+        for (disp in 0 until ROWS) {
+            val r = ROWS - 1 - disp // 显示行（0 = 最顶）→ 数据行（0 = :00）
+            val cy = padTop + disp * rowH + rowH / 2f
             for (c in 0 until COLS) {
                 val sec = slots.getOrElse(r * COLS + c) { 0.0 }
                 val level = when {
@@ -97,10 +98,10 @@ class UsageHeatmapView @JvmOverloads constructor(
             }
         }
 
-        // 左侧分钟刻度：每 15 分钟一行
+        // 左侧分钟刻度：每 15 分钟一行（同样自下而上，:00 在最底、:45 靠近顶部）
         val rowLabels = mapOf(0 to ":00", 3 to ":15", 6 to ":30", 9 to ":45")
-        for ((r, label) in rowLabels) {
-            val baseline = padTop + r * rowH + rowH / 2f + 3f * density
+        for ((slot, label) in rowLabels) {
+            val baseline = padTop + (ROWS - 1 - slot) * rowH + rowH / 2f + 3f * density
             canvas.drawText(label, 0f, baseline, textPaint)
         }
 
