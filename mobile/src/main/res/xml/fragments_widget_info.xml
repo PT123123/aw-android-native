@@ -4,7 +4,8 @@
      旧系统自动忽略，走 minWidth/minHeight + initialLayout。
      最小尺寸按启动器换算公式 70*cells-30 取 2x2 = 110x110dp —— 2 格宽是点阵 24 列的下限，
      再窄就糊成一团了；拖出来默认落在 3x2（targetCell*），可自由缩到 2x2、放到 4x3。
-     FragmentsWidgetProvider 按实际尺寸重画点阵位图，并在窄宽档自动收掉放不下的文字行。 -->
+     FragmentsWidgetProvider 按实际尺寸重画点阵位图，并在窄宽档自动收掉放不下的统计行与标题
+     （「更新于 HH:mm」常驻不隐藏）。 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:minWidth="110dp"
