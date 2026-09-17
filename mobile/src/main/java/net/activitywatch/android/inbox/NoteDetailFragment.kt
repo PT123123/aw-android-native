@@ -268,7 +268,8 @@ class NoteDetailFragment : BottomSheetDialogFragment() {
             try {
                 LocalInboxApi.service.updateNote(
                     noteId,
-                    UpsertNotePayload(content = item.content, tags = parseTags(item.content)),
+                    // 恢复历史版本时沿用该版本自己的标签，不从正文重新解析（标签与正文已分离）
+                    UpsertNotePayload(content = item.content, tags = item.tags),
                 )
                 parentFragmentManager.setFragmentResult(
                     RESULT_KEY,

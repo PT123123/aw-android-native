@@ -13,6 +13,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import androidx.core.os.bundleOf
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -37,6 +38,10 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
         private const val MENU_HISTORY = 1001
         private const val PREFS_EDITOR = "inbox_editor_draft"
         private const val KEY_EDITOR_DRAFT_PREFIX = "editor_draft_"
+
+        /** 保存成功后的回执（查看笔记页监听并刷新正文/标签） */
+        const val RESULT_KEY_SAVED = "note_editor_saved"
+        const val KEY_NOTE_ID = "note_id"
 
         fun newInstance(note: NoteResponse?): NoteEditorFragment {
             val f = NoteEditorFragment()
@@ -171,20 +176,33 @@ class NoteEditorFragment : BottomSheetDialogFragment() {
             Toast.makeText(requireContext(), "内容不能为空", Toast.LENGTH_SHORT).show()
             return
         }
-        val tags = parseTags(content)
-        val payload = UpsertNotePayload(content = content, tags = tags)
+        // 标签不再随正文自动重建：
+        // - 新建笔记沿用「单独发送」的约定，发送即把正文里的 #标签 登记成标签；
+        // - 编辑已有笔记保持服务端标签不变 —— 否则正文里那串 #xxx 会把用户刚在
+        //   「查看笔记 → 扫描标签」里移除掉的标签又登记回来。增删标签走扫描标签。
+        val existing = note
+        val payload = if (existing == null) {
+            UpsertNotePayload(content = content, tags = parseTags(content))
+        } else {
+            UpsertNotePayload(content = content, tags = existing.tags)
+        }
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val saved = if (note == null) {
+                val saved = if (existing == null) {
                     LocalInboxApi.service.createNote(payload)
                 } else {
-                    LocalInboxApi.service.updateNote(note!!.id, payload)
+                    LocalInboxApi.service.updateNote(existing.id, payload)
                 }
                 // 通知 InboxFragment 刷新并跳转到该笔记
                 val inbox = parentFragmentManager.findFragmentById(R.id.fragment_container)
                 if (inbox is InboxFragment) {
                     inbox.refreshAndScrollToNote(saved.id)
                 }
+                // 通知查看笔记页刷新（编辑面板是从查看页打开时）
+                parentFragmentManager.setFragmentResult(
+                    RESULT_KEY_SAVED,
+                    bundleOf(KEY_NOTE_ID to saved.id),
+                )
                 // 保存时清除缓存
                 clearDraft(cacheKey)
                 dismiss()
