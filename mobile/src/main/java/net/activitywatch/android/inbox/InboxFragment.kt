@@ -50,6 +50,14 @@ class InboxFragment : Fragment() {
 
         /** 统计 tag 使用频率时拉取的近期笔记条数 */
         private const val TAG_USAGE_NOTE_LIMIT = 300
+
+        /**
+         * 「查看笔记」页点了标签后要应用的筛选路径。
+         * 查看页是用 replace 压栈的，那时本页的 viewLifecycleOwner 已销毁、fragment result
+         * 收不到；用这个静态字段把意图带回来，本页重建视图时消费一次。
+         */
+        @JvmStatic
+        var pendingTagFilter: String? = null
     }
 
     private var _binding: InboxFragmentBinding? = null
@@ -182,6 +190,13 @@ class InboxFragment : Fragment() {
             currentTag = it
             updateFilterBar()
         }
+        // 「查看笔记」页点了标签返回：优先于上面的恢复值，消费一次即清空
+        pendingTagFilter?.let {
+            pendingTagFilter = null
+            currentTag = it.takeIf { p -> p.isNotBlank() }
+            updateFilterBar()
+        }
+        adapter.markdownEnabled = InboxPrefs.listMarkdown(requireContext())
 
         loadInitial()
         // 设置项：进入页面即弹出输入框（等首帧渲染完再弹，避免 BottomSheet 抢焦点失败）
@@ -737,6 +752,7 @@ class InboxFragment : Fragment() {
 
     private fun performGesture(note: NoteResponse, gesture: InboxPrefs.Gesture, anchor: View) {
         when (InboxPrefs.actionFor(requireContext(), gesture)) {
+            InboxPrefs.GestureAction.VIEW -> openViewer(note)
             InboxPrefs.GestureAction.EDIT -> openEditor(note)
             InboxPrefs.GestureAction.COMMENT -> showCommentDialog(note)
             InboxPrefs.GestureAction.PIN -> togglePin(note)
@@ -744,6 +760,14 @@ class InboxFragment : Fragment() {
             InboxPrefs.GestureAction.MENU -> showItemMenu(note, anchor)
             InboxPrefs.GestureAction.NONE -> {}
         }
+    }
+
+    /** 打开全屏「查看笔记」页（双击默认动作）：查看页里再轻点正文才进编辑 */
+    private fun openViewer(note: NoteResponse) {
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, NoteViewFragment.newInstance(note.id))
+            .addToBackStack(null)
+            .commit()
     }
 
     private fun openEditor(note: NoteResponse?) {
@@ -755,6 +779,14 @@ class InboxFragment : Fragment() {
         val pinned = PinStore.isPinned(requireContext(), note.id)
         val themedCtx = ContextThemeWrapper(requireContext(), R.style.InboxPopupMenu)
         PopupMenu(themedCtx, anchor, Gravity.END).apply {
+            menu.add("查看笔记").setOnMenuItemClickListener {
+                openViewer(note)
+                true
+            }
+            menu.add("编辑").setOnMenuItemClickListener {
+                openEditor(note)
+                true
+            }
             menu.add("评论").setOnMenuItemClickListener {
                 showCommentDialog(note)
                 true
@@ -1069,7 +1101,10 @@ class InboxFragment : Fragment() {
     private fun postComment(note: NoteResponse, content: String) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                LocalInboxApi.service.addComment(note.id, CreateCommentPayload(content = content))
+                LocalInboxApi.service.addComment(
+                    note.id,
+                    CreateCommentPayload(content = content, tags = parseTags(content)),
+                )
                 Toast.makeText(requireContext(), "评论已发布", Toast.LENGTH_SHORT).show()
                 // 刷新列表，让评论笔记立刻显示并带上 ↖️ 原笔记灰色预览
                 loadInitial()

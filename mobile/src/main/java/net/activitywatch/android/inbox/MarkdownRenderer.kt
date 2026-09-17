@@ -50,9 +50,19 @@ object MarkdownRenderer {
         }
     }
 
-    /** @param onTagClick 传入时 #标签 可点击（回调标签名，不含 #）；不传则只着色 */
-    fun render(context: Context, content: String, onTagClick: ((String) -> Unit)? = null): CharSequence {
+    /**
+     * @param onTagClick 传入时 #标签 可点击（回调标签名，不含 #）；不传则只着色
+     * @param highlightTags 是否给正文里的 `#标签` 着色。正文按「纯文本」原则展示时应传 false
+     *        （那里的 #xxx 只是普通文字，标签只在标签栏/标签行单独呈现）
+     */
+    fun render(
+        context: Context,
+        content: String,
+        onTagClick: ((String) -> Unit)? = null,
+        highlightTags: Boolean = true,
+    ): CharSequence {
         val ssb = SpannableStringBuilder(markwon(context).toMarkdown(content))
+        if (!highlightTags) return ssb
         val color = ContextCompat.getColor(context, R.color.inbox_accent)
         TAG_RE.findAll(ssb).forEach { match ->
             val tag = match.value.removePrefix("#")
