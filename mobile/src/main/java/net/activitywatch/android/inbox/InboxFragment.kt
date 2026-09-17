@@ -805,7 +805,7 @@ class InboxFragment : Fragment() {
                 true
             }
             menu.add("转为待办").setOnMenuItemClickListener {
-                confirmConvertToTodo(note)
+                convertNoteToTodo(note)
                 true
             }
             menu.add("删除").setOnMenuItemClickListener {
@@ -818,31 +818,20 @@ class InboxFragment : Fragment() {
 
     // ==== 笔记转待办（⑦-C） ====
 
-    /** 转待办是「建 Todo + 删原笔记」的组合动作，二次确认防误操作 */
-    private fun confirmConvertToTodo(note: NoteResponse) {
-        val themedCtx = ContextThemeWrapper(requireContext(), R.style.InboxPopupMenu)
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(themedCtx)
-            .setTitle("转为待办")
-            .setMessage("把该笔记原样转为一条待办，并删除原笔记？")
-            .setPositiveButton("转为待办") { _, _ -> convertNoteToTodo(note) }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
     /**
      * 顺序调用：先 POST /inbox/todos 再 DELETE /inbox/notes/<id>，失败按约定兜底（见 NoteTodoConverter）。
-     * 完成后整页重载，fetch 自带 currentTag —— 转换不会丢失筛选上下文。
+     * 菜单点即执行、不再二次确认；完成后整页重载，fetch 自带 currentTag —— 转换不会丢失筛选上下文。
      */
     private fun convertNoteToTodo(note: NoteResponse) {
         viewLifecycleOwner.lifecycleScope.launch {
             TodoApi.init(requireContext())
             when (val result = NoteTodoConverter.convert(note)) {
                 is NoteTodoConverter.Result.Success -> {
-                    Toast.makeText(requireContext(), "已转为待办", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "已发送", Toast.LENGTH_SHORT).show()
                     loadInitial()
                 }
                 is NoteTodoConverter.Result.TodoCreatedButDeleteFailed -> {
-                    Toast.makeText(requireContext(), "已转为待办，原笔记删除失败", Toast.LENGTH_LONG).show()
+                    Toast.makeText(requireContext(), "已发送，原笔记删除失败", Toast.LENGTH_LONG).show()
                     loadInitial()
                 }
                 is NoteTodoConverter.Result.CreateFailed -> {

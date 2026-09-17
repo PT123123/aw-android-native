@@ -106,7 +106,7 @@ class NoteDetailFragment : BottomSheetDialogFragment() {
         // 溢出菜单：把该笔记转为待办并删除原笔记
         binding.toolbar.menu.add(Menu.NONE, MENU_CONVERT, Menu.NONE, "转为待办").apply {
             setOnMenuItemClickListener {
-                currentNote?.let { confirmConvertToTodo(it) }
+                currentNote?.let { convertNoteToTodo(it) }
                 true
             }
         }
@@ -204,26 +204,18 @@ class NoteDetailFragment : BottomSheetDialogFragment() {
 
     // ==== 笔记转待办（⑦-C，与 InboxFragment 共用 NoteTodoConverter） ====
 
-    private fun confirmConvertToTodo(note: NoteResponse) {
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("转为待办")
-            .setMessage("把该笔记原样转为一条待办，并删除原笔记？")
-            .setPositiveButton("转为待办") { _, _ -> convertNoteToTodo(note) }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
+    /** 菜单点即执行、不再二次确认；成功后关闭本面板并让笔记列表整页重载 */
     private fun convertNoteToTodo(note: NoteResponse) {
         viewLifecycleOwner.lifecycleScope.launch {
             TodoApi.init(requireContext())
             when (val result = NoteTodoConverter.convert(note)) {
                 is NoteTodoConverter.Result.Success -> {
-                    Toast.makeText(requireContext(), "已转为待办", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "已发送", Toast.LENGTH_SHORT).show()
                     notifyListConverted()
                     dismiss()
                 }
                 is NoteTodoConverter.Result.TodoCreatedButDeleteFailed -> {
-                    Toast.makeText(requireContext(), "已转为待办，原笔记删除失败", Toast.LENGTH_LONG).show()
+                    Toast.makeText(requireContext(), "已发送，原笔记删除失败", Toast.LENGTH_LONG).show()
                     notifyListConverted()
                 }
                 is NoteTodoConverter.Result.CreateFailed -> {

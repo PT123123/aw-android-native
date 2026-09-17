@@ -9,7 +9,7 @@ import net.activitywatch.android.todo.TodoApi
  *  - 建 Todo 失败 → 不删笔记（原笔记保留，不产生半迁移状态）；
  *  - 删笔记失败 → Todo 已创建、原笔记保留（不重复创建）。
  * 字段映射：title = 笔记标题（无独立标题字段时取正文首行）；content = 正文原文不截断；
- * tags 原样带过去（多级 tag 就是普通字符串）；priority 默认中；不设期限；清单由 tag 决定（无 tag 落收集箱）。
+ * tags 原样带过去（多级 tag 就是普通字符串）；priority 固定「无」(0)；不设期限；清单由 tag 决定（无 tag 落收集箱）。
  */
 object NoteTodoConverter {
 
@@ -24,8 +24,8 @@ object NoteTodoConverter {
         data class CreateFailed(val reason: String) : Result()
     }
 
-    /** todo 模块优先级：0 无 / 1 低 / 2 中 / 3 高 */
-    const val DEFAULT_PRIORITY_MEDIUM = 2
+    /** todo 模块优先级：0 无 / 1 低 / 2 中 / 3 高；转过来的笔记不预设优先级，落「无」 */
+    const val DEFAULT_PRIORITY_NONE = 0
 
     private const val MAX_TITLE_LEN = 50
 
@@ -49,7 +49,7 @@ object NoteTodoConverter {
                 CreateTodoPayload(
                     title = extractTitle(note.content),
                     content = note.content,
-                    priority = DEFAULT_PRIORITY_MEDIUM,
+                    priority = DEFAULT_PRIORITY_NONE,
                     dueDate = null,
                     tags = note.tags.ifEmpty { null },
                     createdAt = note.created_at,

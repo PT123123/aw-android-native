@@ -218,18 +218,18 @@ cd C:\Users\<user>\Desktop\aw-android
   1. 读取笔记内容 `title`/`content`（及现有字段：tags、created_at 等可带则带）；
   2. 调用 Todo 创建接口写入一条 **content 完全相同** 的 Todo（title = 笔记标题，content = 笔记正文）；
   3. 删除原笔记（调用 `DELETE /inbox/notes/<id>`，与现有一致）；
-  4. 若 2 成功但 3 失败 → Todo 已创建，原笔记保留（**不二次创建**），在 UI 提示「已转为待办，原笔记删除失败」；
+  4. 若 2 成功但 3 失败 → Todo 已创建，原笔记保留（**不二次创建**），在 UI 提示「已发送，原笔记删除失败」；
   5. 若 2 失败 → 不执行 3，保留笔记，提示「转换失败：<原因>」。
 - **Todo 创建时字段映射**：
   - `title` = 笔记 `title`（若笔记无标题，截取正文首行/前 N 字符作 title）；
   - `content` = 笔记 `content`（含 markdown 原文，**不截断**）；
   - `tags` = 笔记的 tags（原样带上；多级 tag 本来就是普通字符串，**无需特殊处理**）；
-  - `priority` = 默认（中）；`due_date` = 空（不强制设期限）；
+  - `priority` = **无（0）**（2026-09-18 用户反馈：原先默认「中」改成「无」）；`due_date` = 空（不强制设期限）；
   - 清单（listId）默认「收集箱」或最近用过的清单，遵循 Todo 模块现有默认值。
 - **UI 位置**：
   - `NoteDetailFragment` 工具栏菜单（`menu/note_detail.xml` 之类）新增 `action_convert_to_todo`；
   - `InboxAdapter` 长按菜单（`InboxFragment` 的上下文菜单）新增同名项；
-  - 点击后弹**二次确认对话框**：「转为待办并删除该笔记？」，避免误操作；确认后执行上述原子操作。
+  - ~~点击后弹**二次确认对话框**~~ → **2026-09-18 用户反馈：去掉二次确认**，菜单点中即执行，成功后只 Toast「已发送」（失败仍提示原因，见上面第 4/5 条）。两个入口（`InboxFragment.showItemMenu`、`NoteDetailFragment` 工具栏菜单）都直连 `convertNoteToTodo()`，`NoteTodoConverter.DEFAULT_PRIORITY_NONE = 0`。
 - **列表刷新**：操作完成后，`InboxFragment` 的列表应从服务端重新拉取（`GET /inbox/notes`），并保留当前筛选态（⑦-B 的 `?tag=` 参数需一并带回，不因转换丢失筛选上下文）。
 - **服务端**：**无新增接口**。复用现有的 `POST /inbox/todos`（或 `TodoSource.create(...)`）+ `DELETE /inbox/notes/<id>`。实现全在 Android 端通过**顺序调用**完成；事务一致性按上面「失败保留」的规则兜底。
 
