@@ -34,6 +34,15 @@ class InboxAdapter(
             notifyDataSetChanged()
         }
 
+    /** 正文是否用 Markdown 渲染（默认 false = 纯文本，见 InboxPrefs.listMarkdown） */
+    var markdownEnabled: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                notifyDataSetChanged()
+            }
+        }
+
     /** 是否处于多选模式 */
     var selectionMode: Boolean = false
         set(value) {
@@ -228,12 +237,13 @@ class InboxAdapter(
         }
 
         /**
-         * 命中测试：触点是否落在正文里的某个 #标签 上。
+         * 命中测试：触点是否落在标签行 / 正文里的某个 #标签 上。
          * 卡片根节点的 OnTouchListener 拦截了全部触摸，TextView 的 LinkMovementMethod
          * 收不到事件，所以这里按屏幕坐标换算后自己找 TagSpan。
          */
-        private fun tagAt(e: MotionEvent): String? {
-            val tv = b.content
+        private fun tagAt(e: MotionEvent): String? = tagAt(e, b.tags) ?: tagAt(e, b.content)
+
+        private fun tagAt(e: MotionEvent, tv: android.widget.TextView): String? {
             val text = tv.text as? Spanned ?: return null
             val layout = tv.layout ?: return null
             val loc = IntArray(2)
@@ -267,7 +277,13 @@ class InboxAdapter(
         val note = getItem(position)
         val ctx = holder.b.root.context
         val displayContent = if (note.id in pinnedIds) "📌 ${note.content}" else note.content
-        holder.b.content.text = MarkdownRenderer.render(ctx, displayContent) { onTagClick(it) }
+        // 正文默认纯文本（不跑 Markdown 渲染）：正文里的 #xxx 只是普通文字，标签另起一行展示
+        holder.b.content.text = if (markdownEnabled) {
+            MarkdownRenderer.render(ctx, displayContent, highlightTags = false)
+        } else {
+            displayContent
+        }
+        bindTagRow(holder, note)
         // 原笔记预览（仅评论笔记显示）
         if (note.parentId != null && note.parentPreview != null) {
             holder.b.parentPreview.visibility = View.VISIBLE
@@ -296,6 +312,21 @@ class InboxAdapter(
             holder.b.checkmark.visibility = View.GONE
             holder.b.overflow.visibility = View.VISIBLE
         }
+    }
+
+    /**
+     * 标签行：只列出「这篇笔记真正的标签」（服务端 tags 字段），不扫描正文。
+     * 层级 tag 的每段独立可点（点 `工作` → 筛选 `项目/工作`），与查看页顶部标签行一致。
+     */
+    private fun bindTagRow(holder: VH, note: NoteResponse) {
+        val ctx = holder.b.root.context
+        if (note.tags.isEmpty()) {
+            holder.b.tags.visibility = View.GONE
+            holder.b.tags.text = ""
+            return
+        }
+        holder.b.tags.visibility = View.VISIBLE
+        holder.b.tags.text = buildTagRowSpannable(ctx, note.tags, onTagClick)
     }
 
     /** 卡片背景：被定位高亮的笔记闪 accent 色，其余用正常卡片色（走 bind 周期，复用/重绑安全） */

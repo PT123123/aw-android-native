@@ -53,6 +53,7 @@ class InboxSettingsFragment : Fragment() {
 
         setupDrawerEdgeSlider()
         setupAutoInputSwitch()
+        setupListMarkdownSwitch()
 
         // 回收站（笔记回收站 + 同步冲突归档）
         binding.rowTrash.setOnClickListener {
@@ -154,6 +155,14 @@ class InboxSettingsFragment : Fragment() {
         }
     }
 
+    /** 列表正文是否用 Markdown 渲染（默认关 = 纯文本） */
+    private fun setupListMarkdownSwitch() {
+        binding.listMarkdownSwitch.isChecked = InboxPrefs.listMarkdown(requireContext())
+        binding.listMarkdownSwitch.setOnCheckedChangeListener { _, checked ->
+            InboxPrefs.setListMarkdown(requireContext(), checked)
+        }
+    }
+
     /** 侧滑打开抽屉的热区范围：5 个固定档位，0=关闭 */
     private fun setupDrawerEdgeSlider() {
         val labels = arrayOf("关闭", "1/3 屏宽", "1/2 屏宽", "3/4 屏宽", "全屏")
@@ -201,6 +210,7 @@ class InboxSettingsFragment : Fragment() {
     }
 
     private fun actionLabel(action: InboxPrefs.GestureAction): String = when (action) {
+        InboxPrefs.GestureAction.VIEW -> "查看笔记"
         InboxPrefs.GestureAction.EDIT -> "编辑"
         InboxPrefs.GestureAction.COMMENT -> "评论"
         InboxPrefs.GestureAction.PIN -> "置顶/取消置顶"
