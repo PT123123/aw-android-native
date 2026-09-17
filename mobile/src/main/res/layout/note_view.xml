@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  查看笔记（全屏页）：
-  顶部单独显示该笔记的标签（真正的 tags，不扫描正文），下方是正文（默认纯文本，可在菜单里切 Markdown）。
-  轻点正文卡片进入编辑。
+  查看 / 编辑笔记（同一个全屏页，两种状态，不再用弹出面板）：
+  - 查看态：顶部显示该笔记真正的标签（服务端 tags，不扫描正文），正文默认纯文本（菜单可切 Markdown），轻点正文进编辑
+  - 编辑态：正文换成输入框（text_editor），标签可 ✕ 移除 / ＋ 添加，底部一排 Markdown 工具栏 + 保存钮
+  两态靠 visibility 切换，工具栏菜单与标题同步变化（见 NoteViewFragment）。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -24,6 +25,7 @@
         app:titleTextColor="@color/inbox_text" />
 
     <ScrollView
+        android:id="@+id/scroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -36,7 +38,7 @@
             android:paddingHorizontal="12dp"
             android:paddingBottom="24dp">
 
-            <!-- 标签区（顶端单独显示） -->
+            <!-- 标签区（顶端单独显示；编辑态变成可增删） -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -84,6 +86,25 @@
                         android:text="无标签"
                         android:textColor="@color/inbox_sub"
                         android:textSize="13sp" />
+
+                    <!-- 编辑态：添加标签（弹窗里可手输或点常用标签） -->
+                    <TextView
+                        android:id="@+id/btn_add_tag"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/inbox_tag_chip_bg"
+                        android:clickable="true"
+                        android:contentDescription="添加标签"
+                        android:focusable="true"
+                        android:paddingStart="10dp"
+                        android:paddingTop="4dp"
+                        android:paddingEnd="10dp"
+                        android:paddingBottom="4dp"
+                        android:text="＋ 添加标签"
+                        android:textColor="@color/inbox_accent"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -97,7 +118,7 @@
                 android:textColor="@color/inbox_sub"
                 android:textSize="12sp" />
 
-            <!-- 正文卡片：轻点进编辑 -->
+            <!-- 正文卡片：查看态是纯文本/渲染后的正文，编辑态是输入框 -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/content_card"
                 android:layout_width="match_parent"
@@ -108,14 +129,36 @@
                 app:cardCornerRadius="12dp"
                 app:cardElevation="0dp">
 
-                <TextView
-                    android:id="@+id/content"
+                <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:lineSpacingExtra="3dp"
-                    android:padding="14dp"
-                    android:textColor="@color/inbox_text"
-                    android:textSize="15sp" />
+                    android:layout_height="wrap_content">
+
+                    <TextView
+                        android:id="@+id/content"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:lineSpacingExtra="3dp"
+                        android:padding="14dp"
+                        android:textColor="@color/inbox_text"
+                        android:textSize="15sp" />
+
+                    <EditText
+                        android:id="@+id/editor"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@null"
+                        android:gravity="top"
+                        android:hint="记录点什么… 使用 #标签 标记"
+                        android:imeOptions="flagNoExtractUi"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:minLines="8"
+                        android:maxLines="16"
+                        android:padding="14dp"
+                        android:textColor="@color/inbox_text"
+                        android:textColorHint="@color/inbox_sub"
+                        android:textSize="15sp"
+                        android:visibility="gone" />
+                </FrameLayout>
             </com.google.android.material.card.MaterialCardView>
 
             <TextView
@@ -128,4 +171,101 @@
                 android:textSize="12sp" />
         </LinearLayout>
     </ScrollView>
+
+    <!-- 编辑态底部：Markdown 工具栏在左、保存按钮在右（键盘弹出时贴在输入法上方） -->
+    <LinearLayout
+        android:id="@+id/edit_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone">
+
+        <HorizontalScrollView
+            android:id="@+id/md_toolbar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/md_hash"
+                    android:layout_width="42dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="井号"
+                    android:gravity="center"
+                    android:text="#"
+                    android:textColor="@color/inbox_sub"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/md_bold"
+                    android:layout_width="42dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="加粗"
+                    android:gravity="center"
+                    android:text="B"
+                    android:textColor="@color/inbox_sub"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/md_slash"
+                    android:layout_width="42dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="斜杠"
+                    android:gravity="center"
+                    android:text="/"
+                    android:textColor="@color/inbox_sub"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:id="@+id/md_bullet"
+                    android:layout_width="42dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="无序列表"
+                    android:gravity="center"
+                    android:text="•"
+                    android:textColor="@color/inbox_sub"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:id="@+id/md_ordered"
+                    android:layout_width="42dp"
+                    android:layout_height="38dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="有序列表"
+                    android:gravity="center"
+                    android:text="1."
+                    android:textColor="@color/inbox_sub"
+                    android:textSize="15sp" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/save"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:contentDescription="保存"
+            android:text="➤"
+            app:backgroundTint="@color/inbox_accent" />
+    </LinearLayout>
 </LinearLayout>
