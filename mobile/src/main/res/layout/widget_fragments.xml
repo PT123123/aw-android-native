@@ -54,19 +54,18 @@
         android:scaleType="fitXY"
         android:contentDescription="@string/widget_fragments_label" />
 
-    <!-- 「起床 … · 入睡 …」：常驻不隐藏。宽部件一行放得下，2 格宽放不下——
-         那时由 provider 改送带换行的两行文案（见 widget_fragments_stats_stacked），
-         所以 maxLines 必须留到 2；放不下才走 ellipsize 兜底。 -->
+    <!-- 「HH:mm起 HH:mm 睡」：常驻不隐藏，强制单行。autoSize 在放不下时自动缩字，
+         保证始终一行、不被 ellipsize 吃掉后半段；字体上限调小让它在窄宽也只占一行。 -->
     <TextView
         android:id="@+id/tv_frag_stats"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="3dp"
-        android:maxLines="2"
+        android:maxLines="1"
         android:ellipsize="end"
         android:autoSizeTextType="uniform"
-        android:autoSizeMinTextSize="9sp"
-        android:autoSizeMaxTextSize="12sp"
-        android:textSize="12sp"
+        android:autoSizeMinTextSize="8sp"
+        android:autoSizeMaxTextSize="11sp"
+        android:textSize="11sp"
         android:textColor="@color/widget_text_secondary" />
 </LinearLayout>

@@ -40,10 +40,9 @@
     <string name="widget_calendar_label">日历</string>
     <string name="widget_fragments_label">今日碎片</string>
     <string name="widget_fragments_desc">当天使用碎片热力与推断作息</string>
-    <string name="widget_fragments_stats">起床 %1$s · 入睡 %2$s</string>
-    <string name="widget_fragments_stats_stacked">起床 %1$s\n入睡 %2$s</string>
-    <string name="widget_fragments_no_wake">没起</string>
-    <string name="widget_fragments_no_sleep">没睡</string>
+    <string name="widget_fragments_stats">%1$s起 %2$s 睡</string>
+    <string name="widget_fragments_no_wake">无</string>
+    <string name="widget_fragments_no_sleep">无</string>
     <string name="widget_fragments_no_record">当天暂无使用记录</string>
     <string name="widget_fragments_grant_hint">需要授权「使用情况访问」，点按打开应用</string>
     <string name="widget_pin_screen_time_short">添加屏幕使用小部件</string>
