@@ -37,11 +37,11 @@ import kotlin.math.min
  * - 微缩（高度 <75dp）：隐藏标题行与统计行，只留点阵；
  * - 窄宽（宽度 <150dp，即 2 格宽）：标题让位——标题 +「更新于」两段文字挤不下，
  *   而「更新于」是点阵本身读不出来的信息，所以收标题（INVISIBLE 占位）、保留更新时间；
- *   底部起床 / 入睡换成两行排法，免得单行被 ellipsize 吃掉后半段；
+ *   底部起床 / 入睡强制单行（autoSize 缩字），不再折成两行，免得被 ellipsize 吃掉后半段；
  * - 其余尺寸：底部常驻一行「起床 … · 入睡 …」，**不按高度分档**——默认落位 3×2 只有
  *   2 格高，按高度卡会让这一行永久看不见。
  *
- * 作息推断不出来时写「没起 / 没睡」而不是留空：早上还没睡过、久没碰手机都不是「没内容」。
+ * 作息推断不出来时写「无」而不是留空：早上还没睡过、久没碰手机都不是「没内容」。
  *
  * 刻度同样自适应，空间不够就自动省掉、把位置让给点阵：
  * - 底部小时刻度（0/6/12/18）要位图高度 ≥90dp；
@@ -120,29 +120,24 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
                 ?: context.getString(R.string.widget_fragments_no_wake)
             val sleepText = day?.sleepMs?.let { HM_FMT.format(Date(it)) }
                 ?: context.getString(R.string.widget_fragments_no_sleep)
-            // 两种排法：宽部件一行放得下，2 格宽放不下就换成「起床 …\n入睡 …」两行
+            // 常驻一行「HH:mm起 HH:mm 睡」：强制单行，靠 autoSize 缩字保证一行放得下，不折行
             val statsText: String
-            val statsTextStacked: String
             when {
                 !permitted -> {
                     statsText = context.getString(R.string.widget_fragments_grant_hint)
-                    statsTextStacked = statsText
                 }
                 // 扫不到数据（极端情况）：这一行也照样占住，别让底部整块空掉
                 day == null -> {
                     statsText = context.getString(R.string.widget_fragments_no_record)
-                    statsTextStacked = statsText
                 }
                 else -> {
                     statsText = context.getString(R.string.widget_fragments_stats, wakeText, sleepText)
-                    statsTextStacked =
-                        context.getString(R.string.widget_fragments_stats_stacked, wakeText, sleepText)
                 }
             }
 
             for (id in ids) {
                 val opts = mgr.getAppWidgetOptions(id)
-                val views = buildViews(context, day?.slots, updatedText, statsText, statsTextStacked, opts)
+                val views = buildViews(context, day?.slots, updatedText, statsText, opts)
                 mgr.updateAppWidget(id, views)
             }
         }
@@ -152,7 +147,6 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
             slots: List<Double>?,
             updatedText: String,
             statsText: String,
-            statsTextStacked: String,
             opts: Bundle,
         ): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_fragments)
@@ -164,7 +158,7 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
             val narrow = minWidth in 1 until NARROW_MAX_WIDTH_DP
             val showHeader = !micro
             // 统计行不按高度分档、也不因窄宽收掉：默认落位 3×2 只有 2 格高，按高度卡会把
-            // 起床 / 入睡永久藏起来；2 格宽单行放不下就折成两行。只有微缩档（整行收起）不显示。
+            // 起床 / 入睡永久藏起来；强制单行、autoSize 缩字保证一行放得下。只有微缩档（整行收起）不显示。
             val showStats = !micro && statsText.isNotEmpty()
 
             views.setViewVisibility(R.id.ll_frag_header, if (showHeader) View.VISIBLE else View.GONE)
@@ -174,15 +168,15 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
             views.setViewVisibility(R.id.tv_frag_updated, if (showHeader) View.VISIBLE else View.GONE)
             views.setViewVisibility(R.id.tv_frag_stats, if (showStats) View.VISIBLE else View.GONE)
             views.setTextViewText(R.id.tv_frag_updated, updatedText)
-            // 2 格宽用两行排法，免得单行被 ellipsize 吃掉「入睡 23:40」那一半
-            views.setTextViewText(R.id.tv_frag_stats, if (narrow) statsTextStacked else statsText)
+            // 强制单行：autoSize 已在放不下时缩字，这里直接给单行文案
+            views.setTextViewText(R.id.tv_frag_stats, statsText)
 
             // 点阵位图按「部件实际 dp 尺寸 − 内边距/标题/统计行」推算像素尺寸
             val density = context.resources.displayMetrics.density
             val dpW = if (minWidth > 0) minWidth else 220
             val dpH = if (minHeight > 0) minHeight else 120
             val contentW = dpW - WIDGET_PADDING_H_DP
-            val statsDp = if (narrow) STATS_DP_STACKED else STATS_DP
+            val statsDp = STATS_DP
             val contentH = dpH - WIDGET_PADDING_V_DP -
                 (if (showHeader) HEADER_DP else 0) - (if (showStats) statsDp else 0)
             views.setImageViewBitmap(
@@ -291,9 +285,6 @@ class FragmentsWidgetProvider : AppWidgetProvider() {
         private const val WIDGET_PADDING_V_DP = 16
         private const val HEADER_DP = 18
         private const val STATS_DP = 17
-
-        /** 2 格宽时统计行折成两行（起床 / 入睡 各一行），高度大约翻倍 */
-        private const val STATS_DP_STACKED = 31
 
         private fun openAppIntent(context: Context): PendingIntent =
             PendingIntent.getActivity(
