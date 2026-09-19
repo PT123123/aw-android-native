@@ -117,6 +117,11 @@ interface SyncApi {
     @GET("api/0/sync/debuglog")
     suspend fun getDebugLog(@Query("after") after: Int): List<DebugEntry>
 
+    // ---- 数据修订号（客户端低频轮询，值变 = 本地业务库被远端改动过）----
+
+    @GET("api/0/sync/revision")
+    suspend fun getRevision(): RevisionResponse
+
     // ---- Cloudflare D1 云同步 ----
 
     /** 触发一次 D1 云同步 */
