@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -21,11 +22,25 @@ import kotlinx.coroutines.launch
  */
 class RestTodoSource(context: Context) : TodoSource() {
 
+    companion object {
+        /** 加载失败的最大重试次数（同收件箱页 fetch：上限 3 次） */
+        private const val MAX_LOAD_RETRIES = 3
+
+        /** 两次重试之间的退避间隔（内嵌 server 冷启动窗口，同收件箱页 1500ms） */
+        private const val LOAD_RETRY_DELAY_MS = 1500L
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val lock = Any()
 
     private var mTasks: List<TodoTask> = emptyList()
     private var mLists: List<TodoList> = emptyList()
+
+    /** 在途加载序号：load 请求串行的去重凭据（写后 reload 与手动刷新撞车时只跑一轮） */
+    private var loadSeq = 0L
+
+    /** 加载失败重试计数（内嵌 server 冷启动尚未就绪时退避重试） */
+    private var retryCount = 0
 
     override var ready: Boolean = false
         private set
@@ -47,7 +62,16 @@ class RestTodoSource(context: Context) : TodoSource() {
 
     // ── 加载 ────────────────────────────────────────────
 
+    /**
+     * 全量拉取（在途去重 + 失败退避重试）。
+     *
+     * - 在途去重：一轮加载在跑时，后续 [load]（含 8 处写后 [reload]）只记 pending，
+     *   在途轮结束后补一轮——结果等价于每轮都跑，但不会向本机 server 同时打多个全量请求。
+     * - 失败重试：内嵌 Rust server 冷启动需几秒，首次加载失败按 1500ms 退避最多重试 3 次
+     *   （同收件箱页 fetch 的重试参数），避免任务页停在空态。
+     */
     override fun load() {
+        val seq = synchronized(lock) { ++loadSeq }
         scope.launch {
             try {
                 val response = TodoApi.service.getTodos()   // 不带 completed → 返回全部（含已完成）
@@ -58,7 +82,7 @@ class RestTodoSource(context: Context) : TodoSource() {
                 for (t in tasks) {
                     if (t.listId != 0L && t.listId !in knownListIds) t.listId = 0L
                 }
-                synchronized(lock) {
+                val superseded = synchronized(lock) {
                     mTasks = tasks
                     mLists = lists.map { l ->
                         TodoList(
@@ -69,15 +93,30 @@ class RestTodoSource(context: Context) : TodoSource() {
                         )
                     }
                     ready = true
+                    seq != loadSeq
                 }
+                if (superseded) {
+                    // 加载期间又来了新的 load 请求（在途合并）：补一轮，让最新请求也拿到结果
+                    load()
+                    return@launch
+                }
+                retryCount = 0
                 notifyChanged()
             } catch (t: Throwable) {
-                reportError("加载失败：${t.message}")
+                val retried = synchronized(lock) { seq == loadSeq && retryCount++ < MAX_LOAD_RETRIES }
+                if (retried) {
+                    // 退避后重试（仅在仍为最新一轮时）：内嵌 server 未就绪的窗口里不放弃
+                    delay(LOAD_RETRY_DELAY_MS)
+                    load()
+                } else {
+                    retryCount = 0
+                    reportError("加载失败：${t.message}")
+                }
             }
         }
     }
 
-    /** 写操作收尾：全量重新拉取（契约 §3.5） */
+    /** 写操作收尾：全量重新拉取（契约 §3.5）；在途去重逻辑在 [load] 内完成 */
     private fun reload() {
         load()
     }
