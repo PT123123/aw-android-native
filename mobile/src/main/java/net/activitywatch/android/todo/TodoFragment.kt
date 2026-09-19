@@ -23,8 +23,12 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.TodoFragmentBinding
@@ -32,6 +36,8 @@ import net.activitywatch.android.inbox.TagSuggestionView
 import net.activitywatch.android.inbox.buildMarkdownToolbar
 import net.activitywatch.android.inbox.formatTagBreadcrumb
 import net.activitywatch.android.inbox.tagParentPath
+import net.activitywatch.android.sync.LanPull
+import net.activitywatch.android.sync.RemoteSyncBus
 import net.activitywatch.android.ui.GradientBackground
 
 /**
@@ -69,6 +75,10 @@ class TodoFragment : Fragment() {
      * 由 [TodoSource.createTask] 的 onCreated 回调写入，下一次 render 时消费。
      */
     private var pendingScrollTaskId: Long = -1L
+
+    /** 局域网拉取：刷新/进页时先跨设备拉一轮，有落地才重拉（同收件箱页） */
+    private var lanPullJob: Job? = null
+    private var lanPullPending = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -186,7 +196,7 @@ class TodoFragment : Fragment() {
         binding.list.layoutManager = LinearLayoutManager(requireContext())
         binding.list.adapter = adapter
 
-        binding.swipe.setOnRefreshListener { source.load() }
+        binding.swipe.setOnRefreshListener { loadInitial() }
         // 右下角按钮 = 从底部展开快速添加输入层（同笔记页快速输入）
         binding.fab.setOnClickListener { showQuickAddDialog() }
 
@@ -210,8 +220,48 @@ class TodoFragment : Fragment() {
 
         TodoRepository.addErrorListener(errorToast)
         TodoRepository.addListener(dataChanged)
-        source.load()
+        loadInitial()
         render()
+
+        // 应用级「远端数据已落地」事件：同步链路成功 / 修订号变化时重拉一次。
+        // repeatOnLifecycle(STARTED)：离开页面自动停止订阅与 15s 修订号轮询，回来再续。
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    RemoteSyncBus.events.collectLatest { loadInitial() }
+                }
+                launch { RemoteSyncBus.pollRevisionLoop() }
+            }
+        }
+    }
+
+    // ── 跨设备拉取（笔记页 loadInitial/triggerLanPull 同款） ──
+
+    /** 任务页刷新形态（对齐收件箱 loadInitial）：先拉跨设备、有落地才重拉列表 */
+    private fun loadInitial() {
+        triggerLanPull()
+        source.load()
+    }
+
+    /**
+     * 并行触发一次局域网拉取（不阻塞本机列表先渲染），拉完有落地再重载一次列表。
+     * 已有拉取在跑时不重复发起，只记 pending，结束后补一轮（合并连续触发）。
+     * 全程静默：非 Wi-Fi / 无配对设备 / 失败都不打扰任务页。
+     */
+    private fun triggerLanPull() {
+        if (lanPullJob?.isActive == true) {
+            lanPullPending = true
+            return
+        }
+        lanPullPending = false
+        lanPullJob = viewLifecycleOwner.lifecycleScope.launch {
+            val synced = runCatching { LanPull.syncAllPairedNow() }.getOrDefault(0)
+            if (synced > 0) source.load()
+            if (lanPullPending) {
+                lanPullPending = false
+                triggerLanPull()
+            }
+        }
     }
 
     override fun onDestroyView() {

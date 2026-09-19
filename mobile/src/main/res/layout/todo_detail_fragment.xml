@@ -238,6 +238,26 @@
                 android:layout_marginTop="20dp"
                 android:text="删除任务"
                 android:textColor="@color/aw_danger" />
+
+            <!-- 详细信息（同笔记详情：来源设备 / 版本号 / 创建与更新时间 / 同步时间），只读 -->
+            <TextView
+                android:id="@+id/detailMetaTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="详细信息"
+                android:textColor="@color/aw_text_secondary"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/detailMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="@color/aw_text_secondary"
+                android:textIsSelectable="true"
+                android:textSize="13sp" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </LinearLayout>

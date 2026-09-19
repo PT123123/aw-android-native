@@ -182,6 +182,11 @@ data class TrashOpResult(
     @SerializedName("id") val id: Long? = null
 )
 
+// GET api/0/sync/revision：数据修订号（服务端 apply_snapshot 落库后递增）
+data class RevisionResponse(
+    @SerializedName("revision") val revision: Long = 0
+)
+
 // 宽松承载各操作端点的返回（cleared / deleted / updated / saved / id 等）
 data class OpResult(
     @SerializedName("cleared") val cleared: Int? = null,

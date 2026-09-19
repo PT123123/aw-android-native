@@ -191,5 +191,7 @@ object LanSyncNetworkMonitor {
         delay(BURST_WAIT_MS)
         val synced = runCatching { LanPull.syncAllPairedNow() }.getOrDefault(0)
         Log.i(TAG, "重发现窗口结束，本轮双向同步成功 $synced 台设备")
+        // 自愈轮若拉回了远端改动，同样通知存活中的页面重拉（收件箱/任务页订阅）
+        if (synced > 0) RemoteSyncBus.emitRemoteDataLanded()
     }
 }
