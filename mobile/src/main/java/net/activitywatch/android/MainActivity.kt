@@ -1,7 +1,6 @@
 package net.activitywatch.android
 
 import android.Manifest
-import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.appwidget.AppWidgetManager
@@ -12,10 +11,8 @@ import android.content.pm.PackageManager
 import android.graphics.PorterDuff
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
@@ -300,30 +297,6 @@ class MainActivity : AppCompatActivity() {
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_POST_NOTIFICATIONS)
-        }
-
-        // 精确闹钟（Android 12+ 的「闹钟和提醒」特殊权限，无法弹窗申请）：
-        // 缺失时用 Snackbar 引导跳系统设置，不阻塞使用
-        if (Build.VERSION.SDK_INT >= 31) {
-            val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            if (!am.canScheduleExactAlarms()) {
-                Snackbar.make(
-                    binding.coordinatorLayout,
-                    "任务到期提醒需要「闹钟和提醒」权限",
-                    Snackbar.LENGTH_LONG
-                ).setAction("去设置") {
-                    try {
-                        startActivity(
-                            Intent(
-                                Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                                Uri.parse("package:$packageName"),
-                            )
-                        )
-                    } catch (e: Throwable) {
-                        Log.w(TAG, "打开精确闹钟设置页失败", e)
-                    }
-                }.show()
-            }
         }
     }
 

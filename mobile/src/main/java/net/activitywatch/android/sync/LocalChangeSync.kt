@@ -78,6 +78,8 @@ object LocalChangeSync {
             synchronized(this) { if (target > syncedSeq) syncedSeq = target }
             if (synced > 0) {
                 Log.i(TAG, "本地变更已同步到 $synced 台设备")
+                // 本轮把本机变更推到了对端、也可能拉回了对端改动：通知存活中的页面重拉
+                RemoteSyncBus.emitRemoteDataLanded()
             } else {
                 Log.d(TAG, "本地变更已记录，但当前无可用同步链路（非 Wi-Fi / 无配对设备）")
             }

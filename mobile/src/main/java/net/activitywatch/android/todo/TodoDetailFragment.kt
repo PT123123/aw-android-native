@@ -18,6 +18,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.TodoDetailFragmentBinding
+import net.activitywatch.android.inbox.DeviceNameResolver
+import net.activitywatch.android.sync.parseEpochMilli
 import net.activitywatch.android.ui.GradientBackground
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -294,6 +296,7 @@ class TodoDetailFragment : DialogFragment() {
         b.detailPriorityValue.text = priorityLabel(selectedPriority)
         b.detailRecurrenceValue.text = recurrenceLabel(selectedRecurrence)
         refreshDue()
+        renderMeta(task)
 
         // 能力降级：服务端不支持子任务 / 重复
         val canSubtask = source.supportsSubtasks
@@ -309,6 +312,35 @@ class TodoDetailFragment : DialogFragment() {
         subtaskAdapter.submit(task.subtasks)
         b.subtaskList.visibility =
             if (task.subtasks.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    /**
+     * 「详细信息」只读块（对齐笔记详情）：来源设备、版本号、创建 / 更新时间、最近同步时间。
+     * 数据来自列表快照（RestTodoSource 全量 reload），面板内不发网络请求。
+     */
+    private fun renderMeta(task: TodoTask) {
+        val lines = mutableListOf<String>()
+        task.deviceId?.takeIf { it.isNotBlank() }?.let { dev ->
+            lines += "来源设备：${DeviceNameResolver.resolve(requireContext(), dev)}"
+        }
+        if (task.version > 0) lines += "版本：第 ${task.version} 版"
+        parseEpochMilli(task.createdAt)?.let {
+            lines += "创建：${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(it)}"
+        }
+        parseEpochMilli(task.updatedAt)?.let {
+            lines += "更新：${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(it)}"
+        }
+        parseEpochMilli(task.syncedAt)?.let {
+            lines += "同步：${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(it)}"
+        }
+        if (lines.isEmpty()) {
+            b.detailMetaTitle.visibility = View.GONE
+            b.detailMeta.visibility = View.GONE
+        } else {
+            b.detailMetaTitle.visibility = View.VISIBLE
+            b.detailMeta.visibility = View.VISIBLE
+            b.detailMeta.text = lines.joinToString("\n")
+        }
     }
 
     private fun refreshDue() {

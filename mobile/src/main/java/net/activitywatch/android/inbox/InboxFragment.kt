@@ -22,13 +22,17 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.InboxFragmentBinding
 import net.activitywatch.android.sync.LanPull
+import net.activitywatch.android.sync.RemoteSyncBus
 import net.activitywatch.android.todo.TodoApi
 import net.activitywatch.android.ui.GradientBackground
 
@@ -199,6 +203,18 @@ class InboxFragment : Fragment() {
         adapter.markdownEnabled = InboxPrefs.listMarkdown(requireContext())
 
         loadInitial()
+
+        // 应用级「远端数据已落地」事件：局域网同步成功 / 修订号变化时整页重拉。
+        // repeatOnLifecycle(STARTED)：离开页面自动停止订阅与 15s 修订号轮询，回来再续。
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    RemoteSyncBus.events.collectLatest { loadInitial() }
+                }
+                launch { RemoteSyncBus.pollRevisionLoop() }
+            }
+        }
+
         // 设置项：进入页面即弹出输入框（等首帧渲染完再弹，避免 BottomSheet 抢焦点失败）
         if (InboxPrefs.autoInputOnStart(requireContext())) {
             view.post { if (isAdded) showQuickNoteDialog() }

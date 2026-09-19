@@ -48,6 +48,12 @@ data class TodoTask(
     var updatedAt: String = "",
     var sortOrder: Int = 0,
     var subtasks: MutableList<TodoSubtask> = mutableListOf(),
+    /** 服务端全局版本号（每次写 +1，同步仲裁用） */
+    var version: Long = 0,
+    /** 最后写入端 device_id（详情页「详细信息」解析为设备名） */
+    var deviceId: String? = null,
+    /** 最近一次同步落到本库的时间（RFC3339，可空） */
+    var syncedAt: String? = null,
 ) {
     fun hasDue(): Boolean = dueDate.isNotBlank()
 
@@ -77,24 +83,22 @@ enum class TodoView { INBOX, TODAY, NEXT7, ALL, LIST }
 
 /** 排序模式（右上角选项菜单选择，持久化到 todo_prefs/sort_mode） */
 enum class TodoSortMode {
-    DEFAULT,        // 优先级降序 → 有期限优先 → 期限升序 → sortOrder 升序 → id 升序
-    RECENTLY_ADDED, // 按创建时间降序
+    DEFAULT,        // 已废弃语义：等同于 RECENTLY_ADDED（历史持久化值兼容保留）
+    RECENTLY_ADDED, // 按创建时间降序（应用的默认排序）
     REVERSED,       // 默认排序的倒置
     BY_PRIORITY,    // 按优先级降序
     BY_DUE_DATE,    // 按截止日期升序（有期限在前，无期限在后）
 }
 
 // 各模式的未完成组 Comparator（已完成组始终按 completedAt 降序，见 TodoSource.sortTasks）
-internal val DEFAULT_OPEN_COMPARATOR = compareByDescending<TodoTask> { it.priority }
-    .thenBy { it.dueDate.isEmpty() }
-    .thenBy { it.dueDate }
-    .thenBy { it.sortOrder }
-    .thenBy { it.id }
 
 internal val RECENTLY_ADDED_COMPARATOR = compareByDescending<TodoTask> { it.createdAt }
     .thenByDescending { it.priority }
     .thenBy { it.dueDate.isEmpty() }
     .thenBy { it.dueDate }
+
+// 「默认」= 最近添加（createdAt 降序）：任务按新增顺序展示，新加的排最前
+internal val DEFAULT_OPEN_COMPARATOR = RECENTLY_ADDED_COMPARATOR
 
 internal val REVERSED_COMPARATOR = compareBy<TodoTask> { it.priority }
     .thenByDescending { it.dueDate.isEmpty() }
@@ -234,6 +238,9 @@ fun TodoResponse.toTask(): TodoTask = TodoTask(
     subtasks = subtasks
         .map { TodoSubtask(id = it.id, title = it.title, completed = it.completed) }
         .toMutableList(),
+    version = version,
+    deviceId = deviceId,
+    syncedAt = syncedAt,
 )
 
 /** 日期（yyyy-MM-dd）→ 服务端 RFC3339：当天零点按 UTC 表示 */
