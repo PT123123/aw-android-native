@@ -93,9 +93,7 @@ enum class TodoSortMode {
 // 各模式的未完成组 Comparator（已完成组始终按 completedAt 降序，见 TodoSource.sortTasks）
 
 internal val RECENTLY_ADDED_COMPARATOR = compareByDescending<TodoTask> { it.createdAt }
-    .thenByDescending { it.priority }
-    .thenBy { it.dueDate.isEmpty() }
-    .thenBy { it.dueDate }
+    .thenByDescending { it.id }
 
 // 「默认」= 最近添加（createdAt 降序）：任务按新增顺序展示，新加的排最前
 internal val DEFAULT_OPEN_COMPARATOR = RECENTLY_ADDED_COMPARATOR
