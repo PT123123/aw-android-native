@@ -1,6 +1,6 @@
 import io
 
-p = r"C:\Users\<user>\Desktop\aw-android\aw-server-rust\aw-server\src\android\mod.rs"
+p = "aw-server-rust/aw-server/src/android/mod.rs"   # 相对仓库根
 raw = io.open(p, 'rb').read()
 crlf = b'\r\n' in raw
 s = raw.decode('utf-8').replace('\r\n', '\n')

@@ -23,14 +23,17 @@
 
 set windows-shell := ["pwsh.exe", "-NoLogo", "-NoProfile", "-Command"]
 
-# ---- 工具链路径（按需修改）----
-export JAVA_HOME    := "C:/Users/<user>/Tools/jdk-17/zulu17.68.203-ca-jdk17.0.20.1-win_x64"
-export ANDROID_HOME := "C:/Users/<user>/AppData/Local/Android/Sdk"
+# ---- 工具链路径 ----
+# 默认按「家目录下的相对位置」解析，换机器/换用户名都不用改这里；
+# 路径不在一处时用同名环境变量覆盖（JAVA_HOME / ANDROID_HOME / GRADLE_BIN / ADB）。
+HOME_DIR            := replace(home_directory(), "\\", "/")
+export JAVA_HOME    := env_var_or_default("JAVA_HOME",    HOME_DIR / "Tools/jdk-17/zulu17.68.203-ca-jdk17.0.20.1-win_x64")
+export ANDROID_HOME := env_var_or_default("ANDROID_HOME", HOME_DIR / "AppData/Local/Android/Sdk")
 # Gradle JVM 走本机 HTTP 代理（大文件会被代理掐断，但 Gradle 依赖体积极小，正常）
 export GRADLE_OPTS  := "-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=10809 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=10809"
 
-GRADLE       := "C:/Users/<user>/.gradle/wrapper/dists/gradle-8.1-bin/2eyty4r6kz6fpakefpk52nbbm/gradle-8.1/bin/gradle.bat"
-export ADB   := "C:/Users/<user>/AppData/Local/Android/Sdk/platform-tools/adb.exe"
+GRADLE       := env_var_or_default("GRADLE_BIN", HOME_DIR / ".gradle/wrapper/dists/gradle-8.1-bin/2eyty4r6kz6fpakefpk52nbbm/gradle-8.1/bin/gradle.bat")
+export ADB   := env_var_or_default("ADB",        HOME_DIR / "AppData/Local/Android/Sdk/platform-tools/adb.exe")
 
 DEBUG_APK    := "mobile/build/outputs/apk/debug/mobile-debug.apk"
 RELEASE_APK  := "mobile/build/outputs/apk/release/mobile-release.apk"

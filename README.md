@@ -174,7 +174,7 @@ https://github.com/PT123123/aw-android-native/releases/latest/download/aw-androi
 
 - 包名 `dev.pt123123.awandroid`（改自上游 `net.activitywatch.android`，避免与官方 ActivityWatch 同包名不同签名而装不上）；debug 变体带 `.debug` 后缀，可与 release 版共存。
 - 签名材料在仓库根：`keystore.properties` + `aw-release.p12`，**都不入 git**。缺失时 release 包退化为未签名（刻意不回退 debug 签名——debug key 换台机器就变，会让已安装的人无法覆盖升级）。
-- **keystore 丢了 = 所有已安装设备以后都无法覆盖升级**，只能卸载重装。备份见 `C:\Users\<user>\Tools\keystores\aw-android-20260917\`。
+- **keystore 丢了 = 所有已安装设备以后都无法覆盖升级**，只能卸载重装。keystore 与口令请存在仓库之外的密钥目录里做好备份（两者都不入库）。
 - 每次发版 `versionCode` 必须递增：覆盖安装时 Android 会拒装 versionCode 未增的包（`INSTALL_FAILED_VERSION_DOWNGRADE`），`just release` 已内置 +1。
 
 > 上游遗留、本项目不再使用：`.github/workflows/build.yml`（需 ubicloud runner + Play 密钥，已删除）、`scripts/sign_apk.sh`、`android.jks.age`、`fastlane/`（Play 流程）。

@@ -1,6 +1,6 @@
 import io
 
-p = r"C:\Users\<user>\Desktop\aw-android\mobile\src\main\java\net\activitywatch\android\MainActivity.kt"
+p = "mobile/src/main/java/net/activitywatch/android/MainActivity.kt"   # 相对仓库根
 raw = io.open(p, 'rb').read()
 crlf = b'\r\n' in raw
 s = raw.decode('utf-8').replace('\r\n', '\n')
