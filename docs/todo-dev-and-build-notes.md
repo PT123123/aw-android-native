@@ -43,7 +43,7 @@
 
 ### 界面参考（aw-qtui，TickTick 式三栏）
 
-- 克隆于 `C:\Users\<user>\AppData\Local\Temp\aw-qtui-ref`（仅参考）。
+- 参考实现在临时目录克隆（如 `%TEMP%\aw-qtui-ref`，仅参考）。
 - **清单用 tags 模拟**：`listId = tag字符串哈希(qHash%1000000+1)`，listId 0 = 收集箱；创建清单不实际写入服务端，tag 随任务自动出现。
 - subtasks / recurrence 暂不支持。
 - 视图枚举：INBOX / TODAY / NEXT7 / ALL / LIST：
@@ -76,7 +76,7 @@
 - `build/linker-wrapper/linker-wrapper.py` `import pipes`，而系统默认 `python` = **3.14.7**（`pipes` 自 3.13 移除）→ `ModuleNotFoundError`。
 - 手工把 py 改成 shlex **无效**：`generateLinkerWrapper` 每次构建会重新生成覆盖。
 - **解法**：构建前把 Python 3.12 目录前置到 PATH
-  `C:\Users\<user>\AppData\Roaming\uv\python\cpython-3.12.14-windows-x86_64-none`
+  `%USERPROFILE%\AppData\Roaming\uv\python\cpython-3.12.14-windows-x86_64-none`
   并 `gradlew --stop` 重启 daemon 才生效。
 
 ### 2. openssl-src 从源码编 OpenSSL（死结 1：Configure 重拼反斜杠路径）
@@ -129,8 +129,8 @@
 
 ```powershell
 # 前置 Python 3.12（linker-wrapper 需要 pipes）
-$env:PATH = 'C:\Users\<user>\AppData\Roaming\uv\python\cpython-3.12.14-windows-x86_64-none;' + $env:PATH
-cd C:\Users\<user>\Desktop\aw-android
+$env:PATH = "$env:USERPROFILE\AppData\Roaming\uv\python\cpython-3.12.14-windows-x86_64-none;" + $env:PATH
+cd <仓库根>
 .\gradlew.bat --stop                 # 改环境后必须重启 daemon
 .\gradlew.bat :mobile:cargoBuildArm :mobile:cargoBuildArm64 --console=plain   # Rust .so
 .\gradlew.bat :mobile:assembleDebug --console=plain                           # 完整 APK
@@ -145,7 +145,7 @@ cd C:\Users\<user>\Desktop\aw-android
 ## 六、环境约束备忘
 
 - 默认 `python` = 3.14.7（无 pipes）；可用的 Python 3.12 见上。
-- NDK：`C:\Users\<user>\AppData\Local\Android\Sdk\ndk\25.2.9519653`。
+- NDK：`%LOCALAPPDATA%\Android\Sdk\ndk\25.2.9519653`。
 - `build.gradle` cargo.exec（Windows 分支）已固化：`OPENSSL_SRC_PERL=C:/msys64/usr/bin/perl.exe`、CC 裸 basename(26)、PATH 前置 NDK bin + MSYS bin、`MAKEFLAGS=-j4`。
 - submodule 工作区未提交修改：`compile-android.sh`（Windows NDK 修复，无备份）、`aw-server/Cargo.toml`、`aw-sync-rust/Cargo.toml`、`aw-server/src/android/mod.rs`（方案 A + E0061 修复）——**任意 checkout/reset/submodule update 会冲掉，注意保留**。
 

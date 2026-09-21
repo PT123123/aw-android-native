@@ -14,7 +14,7 @@ def patch(path, old, new, desc):
 
 # 1) aw-server: remove openssl-sys vendored
 patch(
-    r"C:\Users\<user>\Desktop\aw-android\aw-server-rust\aw-server\Cargo.toml",
+    "aw-server-rust/aw-server/Cargo.toml",   # 相对仓库根
     'android_logger = "0.13"\nopenssl-sys = { version = "0.9.82", features = ["vendored"]}\naw-client-rust = { path = "../aw-client-rust" }',
     'android_logger = "0.13"\naw-client-rust = { path = "../aw-client-rust" }',
     "aw-server remove openssl-sys vendored"
@@ -22,7 +22,7 @@ patch(
 
 # 2) aw-sync-rust: add rustls TLS backend to reqwest (match aw-client-rust)
 patch(
-    r"C:\Users\<user>\Desktop\aw-android\aw-server-rust\aw-sync-rust\Cargo.toml",
+    "aw-server-rust/aw-sync-rust/Cargo.toml",   # 相对仓库根
     'reqwest = { version = "0.12", default-features = false, features = ["json", "blocking"] }',
     'reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "rustls-tls-native-roots"] }',
     "aw-sync-rust reqwest + rustls-tls-native-roots"

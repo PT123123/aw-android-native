@@ -13,14 +13,14 @@ def patch(path, replacements):
     io.open(path, 'wb').write(out)
     print("OK:", path)
 
-patch(r"C:\Users\<user>\Desktop\aw-android\mobile\src\main\java\net\activitywatch\android\todo\TodoAdapter.kt", [
+patch("mobile/src/main/java/net/activitywatch/android/todo/TodoAdapter.kt", [   # 相对仓库根
     ("    private fun dueColor(ctx: android.content.Context, due: String, completed: Boolean): Int {",
      "    private fun dueColor(due: String, completed: Boolean): Int {"),
     ("b.dueDate.setTextColor(ContextCompat.getColor(ctx, dueColor(ctx, due, task.completed)))",
      "b.dueDate.setTextColor(ContextCompat.getColor(ctx, dueColor(due, task.completed)))"),
 ])
 
-patch(r"C:\Users\<user>\Desktop\aw-android\mobile\src\main\java\net\activitywatch\android\todo\TodoDetailDialog.kt", [
+patch("mobile/src/main/java/net/activitywatch/android/todo/TodoDetailDialog.kt", [   # 相对仓库根
     ("                cal.time = SimpleDateFormat(\"yyyy-MM-dd\", Locale.US).parse(it)",
      "                SimpleDateFormat(\"yyyy-MM-dd\", Locale.US).parse(it)?.let { parsed -> cal.time = parsed }"),
 ])
