@@ -95,3 +95,6 @@ fastlane/metadata/android/en-US/images/icon.png
 
 # 会话日志导出
 aw-webui-inbox.json
+
+# 服务端源码改为仓库外的共享目录（aw-server-rust 是指向 ../aw-server-plus 的 junction）
+/aw-server-rust

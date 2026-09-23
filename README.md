@@ -92,11 +92,11 @@ Inbox 是本分支的核心功能之一，背后由 [`aw-server-rust` 子模块]
 
 ## 架构
 
-- **内嵌服务器**：应用通过 JNI 启动 [`aw-server-rust`](https://github.com/PT123123/aw-server-rust)（本仓库的 `aw-server-rust` 子模块，亦为定制分支），监听 `127.0.0.1:5600`。`RustInterface` 负责启动与生命周期管理。
+- **内嵌服务器**：应用通过 JNI 启动 [`aw-server-plus`](https://github.com/PT123123/aw-server-plus)（定制分支，亦即 workspace 里共享的 `aw-server-plus/` 目录；本仓库 `aw-server-rust` 是指向它的 junction，不再是子模块），监听 `127.0.0.1:5600`。`RustInterface` 负责启动与生命周期管理。
 - **数据采集**：`UsageStatsWatcher`（基于 UsageStats）与 `ChromeWatcher` 采集应用 / 浏览器使用数据并以心跳上报。
 - **原生页面数据流**：原生 Fragment 通过 `common/` 下的 API 客户端（`AwApiClient` 等）调用本地服务器；`inbox/` 使用独立的本地 API 与 Room 缓存。
 - **桌面小部件**：`widget/` 下三个 `AppWidgetProvider`（屏幕使用 / 今日碎片 / 日历）、统一刷新入口 `WidgetUpdater`，以及系统口径数据源 `ScreenTimeStats`（总量走 `UsageEvents` 并集，逐包明细走 `queryUsageStats`，与仪表盘「概览」共用）；碎片的单日扫描在 `dashboard/DayFragments`，碎片页 Tab 与小部件共用；见[上文](#桌面小部件app-widgets)。
-- **子模块定制点**：`aw-server-rust` 分支集成了 `aw-inbox-rust`（Inbox 服务）、`aw-sync-rust`（局域网同步）、CORS 放开（便于局域网访问），并做了 JNI 内存安全、SQLite 崩溃修复、日志系统完善等加固。
+- **服务端定制点**：`aw-server-plus` 分支集成了 `aw-inbox-rust`（Inbox 服务）、`aw-sync-rust`（局域网同步）、CORS 放开（便于局域网访问），并做了 JNI 内存安全、SQLite 崩溃修复、日志系统完善等加固。
 
 ---
 
@@ -104,7 +104,19 @@ Inbox 是本分支的核心功能之一，背后由 [`aw-server-rust` 子模块]
 
 构建本应用需要先编译 `aw-server-rust`（`./aw-server-rust`）。
 
-如果还没有初始化子模块：`git submodule update --init --recursive`。
+> **服务端源码位置变了**：它与 `aw-qtui` 共用同一份 checkout，实体目录在仓库外的
+> `../aw-server-plus`，本仓库的 `aw-server-rust` 只是指向它的 junction（构建脚本路径不变）。
+> 新机器初始化：
+>
+> ```powershell
+> git clone git@github.com:PT123123/aw-server-plus.git <workspace>/aw-server-plus
+> New-Item -ItemType Junction -Path '<workspace>/aw-android-native/aw-server-rust' `
+>          -Target '<workspace>/aw-server-plus'
+> ```
+>
+> 交叉编译产物仍写在 `aw-server-plus/target/`（`rust-android-gradle` 按 `<module>/target` 找库）。
+
+`res/drawable/media` 仍是子模块，未初始化时：`git submodule update --init --recursive`。
 
 > **提示**
 > 如果不想折腾 Rust 环境，可以从 [aw-server-rust 的 CI 产物](https://github.com/ActivityWatch/aw-server-rust/actions/workflows/build.yml) 下载 jniLibs，手动放进 `mobile/src/main/jniLibs`，跳过下面编译 Rust 的步骤。
@@ -128,7 +140,7 @@ pushd aw-server-rust && ./install-ndk.sh; popd    # 配置并（如缺失）安�
 
 ### 在 Windows 上构建
 
-顶层构建完全由 **Gradle** 驱动——编排层不再使用 `make`/`cmake`/`ninja`（已删除 `Makefile`）。先初始化子模块：
+顶层构建完全由 **Gradle** 驱动——编排层不再使用 `make`/`cmake`/`ninja`（已删除 `Makefile`）。先准备服务端源码（共享目录 + junction，见[构建](#构建)）与 `media` 子模块：
 `git submodule update --init --recursive`。
 
 **推荐方式 — 任意 shell 下使用 `./gradlew`（PowerShell / Git Bash / cmd）。**
