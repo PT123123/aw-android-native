@@ -5,6 +5,13 @@
     <dimen name="nav_header_vertical_spacing">8dp</dimen>
     <dimen name="nav_header_height">102dp</dimen>
     <dimen name="fab_margin">16dp</dimen>
+    <!-- 抽屉（侧边栏）宽度。必须写死宽度，不能用 wrap_content：
+         行内标题是 layout_width=0 + weight=1，而 DrawerLayout 把抽屉按
+         「屏宽 − 64dp（MIN_DRAWER_MARGIN）」的 AT_MOST 来测量，权重会把标题
+         撑满这段可用宽度，连带整条抽屉一起膨胀（实测 1600px 屏上占 1440px，右侧约 3/4 空白）。
+         220dp 是内容实需：48dp 缩进 + 24dp 图标 + 28dp 间距 + 文本(最长「笔记设置」≈56dp) + 16dp 尾部留白，
+         并给头部标题「ActivityWatch for Android」留一行不折行的余量。 -->
+    <dimen name="nav_drawer_width">220dp</dimen>
     <dimen name="app_bar_height">180dp</dimen>
     <dimen name="text_margin">16dp</dimen>
 </resources>
