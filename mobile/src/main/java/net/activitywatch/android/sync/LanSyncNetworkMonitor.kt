@@ -48,6 +48,9 @@ object LanSyncNetworkMonitor {
     private const val BURST_SECS = 5
     private const val BURST_WAIT_MS = 4000L
 
+    /** 组播锁的持有方标识：重发现窗口期间（见 [MulticastLocks]） */
+    private const val HEAL_OWNER = "lan-heal-window"
+
     /** 自愈的最小触发间隔：网络抖动期不反复重发现 */
     private const val HEAL_MIN_INTERVAL_MS = 10_000L
 
@@ -109,7 +112,7 @@ object LanSyncNetworkMonitor {
                 Log.i(TAG, "Wi-Fi IP 变为 $ip：刷新注入 IP 并触发一次重发现同步")
                 scope.launch {
                     rust.applySyncWifiIp(app)
-                    rediscoverAndSyncNow()
+                    rediscoverAndSyncNow(app)
                 }
             }
         })
@@ -162,7 +165,7 @@ object LanSyncNetworkMonitor {
                 if (wifi) {
                     // 回到 Wi-Fi：先开重发现窗口刷新双方记录里的对端 IP，再同步一轮；
                     // 不等 auto_sync 的轮询周期——对端 IP 变了的话它只会一直探测失败。
-                    rediscoverAndSyncNow()
+                    rediscoverAndSyncNow(context)
                 }
                 return
             } catch (e: Exception) {
@@ -179,19 +182,27 @@ object LanSyncNetworkMonitor {
      * 开一个短暂的后台重发现窗口，等对端广播把设备记录里的 IP 刷新成当前真实地址，
      * 再对全部已配对设备跑一轮双向同步。全程静默：失败只记日志，不打扰用户。
      * 触发频率受 [HEAL_MIN_INTERVAL_MS] 限制。
+     *
+     * 窗口期间必须持组播锁，否则 mDNS 首选路径收不到任何应答（见 [MulticastLocks]）；
+     * UDP 广播是广播帧、不受组播过滤影响，所以锁只影响走哪条路径，不影响自愈本身。
      */
-    private suspend fun rediscoverAndSyncNow() {
+    private suspend fun rediscoverAndSyncNow(context: Context) {
         val now = System.currentTimeMillis()
         synchronized(this) {
             if (now - lastHealMs < HEAL_MIN_INTERVAL_MS) return
             lastHealMs = now
         }
-        runCatching { SyncApiClient.api.startDiscoveryBurst(BURST_SECS) }
-            .onFailure { Log.w(TAG, "开启后台重发现窗口失败：${it.message}") }
-        delay(BURST_WAIT_MS)
-        val synced = runCatching { LanPull.syncAllPairedNow() }.getOrDefault(0)
-        Log.i(TAG, "重发现窗口结束，本轮双向同步成功 $synced 台设备")
-        // 自愈轮若拉回了远端改动，同样通知存活中的页面重拉（收件箱/任务页订阅）
-        if (synced > 0) RemoteSyncBus.emitRemoteDataLanded()
+        MulticastLocks.acquire(context, HEAL_OWNER)
+        try {
+            runCatching { SyncApiClient.api.startDiscoveryBurst(BURST_SECS) }
+                .onFailure { Log.w(TAG, "开启后台重发现窗口失败：${it.message}") }
+            delay(BURST_WAIT_MS)
+            val synced = runCatching { LanPull.syncAllPairedNow() }.getOrDefault(0)
+            Log.i(TAG, "重发现窗口结束，本轮双向同步成功 $synced 台设备")
+            // 自愈轮若拉回了远端改动，同样通知存活中的页面重拉（收件箱/任务页订阅）
+            if (synced > 0) RemoteSyncBus.emitRemoteDataLanded()
+        } finally {
+            MulticastLocks.release(HEAL_OWNER)
+        }
     }
 }

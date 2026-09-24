@@ -42,6 +42,8 @@ class RustInterface constructor(context: Context? = null) {
             Log.d(TAG, "[数据目录] 已设置数据目录为 ${context.filesDir.absolutePath}")
             // 注入 Wi-Fi 链路真实 IP（绕过 VPN），供局域网同步展示/广播使用
             applySyncWifiIp(context)
+            // 注入 ANDROID_ID，供 Rust 派生装机指纹（重装后认出同一台机器，仅做归并提示）
+            applySyncMachineUid(context)
         } else {
             Log.d(TAG, "[初始化] context为空")
         }
@@ -57,6 +59,7 @@ class RustInterface constructor(context: Context? = null) {
     private external fun startServer()
     private external fun setDataDir(path: String)
     private external fun setSyncLocalIp(ip: String)
+    private external fun setSyncMachineUid(raw: String)
     external fun getBuckets(): String
     external fun createBucket(bucket: String): String
     external fun getEvents(bucket_id: String, limit: Int): String
@@ -107,6 +110,30 @@ class RustInterface constructor(context: Context? = null) {
             Log.w(TAG, "Server started")
         } else {
             Log.d(TAG, "服务器已启动，跳过启动流程")
+        }
+    }
+
+    /**
+     * 注入本机装机标识（ANDROID_ID），由 Rust 侧派生「装机指纹」。
+     *
+     * 用途只有一个：平板/手机卸载重装后 device_id 会变，指纹让旧记录能被认出来并提示归并。
+     * 它不是凭据（任何本地应用都能读），也绝不进广播/mDNS 宣告，所以这里只把值交给 Rust，
+     * 日志里也不打原值——那是个跨网络可跟踪的机器标识。
+     */
+    fun applySyncMachineUid(context: Context) {
+        try {
+            val uid = android.provider.Settings.Secure.getString(
+                context.contentResolver,
+                android.provider.Settings.Secure.ANDROID_ID
+            )
+            if (uid.isNullOrEmpty()) {
+                Log.d(TAG, "[同步] 读不到 ANDROID_ID（部分 ROM 或工作资料），重装归并提示不可用")
+                return
+            }
+            Log.d(TAG, "[同步] 已注入 ANDROID_ID（值不落日志），供 Rust 派生装机指纹")
+            setSyncMachineUid(uid)
+        } catch (e: Exception) {
+            Log.e(TAG, "[同步] 读取 ANDROID_ID 失败: ${e.message}")
         }
     }
 

@@ -343,6 +343,37 @@ class SyncViewModel : ViewModel() {
         }
     }
 
+    /**
+     * 归并：把候选旧记录（fromId）并进当前活着的这一行（toId）。
+     * 方向不能反——只有新 id 还可能被访问到，反了会让历史数据挂在一条再也连不上的记录上。
+     */
+    fun mergeDevices(fromId: String, toId: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(busyDevices = it.busyDevices + toId) }
+            repo.call { api.mergeDevices(MergeRequest(fromId, toId)) }
+                .onSuccess {
+                    refreshDevices()
+                    refreshLogs()
+                    toast("已归并旧记录，其历史同步数据已归到当前设备")
+                }
+                .onFailure { e -> toast("归并失败：${e.message}") }
+            _state.update { it.copy(busyDevices = it.busyDevices - toId) }
+        }
+    }
+
+    /** 一键清理：淘汰静默未配对行 + 删除 days 天没同步成功的旧配对 */
+    fun purgeStaleDevices(days: Int) {
+        viewModelScope.launch {
+            repo.call { api.purgeDevices(PurgeRequest(days)) }
+                .onSuccess { r ->
+                    refreshDevices()
+                    toast("已清理：静默发现行 ${r.discoveredRemoved} 条，" +
+                        "$days 天未同步的旧配对 ${r.pairedRemoved} 台")
+                }
+                .onFailure { e -> toast("清理失败：${e.message}") }
+        }
+    }
+
     fun clearAllDevices() {
         viewModelScope.launch {
             repo.call { api.clearAllDevices() }

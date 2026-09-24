@@ -64,13 +64,13 @@ class SyncSettingsFragment : Fragment() {
 
     private fun setupDiscoveryDropdown(current: String) {
         val entries = listOf(
-            "broadcast" to "广播 / mDNS + UDP（已实现）",
+            "mdns" to "mDNS 首选 + UDP 广播兜底（默认）",
+            "udp_only" to "仅 UDP 广播（排障：组播被 AP 吞掉时）",
             "poll" to "轮询遍历（待实现）"
         )
-        if (entries.none { it.first == current }) {
-            // 未知方式，补一个
-        }
-        discoveryMethod = current
+        // 老库里存的 "broadcast" 与新默认同义（两条路径都在跑），显示上归到第一档，
+        // 用户下次保存即自动改写成新值。
+        discoveryMethod = if (entries.any { it.first == current }) current else entries[0].first
         val labels = entries.map { it.second }
         binding.cfgDiscoveryMethod.setAdapter(
             ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, labels)

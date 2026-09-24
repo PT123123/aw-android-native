@@ -45,6 +45,9 @@ class SyncRowsAdapter(private val actions: Actions) :
         fun onCommitRename(device: Device, alias: String)
         fun onCancelRename()
         fun onToggleDetails(device: Device)
+
+        /** 把候选旧记录（candidateId）归并进当前这一行（device） */
+        fun onMerge(device: Device, candidateId: String)
     }
 
     override fun getItemViewType(position: Int): Int = when (getItem(position)) {
@@ -168,6 +171,10 @@ class SyncRowsAdapter(private val actions: Actions) :
         private val meta: TextView = view.findViewById(R.id.deviceMeta)
         private val badge: TextView = view.findViewById(R.id.onlineBadge)
         private val lastSync: TextView = view.findViewById(R.id.lastSync)
+        private val securityCode: TextView = view.findViewById(R.id.securityCode)
+        private val mergeRow: View = view.findViewById(R.id.mergeRow)
+        private val mergeHint: TextView = view.findViewById(R.id.mergeHint)
+        private val btnMerge: MaterialButton = view.findViewById(R.id.btnMerge)
         private val renameRow: View = view.findViewById(R.id.renameRow)
         private val renameInput: EditText = view.findViewById(R.id.renameInput)
         private val btnRenameOk: MaterialButton = view.findViewById(R.id.btnRenameOk)
@@ -202,6 +209,32 @@ class SyncRowsAdapter(private val actions: Actions) :
                 lastSync.text = "上次同步: ${SyncFormatters.formatTime(d.lastSyncAt)}"
             } else {
                 lastSync.visibility = View.GONE
+            }
+            // 安全码：两端各自从配对密钥算出，肉眼对一致才说明中间没人换包（旧端未交换密钥则不下发）
+            when {
+                !d.isSelf && !d.fingerprint.isNullOrEmpty() -> {
+                    securityCode.visibility = View.VISIBLE
+                    securityCode.text = "安全码 ${d.fingerprint}（请与对端核对）"
+                }
+                !d.isSelf && d.paired -> {
+                    securityCode.visibility = View.VISIBLE
+                    securityCode.text = "未加密（重新配对可启用加密同步）"
+                }
+                else -> securityCode.visibility = View.GONE
+            }
+
+            // 归并提示：服务端已判定这一行与另一条已配记录装机指纹相同。
+            // 这里只把候选摆出来，点「归并」并经对话框确认后才调 /merge。
+            val candidate = d.mergeCandidate
+            if (candidate == null || d.isSelf) {
+                mergeRow.visibility = View.GONE
+            } else {
+                mergeRow.visibility = View.VISIBLE
+                val oldName = candidate.alias?.takeIf { it.isNotBlank() } ?: candidate.name
+                mergeHint.text = "与「$oldName」（配对 ${candidate.sincePairedDays} 天前，指纹 ${candidate.uidHint}）" +
+                    "疑似同一台机器 —— 归并后旧记录消失，历史数据仍归到这一行"
+                btnMerge.isEnabled = !row.busy
+                btnMerge.setOnClickListener { actions.onMerge(d, candidate.id) }
             }
 
             // 重命名态

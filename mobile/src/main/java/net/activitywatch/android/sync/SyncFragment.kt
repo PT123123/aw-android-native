@@ -36,6 +36,12 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions, TabHub.MenuTarget {
         private const val INTERVAL_CALM = 300L     // 平和
         private const val INTERVAL_SILENT = 1800L  // 静默
         private const val INTERVAL_MIN = 5L
+
+        /** 组播锁的持有方标识：本页面可见期间 */
+        private const val PAGE_OWNER = "sync-page"
+
+        /** 一键清理：删除连续这么多天没同步成功过的旧配对（未配对发现行的阈值由服务端决定） */
+        private const val PURGE_STALE_DAYS = 30
     }
 
     private var _binding: FragmentSyncBinding? = null
@@ -48,7 +54,6 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions, TabHub.MenuTarget {
 
     // 水合期间程序化 check 档位时抑制监听回调，避免打开页面就触发一次冗余保存
     private var hydrating = false
-    private var discoveryMethod = "broadcast"
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -111,12 +116,15 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions, TabHub.MenuTarget {
     override fun onResume() {
         super.onResume()
         // 进入局域网同步界面：开始发现广播（离开即停，不进界面绝不广播）
+        // 组播锁与它同步：mDNS 首选路径在安卓上收得到包全靠这把锁（见 MulticastLocks）
+        MulticastLocks.acquire(requireContext(), PAGE_OWNER)
         viewModel.startDiscovery()
     }
 
     override fun onPause() {
         super.onPause()
         viewModel.stopDiscovery()
+        MulticastLocks.release(PAGE_OWNER)
     }
 
     /** 标题栏「刷新并立即同步」（被 SyncHubFragment 内嵌时由宿主派发给当前可见页） */
@@ -187,6 +195,20 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions, TabHub.MenuTarget {
                 .replace(R.id.fragment_container, SyncPermissionsFragment())
                 .addToBackStack(null)
                 .commit()
+        }
+
+        binding.btnPurgeStale.setOnClickListener {
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle("一键清理过期设备")
+                .setMessage(
+                    "清理两类记录：\n" +
+                        "• 静默已久的未配对发现行（阈值由服务端决定）\n" +
+                        "• 连续 $PURGE_STALE_DAYS 天没同步成功过的旧配对\n\n" +
+                        "正常同步的设备不受影响，本操作不可恢复。"
+                )
+                .setNegativeButton("取消", null)
+                .setPositiveButton("开始清理") { _, _ -> viewModel.purgeStaleDevices(PURGE_STALE_DAYS) }
+                .show()
         }
 
         binding.btnClearAll.setOnClickListener {
@@ -295,4 +317,33 @@ class SyncFragment : Fragment(), SyncRowsAdapter.Actions, TabHub.MenuTarget {
     override fun onCancelRename() = viewModel.cancelRename()
 
     override fun onToggleDetails(device: Device) = viewModel.toggleDeviceDetails(device.id)
+
+    /**
+     * 归并确认：把候选旧记录并进当前这一行（from=旧、to=活）。
+     * 默认焦点放在「不合并」上 —— 只有用户明确点「归并」才会改数据。
+     * 归并只是把旧 id 的历史归因转到新行，不改配对结果，所以安全码仍需与对端核对。
+     */
+    override fun onMerge(device: Device, candidateId: String) {
+        val candidate = device.mergeCandidate ?: return
+        val oldName = candidate.alias?.takeIf { it.isNotBlank() } ?: candidate.name
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle("归并为同一台机器？")
+            .setMessage(
+                "「${device.displayName}」与「$oldName」的装机指纹相同（${candidate.uidHint}），" +
+                    "判定为同一台机器在重装或升级后换了设备 ID。\n\n" +
+                    "归并后：\n" +
+                    "• 旧记录「$oldName」从列表消失\n" +
+                    "• 它的历史同步数据与配对时间归到当前这条记录\n" +
+                    "• 旧记录的配对密钥作废（该 ID 已不再可达）\n\n" +
+                    "拿不准就选「保持两台」并存 —— 不影响同步。安全码仍需与对端屏幕核对。"
+            )
+            .setNegativeButton("保持两台，不合并", null)
+            .setPositiveButton("归并") { _, _ -> viewModel.mergeDevices(candidateId, device.id) }
+            .create()
+        dialog.setOnShowListener {
+            // button2 = negative：把焦点停在不动数据的那一侧
+            dialog.findViewById<View>(android.R.id.button2)?.requestFocus()
+        }
+        dialog.show()
+    }
 }
