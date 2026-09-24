@@ -28,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.FragmentWifiTransferBinding
+import net.activitywatch.android.sync.PushToRequest
 import net.activitywatch.android.sync.SyncApiClient
 import net.activitywatch.android.sync.SyncFormatters
 import net.activitywatch.android.sync.SyncSnapshot
@@ -38,9 +39,12 @@ import net.activitywatch.android.sync.SyncSnapshot
  * 流程：
  * - 传送方（数据源）：开启 Local-only Hotspot → 出示二维码（SSID / 密码 / 服务器地址）；
  * - 被传送方（接收方）：扫码 → WifiNetworkSpecifier 连接对端热点 →
- *   拉对端 /snapshot → 本机 /apply（合并入本机）→ 导出本机 /snapshot → 推对端 /push，
+ *   拉对端 /snapshot → 本机 /apply（合并入本机）→ 调本机 /push-to 让服务端把本机快照推给对端，
  *   双向都收敛到并集；合并 / 冲突处理复用局域网同步的服务端逻辑
  *   （inbox / activity 幂等 upsert，todo 按 updated_at 新者胜，本地优先保留）。
+ *
+ * 回程为什么交给 /push-to 而不是本端自己 POST 对端 /push：密钥从不出服务端接口，
+ * 而已协商密钥的 /push 会拒收明文（防降级），Kotlin 手搓的 HTTP 必然被挡。
  */
 class WifiTransferFragment : Fragment() {
 
@@ -366,11 +370,10 @@ class WifiTransferFragment : Fragment() {
 
     /**
      * 传输主体（全部在 IO 线程执行，日志经 [log] 回主线程）：
-     * 1. GET 对端 /info —— 验证对端 aw-sync 服务可达；
-     * 2. GET 对端 /snapshot —— 拉取对端快照；
-     * 3. POST 本机 /apply —— 合并对端数据进本机（127.0.0.1，Retrofit）；
-     * 4. GET 本机 /snapshot —— 合并后导出（保证推送的是并集）；
-     * 5. POST 对端 /push —— 推送本机快照。
+     * 1. GET  对端 /info     —— 验证对端 aw-sync 服务可达；
+     * 2. GET  对端 /snapshot —— 拉取对端快照（不带 from=，对端按「无共享密钥」返回明文）；
+     * 3. POST 本机 /apply    —— 合并对端数据进本机（127.0.0.1，Retrofit）；
+     * 4. POST 本机 /push-to  —— 本机导出并集、按需信封加密后推给对端。
      */
     private suspend fun doTransfer(network: Network?, payload: QrPayload): TransferResult {
         // 1) 验证对端
@@ -395,21 +398,20 @@ class WifiTransferFragment : Fragment() {
         log("合并对端数据到本机…")
         val appliedLocal = localApi.applySnapshot(remoteSnap).applied
 
-        // 4) 导出本机数据（合并之后导出，推送并集）
-        log("导出本机数据…")
-        val localSnap = localApi.getSnapshot()
-
-        // 5) 推送到对端
+        // 4) 让本机把合并后的并集推回对端：导出 + 信封加密都在 Rust 侧做
+        //    （客户端自己 POST 对端 /push 只能发明文，两台机器配对过就会被对端降级防护拒收）
         log("推送本机数据到对端…")
-        val pushJson = gson.toJson(localSnap)
-        val pushResp = WifiHttp.postJson(
-            network, payload.ip, payload.port, "/api/0/sync/push", pushJson, readTimeoutMs = 600_000
+        val push = localApi.pushTo(
+            PushToRequest(
+                ip = payload.ip,
+                port = payload.port,
+                deviceId = remoteSnap.sourceDevice?.id,
+                name = remoteSnap.sourceDevice?.name
+            )
         )
-        val appliedRemote = runCatching {
-            (gson.fromJson(pushResp, Map::class.java) as? Map<*, *>)?.get("applied") as? Double
-        }.getOrNull()?.toInt() ?: 0
+        if (push.encrypted) log("已用配对密钥加密推送")
 
-        return TransferResult(appliedLocal, appliedRemote)
+        return TransferResult(appliedLocal, push.applied)
     }
 
     // ==================== 工具 ====================

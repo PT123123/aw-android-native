@@ -8,7 +8,7 @@ import com.google.gson.JsonSyntaxException
  *
  * 出码方（传送方，数据源）开启本地热点后，把 SSID / 密码 / 本机同步服务地址编码成二维码；
  * 被传送方（接收方）扫码后按载荷自动连接热点，并直接通过 HTTP 与对端 [ip]:[port]
- * 上的 aw-sync 服务互传数据（复用局域网同步的 /snapshot /push /apply 端点）。
+ * 上的 aw-sync 服务互传数据（拉对端 /snapshot、合并进本机 /apply，回程由本机 /push-to 代发）。
  */
 data class QrPayload(
     /** 载荷格式版本 */

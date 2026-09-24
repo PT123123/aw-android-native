@@ -14,8 +14,8 @@ import java.nio.charset.StandardCharsets
  *
  * 1. WifiNetworkSpecifier 申请到的网络不会成为系统默认路由，必须用
  *    [Network.socketFactory] 显式建连，否则流量会走移动数据/原 Wi-Fi 而到不了对端；
- *    进程内 Rust 服务的自发请求同理到不了，因此传输由 Kotlin 侧中转
- *    （拉对端 /snapshot 回本机 /apply，再导出本机 /snapshot 推给对端 /push）。
+ *    进程内 Rust 服务的自发请求同理到不了，因此「拉对端 /snapshot → 本机 /apply」由 Kotlin 侧中转；
+ *    反向那一跳改走本机 POST /push-to，让 Rust 导出并加密后再推（客户端不碰配对密钥）。
  * 2. 走原生 socket 绕开了 network_security_config 的明文域名白名单——
  *    对端热点网关 IP 每次都可能不同，无法穷举进白名单；平台策略只约束
  *    OkHttp / HttpURLConnection 等库层，不拦裸 socket。
@@ -33,15 +33,6 @@ object WifiHttp {
         path: String,
         readTimeoutMs: Int = 90_000
     ): String = request(network, ip, port, "GET", path, null, readTimeoutMs)
-
-    fun postJson(
-        network: Network?,
-        ip: String,
-        port: Int,
-        path: String,
-        body: String,
-        readTimeoutMs: Int = 300_000
-    ): String = request(network, ip, port, "POST", path, body, readTimeoutMs)
 
     private fun request(
         network: Network?,

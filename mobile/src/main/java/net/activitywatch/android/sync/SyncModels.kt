@@ -10,7 +10,7 @@ import org.threeten.bp.OffsetDateTime
 data class SyncConfig(
     @SerializedName("enabled") val enabled: Boolean = false,
     @SerializedName("http_enabled") val httpEnabled: Boolean = true,
-    @SerializedName("discovery_method") val discoveryMethod: String = "broadcast",
+    @SerializedName("discovery_method") val discoveryMethod: String = "mdns",
     @SerializedName("listen_port") val listenPort: Int = 5600,
     @SerializedName("udp_port") val udpPort: Int = 46000,
     @SerializedName("sync_inbox") val syncInbox: Boolean = true,
@@ -44,8 +44,27 @@ data class Device(
     @SerializedName("alias") val alias: String? = null,
     // 仅 GET /devices 附带：是否有待本机确认的配对请求
     @SerializedName("incoming_pair_request") val incomingPairRequest: Boolean = false,
+    // 仅 GET /devices 附带：与该设备已交换配对密钥（报文体走 AES-256-GCM 信封）
+    @SerializedName("encrypted") val encrypted: Boolean = false,
+    // 仅 GET /devices 附带：安全码（与对端屏幕核对一致才说明没有中间人），未加密时不下发
+    @SerializedName("fingerprint") val fingerprint: String? = null,
+    // 仅 GET /devices 附带：装机指纹相同的另一条已配记录，即「这台疑似某台的重装」。
+    // 服务端只给提示，是否归并由人点（同机双实例指纹完全相同，自动折叠必错）。
+    @SerializedName("merge_candidate") val mergeCandidate: MergeCandidate? = null,
     // 仅 GET /info 附带：本机 IP 所在网卡名
     @SerializedName("ip_iface") val ipIface: String? = null
+)
+
+/// 疑似同一台机器的旧记录（重装/升级换了 device_id）。
+data class MergeCandidate(
+    @SerializedName("id") val id: String = "",
+    @SerializedName("name") val name: String = "",
+    @SerializedName("alias") val alias: String? = null,
+    // 装机指纹前 8 位：两条记录显示同一片段，才说明真是同一台机器
+    @SerializedName("uid_hint") val uidHint: String = "",
+    @SerializedName("paired_at") val pairedAt: String? = null,
+    @SerializedName("last_sync_at") val lastSyncAt: String? = null,
+    @SerializedName("since_paired_days") val sincePairedDays: Long = 0
 )
 
 // 同步快照（WiFi 传输 / push 载荷）：与 aw-sync-rust SyncSnapshot 一一对应。
@@ -55,6 +74,20 @@ data class SyncSnapshot(
     @SerializedName("activity") val activity: String? = null,
     @SerializedName("inbox") val inbox: String? = null,
     @SerializedName("todo") val todo: String? = null
+)
+
+// POST /push-to：让本机（Rust 侧）导出快照并代发对端。客户端不参与加解密——
+// 配对密钥从不出服务端接口，自己拼明文 POST 对端 /push 会被对端的降级防护拒掉。
+data class PushToRequest(
+    @SerializedName("ip") val ip: String,
+    @SerializedName("port") val port: Int,
+    @SerializedName("device_id") val deviceId: String? = null,
+    @SerializedName("name") val name: String? = null
+)
+
+data class PushToResult(
+    @SerializedName("applied") val applied: Int = 0,
+    @SerializedName("encrypted") val encrypted: Boolean = false
 )
 
 val Device.displayName: String
@@ -71,7 +104,7 @@ val Device.isEffectivelyOnline: Boolean
 data class DiscoveryStatus(
     @SerializedName("enabled") val enabled: Boolean = false,
     @SerializedName("http_enabled") val httpEnabled: Boolean = false,
-    @SerializedName("discovery_method") val discoveryMethod: String = "broadcast",
+    @SerializedName("discovery_method") val discoveryMethod: String = "mdns",
     @SerializedName("discovery_running") val discoveryRunning: Boolean = false,
     @SerializedName("udp_port") val udpPort: Int = 46000,
     @SerializedName("listen_port") val listenPort: Int = 5600,
@@ -149,6 +182,28 @@ data class DebugEntry(
 data class PairRequest(@SerializedName("device_id") val deviceId: String)
 
 data class AliasRequest(@SerializedName("alias") val alias: String?)
+
+// POST /merge：把旧行并进当前活着的这行。方向固定 from=旧（归并后从列表消失）、to=新。
+// 只有新 id 还可能被访问到，反过来会让历史归因断掉。
+data class MergeRequest(
+    @SerializedName("from") val from: String,
+    @SerializedName("to") val to: String
+)
+
+data class MergeResult(
+    @SerializedName("ok") val ok: Boolean = false,
+    @SerializedName("merged_from") val mergedFrom: String = "",
+    @SerializedName("merged_into") val mergedInto: String = ""
+)
+
+// POST /devices/purge：一键清理。未配对发现行的静默阈值由服务端常量决定，此参数只管旧配对。
+data class PurgeRequest(@SerializedName("stale_days") val staleDays: Int = 30)
+
+data class PurgeResult(
+    @SerializedName("ok") val ok: Boolean = false,
+    @SerializedName("discovered_removed") val discoveredRemoved: Int = 0,
+    @SerializedName("paired_removed") val pairedRemoved: Int = 0
+)
 
 data class SyncResult(
     @SerializedName("device_id") val deviceId: String = "",

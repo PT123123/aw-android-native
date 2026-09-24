@@ -85,7 +85,50 @@
                     android:textColor="@color/inbox_sub"
                     android:textSize="12sp"
                     android:visibility="gone" />
+
+                <!-- 安全码：与对端屏幕核对一致，才说明链路中间没有第三人 -->
+                <TextView
+                    android:id="@+id/securityCode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="@color/sync_link"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
             </LinearLayout>
+        </LinearLayout>
+
+        <!-- 归并提示：本机装机指纹与列表里另一条已配记录相同（疑似同一台机器重装后换了 ID）。
+             只提示、绝不自动折叠——同机双实例指纹完全一样，合错会毁掉历史归因，必须人点。 -->
+        <LinearLayout
+            android:id="@+id/mergeRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/sync_rounded_4"
+            android:backgroundTint="#1AA67F1F"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/mergeHint"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/sync_warning"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMerge"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="归并"
+                android:textColor="@color/sync_warning"
+                app:strokeColor="@color/sync_warning" />
         </LinearLayout>
 
         <!-- 重命名行（默认隐藏） -->

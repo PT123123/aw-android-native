@@ -8,7 +8,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-// aw-sync-rust REST API，挂载于 /api/0/sync（共 17 个端点）
+// aw-sync-rust REST API，挂载于 /api/0/sync
 interface SyncApi {
 
     // ---- 设置 ----
@@ -66,15 +66,23 @@ interface SyncApi {
     @POST("api/0/sync/devices/{id}/sync")
     suspend fun syncDevice(@Path("id") id: String): SyncResult
 
-    // ---- WiFi 热点传输（实验性） ----
+    /** 归并疑似同一台机器的两条记录：from=旧行（归并后从列表消失），to=当前活着的这条 */
+    @POST("api/0/sync/merge")
+    suspend fun mergeDevices(@Body request: MergeRequest): MergeResult
 
-    /** 导出本机快照（activity / inbox / todo 按「设置」里的同步目标裁剪） */
-    @GET("api/0/sync/snapshot")
-    suspend fun getSnapshot(): SyncSnapshot
+    /** 一键清理：淘汰静默已久的未配对发现行 + 删除 stale_days 天没同步成功的旧配对 */
+    @POST("api/0/sync/devices/purge")
+    suspend fun purgeDevices(@Body request: PurgeRequest): PurgeResult
+
+    // ---- WiFi 热点传输（实验性） ----
 
     /** 把「从对端拉来的快照」合并进本机（复用服务端 apply_snapshot：幂等 upsert + 冲突处理） */
     @POST("api/0/sync/apply")
     suspend fun applySnapshot(@Body snapshot: SyncSnapshot): SyncResult
+
+    /** 本机导出快照并推给对端 ip:port：加密封装在 Rust 侧完成，客户端经手的是明文本机调用 */
+    @POST("api/0/sync/push-to")
+    suspend fun pushTo(@Body request: PushToRequest): PushToResult
 
     @GET("api/0/sync/devices/{id}/stats")
     suspend fun getDeviceStats(@Path("id") id: String): DeviceSyncStats
