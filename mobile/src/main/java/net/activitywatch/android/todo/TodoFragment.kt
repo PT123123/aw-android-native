@@ -67,6 +67,9 @@ class TodoFragment : Fragment() {
     /** 当前标签筛选（null = 未筛选；层级匹配同收件箱，跨视图/清单切换保留） */
     private var currentTag: String? = null
 
+    /** 反向筛选：被排除的标签路径集合（隐藏含这些标签及其子标签的任务） */
+    private val excludedTags = linkedSetOf<String>()
+
     /** 搜索关键字（null = 未搜索；匹配标题/备注，与视图/清单/标签筛选叠加） */
     private var searchQuery: String? = null
 
@@ -128,6 +131,18 @@ class TodoFragment : Fragment() {
                     enterSelectionMode()
                     true
                 }
+                R.id.action_tag_filter -> {
+                    openTagFilterDialog()
+                    true
+                }
+                R.id.action_commands -> {
+                    showBatchCommandsDialog()
+                    true
+                }
+                R.id.action_copy -> {
+                    copySelectedTasks()
+                    true
+                }
                 R.id.action_new_list -> {
                     showNewListDialog()
                     true
@@ -179,8 +194,8 @@ class TodoFragment : Fragment() {
             }
             source.updateTask(updated)
         }
-        // 筛选条：✕ 清除；↑ 回到上级标签路径（项目/工作/xx → 项目/工作）
-        binding.filterClear.setOnClickListener { applyTagFilter(null) }
+        // 筛选条：✕ 清除全部（含反向筛选）；↑ 回到上级标签路径（项目/工作/xx → 项目/工作）
+        binding.filterClear.setOnClickListener { clearAllTagFilters() }
         binding.filterUp.setOnClickListener { applyTagFilter(tagParentPath(currentTag.orEmpty())) }
 
         // 搜索：软键盘搜索键提交；失焦也提交（同收件箱）
@@ -379,9 +394,9 @@ class TodoFragment : Fragment() {
             mTasks.filter { it.id !in TodoRepository.pendingDeleteIds() },
             currentView, currentListId, currentSortMode,
         )
-        // 标签 + 搜索筛选叠加在视图/清单之上（视图 AND 清单 AND 标签 AND 搜索）
-        val open = open0.filter { it.matchesTag(currentTag) && matchesSearch(it) }
-        val done = done0.filter { it.matchesTag(currentTag) && matchesSearch(it) }
+        // 标签（含反向/排除）+ 搜索筛选叠加在视图/清单之上（视图 AND 清单 AND 标签 AND 搜索）
+        val open = open0.filter { tagFilterMatches(it) && matchesSearch(it) }
+        val done = done0.filter { tagFilterMatches(it) && matchesSearch(it) }
         binding.toolbar.subtitle = "${viewTitle()} · ${open.size} 项待办"
         adapter.submit(open, done, showCompleted)
         updateEmptyState()
@@ -444,13 +459,13 @@ class TodoFragment : Fragment() {
 
     private fun updateEmptyState() {
         val (open0, done0) = visibleTasks(mTasks, currentView, currentListId)
-        val open = open0.filter { it.matchesTag(currentTag) && matchesSearch(it) }
-        val done = done0.filter { it.matchesTag(currentTag) && matchesSearch(it) }
+        val open = open0.filter { tagFilterMatches(it) && matchesSearch(it) }
+        val done = done0.filter { tagFilterMatches(it) && matchesSearch(it) }
         val nothing = open.isEmpty() && (done.isEmpty() || !showCompleted)
         binding.empty.visibility = if (nothing) View.VISIBLE else View.GONE
         binding.empty.text = if (open.isEmpty() && done.isEmpty()) {
             when {
-                currentTag != null || searchQuery != null -> "没有符合条件的任务"
+                currentTag != null || searchQuery != null || excludedTags.isNotEmpty() -> "没有符合条件的任务"
                 else -> "暂无任务\n点右下角 ＋ 添加任务"
             }
         } else {
@@ -467,17 +482,166 @@ class TodoFragment : Fragment() {
         render()
     }
 
+    /** 一次清掉「仅显示」与全部「排除」筛选 */
+    private fun clearAllTagFilters() {
+        currentTag = null
+        excludedTags.clear()
+        updateFilterBar()
+        render()
+    }
+
+    /** 标签筛选（含反向/排除）：命中「仅显示」且不命中任一「排除」才保留 */
+    private fun tagFilterMatches(task: TodoTask): Boolean {
+        if (!task.matchesTag(currentTag)) return false
+        for (ex in excludedTags) {
+            if (task.tags.any { it == ex || it.startsWith("$ex/") }) return false
+        }
+        return true
+    }
+
+    /** 标签筛选对话框：line edit 设「仅显示」，勾选列表设「排除」（反向筛选） */
+    private fun openTagFilterDialog() {
+        val ctx = requireContext()
+        val known = mTasks.flatMap { it.tags }.distinct().sorted()
+        val density = resources.displayMetrics.density
+        val dp = { v: Int -> (v * density).toInt() }
+
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(12), dp(20), dp(4))
+        }
+        container.addView(TextView(ctx).apply {
+            text = "仅显示标签（留空 = 不限，支持 父/子 层级）"
+            setTextColor(ContextCompat.getColor(ctx, R.color.aw_text_secondary))
+            textSize = 13f
+        })
+        val inc = EditText(ctx).apply {
+            setText(currentTag ?: "")
+            hint = "如 项目/工作"
+            setTextColor(ContextCompat.getColor(ctx, R.color.inbox_text))
+            setHintTextColor(ContextCompat.getColor(ctx, R.color.inbox_sub))
+        }
+        container.addView(inc)
+        container.addView(TextView(ctx).apply {
+            text = "排除标签（反向筛选：不显示含该标签及其子标签的任务）"
+            setTextColor(ContextCompat.getColor(ctx, R.color.aw_text_secondary))
+            textSize = 13f
+            setPadding(0, dp(10), 0, 0)
+        })
+        val checks = mutableListOf<Pair<String, android.widget.CheckBox>>()
+        if (known.isEmpty()) {
+            container.addView(TextView(ctx).apply {
+                text = "（暂无标签）"
+                setTextColor(ContextCompat.getColor(ctx, R.color.inbox_sub))
+                textSize = 13f
+            })
+        } else {
+            known.forEach { tag ->
+                val cb = android.widget.CheckBox(ctx).apply {
+                    text = tag
+                    isChecked = excludedTags.contains(tag)
+                    setTextColor(ContextCompat.getColor(ctx, R.color.inbox_text))
+                }
+                checks.add(tag to cb)
+                container.addView(cb)
+            }
+        }
+
+        AlertDialog.Builder(ctx)
+            .setTitle("标签筛选")
+            .setView(android.widget.ScrollView(ctx).apply { addView(container) })
+            .setPositiveButton("应用") { _, _ ->
+                currentTag = inc.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+                excludedTags.clear()
+                checks.forEach { (tag, cb) -> if (cb.isChecked) excludedTags.add(tag) }
+                updateFilterBar()
+                render()
+            }
+            .setNeutralButton("清除筛选") { _, _ -> clearAllTagFilters() }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
     private fun updateFilterBar() {
         val tag = currentTag
-        if (tag == null) {
+        if (tag == null && excludedTags.isEmpty()) {
             binding.filterBar.visibility = View.GONE
-        } else {
-            binding.filterBar.visibility = View.VISIBLE
-            // 层级 tag 用面包屑展示：项目/工作 → 项目 / 工作
-            binding.filterText.text = "仅显示 #${formatTagBreadcrumb(tag)}"
-            binding.filterUp.visibility =
-                if (tagParentPath(tag) != null) View.VISIBLE else View.GONE
+            return
         }
+        binding.filterBar.visibility = View.VISIBLE
+        val parts = mutableListOf<String>()
+        // 层级 tag 用面包屑展示：项目/工作 → 项目 / 工作
+        if (tag != null) parts.add("仅显示 #${formatTagBreadcrumb(tag)}")
+        if (excludedTags.isNotEmpty())
+            parts.add("排除 " + excludedTags.joinToString(" ") { "⊘#${formatTagBreadcrumb(it)}" })
+        binding.filterText.text = parts.joinToString(" · ")
+        binding.filterUp.visibility =
+            if (tag != null && tagParentPath(tag) != null) View.VISIBLE else View.GONE
+    }
+
+    /** 批量操作指令（任务）：粘贴 AI 返回的 JSON 并 POST /inbox/todos/batch */
+    private fun showBatchCommandsDialog() {
+        val ctx = requireContext()
+        val edit = EditText(ctx).apply {
+            hint = "{\"operations\":[{\"action\":\"update\",\"uuid\":\"...\",\"completed\":true}]}"
+            setTextColor(ContextCompat.getColor(ctx, R.color.inbox_text))
+            setHintTextColor(ContextCompat.getColor(ctx, R.color.inbox_sub))
+            setMinLines(5)
+            maxLines = 12
+            gravity = Gravity.TOP or Gravity.START
+            setPadding(24, 24, 24, 24)
+        }
+        AlertDialog.Builder(ctx)
+            .setTitle("批量操作指令（任务）")
+            .setMessage("粘贴 AI 返回的 JSON：action 支持 create/update/delete/restore，目标用 uuid（推荐）或 id。")
+            .setView(edit)
+            .setPositiveButton("执行") { _, _ ->
+                val text = edit.text?.toString()?.trim().orEmpty()
+                if (text.isNotEmpty()) executeBatchCommands(text)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun executeBatchCommands(text: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val parsed = com.google.gson.JsonParser.parseString(text)
+                val body = when {
+                    parsed.isJsonArray ->
+                        com.google.gson.JsonObject().apply { add("operations", parsed) }
+                    parsed.isJsonObject && parsed.asJsonObject.has("operations") -> parsed.asJsonObject
+                    else -> throw IllegalArgumentException("需要包含 operations 字段，或直接给 operations 数组")
+                }
+                val resp = TodoApi.service.batchTodos(body)
+                val applied = resp.get("applied")?.asInt ?: 0
+                val failed = resp.get("failed")?.asInt ?: 0
+                Toast.makeText(requireContext(), "指令完成：成功 $applied / 失败 $failed", Toast.LENGTH_LONG).show()
+                source.load()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "执行失败：${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /** 多选复制任务：附带唯一 ID（uuid）供 AI 指令引用 */
+    private fun copySelectedTasks() {
+        val selected = mTasks.filter { it.id in adapter.selectedIds }
+        if (selected.isEmpty()) {
+            toast("请先选择任务")
+            return
+        }
+        val text = selected.joinToString("\n") { task ->
+            val uid = task.uuid?.takeIf { it.isNotBlank() } ?: "local:${task.id}"
+            val body = if (task.notes.isBlank()) task.title else "${task.title}\n${task.notes}"
+            "$body\nID: $uid"
+        }
+        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE)
+            as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("tasks", text))
+        Toast.makeText(requireContext(), "已复制 ${selected.size} 条任务（含 ID）", Toast.LENGTH_SHORT).show()
     }
 
     // ── 搜索（同收件箱：工具栏 🔍 开关搜索条） ───────────

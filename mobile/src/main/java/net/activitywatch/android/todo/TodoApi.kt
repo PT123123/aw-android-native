@@ -2,6 +2,7 @@ package net.activitywatch.android.todo
 
 import android.content.Context
 import com.google.gson.GsonBuilder
+import com.google.gson.JsonObject
 import net.activitywatch.android.db.DeviceIdProvider
 import net.activitywatch.android.sync.LocalWriteWatcher
 import okhttp3.Interceptor
@@ -75,6 +76,10 @@ interface TodoService {
 
     @POST("inbox/todos")
     suspend fun createTodo(@Body payload: CreateTodoPayload): TodoResponse
+
+    /** 批量操作（AI 指令）：POST /inbox/todos/batch，body 形如 {"operations":[...]} */
+    @POST("inbox/todos/batch")
+    suspend fun batchTodos(@Body body: JsonObject): JsonObject
 
     @PUT("inbox/todos/{id}")
     suspend fun updateTodo(@Path("id") id: Long, @Body payload: UpdateTodoPayload): TodoResponse

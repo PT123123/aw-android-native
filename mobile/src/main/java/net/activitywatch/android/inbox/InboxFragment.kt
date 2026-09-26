@@ -45,6 +45,9 @@ class InboxFragment : Fragment() {
         /** savedInstanceState 里保存的当前标签筛选路径（配置变更/进程重建恢复；离开页面不持久化） */
         private const val STATE_TAG = "inbox_current_tag"
 
+        /** savedInstanceState 里保存的反向筛选（排除）标签集合 */
+        private const val STATE_EXCLUDED = "inbox_excluded_tags"
+
         /** 输入缓存：快速发送 / 评论 对话框的已输入内容 */
         private const val PREFS_QUICK_NOTE = "inbox_quick_note_draft"
         private const val KEY_QUICK_NOTE_DRAFT = "quick_note_draft"
@@ -80,6 +83,10 @@ class InboxFragment : Fragment() {
     private var hasMore = true
     private var loading = false
     private var currentTag: String? = null
+
+    /** 反向筛选：被排除的标签路径集合（隐藏含这些标签及其子标签的笔记） */
+    private val excludedTags = linkedSetOf<String>()
+
     private var searchQuery: String? = null
     private var sortByUpdated = false
     private var retryCount = 0
@@ -148,7 +155,7 @@ class InboxFragment : Fragment() {
 
         binding.swipe.setOnRefreshListener { loadInitial() }
         binding.fab.setOnClickListener { showQuickNoteDialog() }
-        binding.filterClear.setOnClickListener { toggleTagFilter(currentTag) }
+        binding.filterClear.setOnClickListener { clearAllTagFilters() }
         // 筛选条上的 ↑：回到上一级标签路径（项目/工作/xx → 项目/工作 → 项目 → 顶层）
         binding.filterUp.setOnClickListener { applyTagFilterPath(tagParentPath(currentTag.orEmpty())) }
 
@@ -194,6 +201,12 @@ class InboxFragment : Fragment() {
             currentTag = it
             updateFilterBar()
         }
+        // 恢复反向筛选（排除）标签集合
+        savedInstanceState?.getStringArrayList(STATE_EXCLUDED)?.let {
+            excludedTags.clear()
+            it.filter { s -> s.isNotBlank() }.forEach { s -> excludedTags.add(s) }
+            updateFilterBar()
+        }
         // 「查看笔记」页点了标签返回：优先于上面的恢复值，消费一次即清空
         pendingTagFilter?.let {
             pendingTagFilter = null
@@ -224,6 +237,7 @@ class InboxFragment : Fragment() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         currentTag?.let { outState.putString(STATE_TAG, it) }
+        if (excludedTags.isNotEmpty()) outState.putStringArrayList(STATE_EXCLUDED, ArrayList(excludedTags))
     }
 
     /**
@@ -245,7 +259,7 @@ class InboxFragment : Fragment() {
             val tagMatches = currentTag == null ||
                 note.tags.any { it == currentTag || it.startsWith("$currentTag/") }
             val searchMatches = searchQuery == null || note.content.contains(searchQuery!!)
-            if (!(tagMatches && searchMatches)) {
+            if (!(tagMatches && searchMatches && !noteExcluded(note.tags))) {
                 loadInitial()
                 return@launch
             }
@@ -460,6 +474,10 @@ class InboxFragment : Fragment() {
                 enterSelectionMode()
                 true
             }
+            R.id.action_commands -> {
+                showBatchCommandsDialog()
+                true
+            }
             R.id.action_copy -> {
                 copySelectedNotes()
                 true
@@ -474,6 +492,53 @@ class InboxFragment : Fragment() {
                 true
             }
             else -> false
+        }
+    }
+
+    /** 批量操作指令（笔记）：粘贴 AI 返回的 JSON 并 POST /inbox/notes/batch */
+    private fun showBatchCommandsDialog() {
+        val ctx = requireContext()
+        val edit = android.widget.EditText(ctx).apply {
+            hint = "{\"operations\":[{\"action\":\"delete\",\"uuid\":\"...\"}]}"
+            setTextColor(ContextCompat.getColor(ctx, R.color.inbox_text))
+            setHintTextColor(ContextCompat.getColor(ctx, R.color.inbox_sub))
+            setMinLines(5)
+            maxLines = 12
+            gravity = Gravity.TOP or Gravity.START
+            setPadding(24, 24, 24, 24)
+        }
+        androidx.appcompat.app.AlertDialog.Builder(ctx)
+            .setTitle("批量操作指令（笔记）")
+            .setMessage("粘贴 AI 返回的 JSON：action 支持 create/update/delete/restore，目标用 uuid（推荐）或 id。")
+            .setView(edit)
+            .setPositiveButton("执行") { _, _ ->
+                val text = edit.text?.toString()?.trim().orEmpty()
+                if (text.isNotEmpty()) executeBatchCommands(text)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun executeBatchCommands(text: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val parsed = com.google.gson.JsonParser.parseString(text)
+                val body = when {
+                    parsed.isJsonArray ->
+                        com.google.gson.JsonObject().apply { add("operations", parsed) }
+                    parsed.isJsonObject && parsed.asJsonObject.has("operations") -> parsed.asJsonObject
+                    else -> throw IllegalArgumentException("需要包含 operations 字段，或直接给 operations 数组")
+                }
+                val resp = LocalInboxApi.service.batchNotes(body)
+                val applied = resp.get("applied")?.asInt ?: 0
+                val failed = resp.get("failed")?.asInt ?: 0
+                Toast.makeText(requireContext(), "指令完成：成功 $applied / 失败 $failed", Toast.LENGTH_LONG).show()
+                loadInitial()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "执行失败：${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -508,7 +573,11 @@ class InboxFragment : Fragment() {
             Toast.makeText(requireContext(), "请先选择笔记", Toast.LENGTH_SHORT).show()
             return
         }
-        val textToCopy = selectedNotes.joinToString("\n") { it.content }
+        // 每条附带唯一 ID（uuid），便于把内容交给 AI 后按 ID 回传批量操作指令
+        val textToCopy = selectedNotes.joinToString("\n") { note ->
+            val uid = note.uuid?.takeIf { it.isNotBlank() } ?: "local:${note.id}"
+            "${note.content}\nID: $uid"
+        }
         val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("notes", textToCopy)
         clipboard.setPrimaryClip(clip)
@@ -517,11 +586,12 @@ class InboxFragment : Fragment() {
         loadInitial()
     }
 
-    /** 单条笔记复制：与批量复制取同一字段（正文原文，#标签 本身就在 content 里） */
+    /** 单条笔记复制：与批量复制取同一字段（正文原文，#标签 本身就在 content 里），并附带唯一 ID */
     private fun copySingleNote(note: NoteResponse) {
+        val uid = note.uuid?.takeIf { it.isNotBlank() } ?: "local:${note.id}"
         val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("note", note.content))
-        Toast.makeText(requireContext(), "已复制笔记", Toast.LENGTH_SHORT).show()
+        clipboard.setPrimaryClip(ClipData.newPlainText("note", "${note.content}\n\nID: $uid"))
+        Toast.makeText(requireContext(), "已复制笔记（含 ID）", Toast.LENGTH_SHORT).show()
     }
 
     private fun deleteSelectedNotes() {
@@ -606,17 +676,48 @@ class InboxFragment : Fragment() {
         loadInitial()
     }
 
+    /** 反向筛选：把某标签加入/移出排除集合（长按 chips 触发） */
+    private fun toggleTagExclude(tag: String?) {
+        if (tag.isNullOrEmpty()) return
+        if (!excludedTags.remove(tag)) {
+            excludedTags.add(tag)
+            // 排除与「仅显示」互斥：正在显示的标签被排除时，取消「仅显示」
+            val cur = currentTag
+            if (cur != null && (cur == tag || cur.startsWith("$tag/"))) currentTag = null
+        }
+        updateFilterBar()
+        renderTagChips()
+        loadInitial()
+    }
+
+    /** 一次清掉「仅显示」与全部「排除」筛选 */
+    private fun clearAllTagFilters() {
+        currentTag = null
+        excludedTags.clear()
+        updateFilterBar()
+        renderTagChips()
+        loadInitial()
+    }
+
+    /** 是否命中任一排除标签（段边界前缀匹配：排除父标签连同子孙一起隐藏） */
+    private fun noteExcluded(tags: List<String>): Boolean =
+        excludedTags.any { ex -> tags.any { it == ex || it.startsWith("$ex/") } }
+
     private fun updateFilterBar() {
         val tag = currentTag
-        if (tag == null) {
+        if (tag == null && excludedTags.isEmpty()) {
             binding.filterBar.visibility = View.GONE
-        } else {
-            binding.filterBar.visibility = View.VISIBLE
-            // 层级 tag 用面包屑展示：项目/工作 → 项目 / 工作
-            binding.filterText.text = "仅显示 #${formatTagBreadcrumb(tag)}"
-            binding.filterUp.visibility =
-                if (tagParentPath(tag) != null) View.VISIBLE else View.GONE
+            return
         }
+        binding.filterBar.visibility = View.VISIBLE
+        val parts = mutableListOf<String>()
+        // 层级 tag 用面包屑展示：项目/工作 → 项目 / 工作
+        if (tag != null) parts.add("仅显示 #${formatTagBreadcrumb(tag)}")
+        if (excludedTags.isNotEmpty())
+            parts.add("排除 " + excludedTags.joinToString(" ") { "⊘#${formatTagBreadcrumb(it)}" })
+        binding.filterText.text = parts.joinToString(" · ")
+        binding.filterUp.visibility =
+            if (tag != null && tagParentPath(tag) != null) View.VISIBLE else View.GONE
     }
 
     // ==== 层级标签 chips 行 ====
@@ -652,14 +753,19 @@ class InboxFragment : Fragment() {
         val dp = { v: Int -> (v * density).toInt() }
         binding.tagChipsRow.removeAllViews()
         nodes.forEach { node ->
+            val excluded = excludedTags.contains(node.path)
             val chip = android.widget.TextView(ctx).apply {
-                text = "${tagLastSegment(node.path)} ${node.count}"
-                setTextColor(ContextCompat.getColor(ctx, R.color.inbox_text))
+                text = if (excluded) "⊘ ${tagLastSegment(node.path)} ${node.count}"
+                       else "${tagLastSegment(node.path)} ${node.count}"
+                setTextColor(ContextCompat.getColor(ctx, if (excluded) R.color.inbox_sub else R.color.inbox_text))
                 textSize = 13f
                 background = ContextCompat.getDrawable(ctx, R.drawable.inbox_tag_chip_bg)
                 setPadding(dp(12), dp(5), dp(12), dp(5))
                 gravity = Gravity.CENTER
+                if (excluded) paintFlags = paintFlags or android.graphics.Paint.STRIKE_THRU_TEXT_FLAG
                 setOnClickListener { applyTagFilterPath(node.path) }
+                // 长按 chip = 反向筛选：加入/移出排除集合
+                setOnLongClickListener { toggleTagExclude(node.path); true }
             }
             val lp = android.widget.LinearLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -713,6 +819,7 @@ class InboxFragment : Fragment() {
                     limit = limit,
                     offset = if (append) items.size else 0,
                     tag = currentTag,
+                    excludeTags = excludedTags.toList(),
                     search = searchQuery,
                     deleted = false,
                 )

@@ -2,6 +2,7 @@ package net.activitywatch.android.inbox
 
 import android.content.Context
 import com.google.gson.GsonBuilder
+import com.google.gson.JsonObject
 import net.activitywatch.android.db.DeviceIdProvider
 import net.activitywatch.android.sync.LocalWriteWatcher
 import okhttp3.Interceptor
@@ -56,12 +57,18 @@ interface InboxService {
         @Query("limit") limit: Int? = null,
         @Query("offset") offset: Int? = null,
         @Query("tag") tag: String? = null,
+        /** 反向筛选：排除含这些标签（及其子标签）的笔记（同名参数重复出现） */
+        @Query("exclude_tag") excludeTags: List<String>? = null,
         @Query("search") search: String? = null,
         @Query("deleted") deleted: Boolean? = null,
     ): List<NoteResponse>
 
     @POST("inbox/notes")
     suspend fun createNote(@Body payload: UpsertNotePayload): NoteResponse
+
+    /** 批量操作（AI 指令）：POST /inbox/notes/batch，body 形如 {"operations":[...]} */
+    @POST("inbox/notes/batch")
+    suspend fun batchNotes(@Body body: JsonObject): JsonObject
 
     @PUT("inbox/notes/{id}")
     suspend fun updateNote(@Path("id") id: Long, @Body payload: UpsertNotePayload): NoteResponse
