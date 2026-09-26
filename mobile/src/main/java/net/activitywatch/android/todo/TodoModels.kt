@@ -35,6 +35,8 @@ data class TodoSubtask(
 /** 任务（契约 §1.1，键名 snake_case） */
 data class TodoTask(
     var id: Long = 0,
+    /** 全局唯一逻辑键（服务端 TodoResponse.uuid）：AI 批量指令按它唯一定位任务 */
+    var uuid: String? = null,
     var title: String = "",
     var notes: String = "",
     var listId: Long = 0,                       // 0 = 收集箱
@@ -170,6 +172,8 @@ data class UpdateTodoListPayload(
 /** 服务端 GET /inbox/todos 返回的单条任务 */
 data class TodoResponse(
     val id: Long,
+    /** 全局唯一逻辑键：AI 批量指令按它唯一定位任务 */
+    val uuid: String? = null,
     val title: String,
     @SerializedName("content") val content: String? = null,     // 备注 / 描述
     val completed: Boolean = false,
@@ -221,6 +225,7 @@ data class UpdateTodoPayload(
 /** 服务端 → 领域模型。tags 全部是自由标签（清单由 list_id 关联，与 tag 无关）。 */
 fun TodoResponse.toTask(): TodoTask = TodoTask(
     id = id,
+    uuid = uuid,
     title = title,
     notes = content ?: "",
     listId = listIdRaw,

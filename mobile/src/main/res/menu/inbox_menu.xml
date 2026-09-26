@@ -16,4 +16,9 @@
         android:icon="@drawable/ic_select_all"
         android:title="多选"
         app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_commands"
+        android:icon="@android:drawable/ic_menu_manage"
+        android:title="批量指令"
+        app:showAsAction="never" />
 </menu>

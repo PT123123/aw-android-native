@@ -19,6 +19,16 @@
         android:title="新建清单"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/action_tag_filter"
+        android:title="标签筛选"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_commands"
+        android:title="批量指令"
+        app:showAsAction="never" />
+
     <!-- 排序选项收进子菜单；两项均为 never，由工具栏右侧系统 ⋮ 溢出菜单承载 -->
     <item
         android:id="@+id/action_sort"

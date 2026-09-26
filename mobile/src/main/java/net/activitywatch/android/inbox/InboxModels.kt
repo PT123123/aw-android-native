@@ -4,6 +4,8 @@ import java.io.Serializable
 
 data class NoteResponse(
     val id: Long,
+    /** 全局唯一逻辑键（服务端 NoteResponse.uuid）：AI 批量指令按它唯一定位笔记 */
+    val uuid: String? = null,
     val content: String,
     val tags: List<String> = emptyList(),
     val created_at: String? = null,
