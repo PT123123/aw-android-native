@@ -33,8 +33,10 @@ import kotlinx.coroutines.launch
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.TodoFragmentBinding
 import net.activitywatch.android.inbox.TagSuggestionView
+import net.activitywatch.android.inbox.TODO_BATCH_EXAMPLE
 import net.activitywatch.android.inbox.buildMarkdownToolbar
 import net.activitywatch.android.inbox.formatTagBreadcrumb
+import net.activitywatch.android.inbox.promptBatchCommands
 import net.activitywatch.android.inbox.tagParentPath
 import net.activitywatch.android.sync.LanPull
 import net.activitywatch.android.sync.RemoteSyncBus
@@ -581,26 +583,14 @@ class TodoFragment : Fragment() {
 
     /** 批量操作指令（任务）：粘贴 AI 返回的 JSON 并 POST /inbox/todos/batch */
     private fun showBatchCommandsDialog() {
-        val ctx = requireContext()
-        val edit = EditText(ctx).apply {
-            hint = "{\"operations\":[{\"action\":\"update\",\"uuid\":\"...\",\"completed\":true}]}"
-            setTextColor(ContextCompat.getColor(ctx, R.color.inbox_text))
-            setHintTextColor(ContextCompat.getColor(ctx, R.color.inbox_sub))
-            setMinLines(5)
-            maxLines = 12
-            gravity = Gravity.TOP or Gravity.START
-            setPadding(24, 24, 24, 24)
-        }
-        AlertDialog.Builder(ctx)
-            .setTitle("批量操作指令（任务）")
-            .setMessage("粘贴 AI 返回的 JSON：action 支持 create/update/delete/restore，目标用 uuid（推荐）或 id。")
-            .setView(edit)
-            .setPositiveButton("执行") { _, _ ->
-                val text = edit.text?.toString()?.trim().orEmpty()
-                if (text.isNotEmpty()) executeBatchCommands(text)
-            }
-            .setNegativeButton("取消", null)
-            .show()
+        promptBatchCommands(
+            requireContext(),
+            "批量操作指令（任务）",
+            "粘贴 AI 返回的 JSON 并执行。action 支持 create / update / delete / restore / add_tags / " +
+                "remove_tags / set_tags / set_completed / move / set_priority / set_due / add_subtask / " +
+                "remove_subtask / set_subtask / comment；目标用 uuid（推荐）或 id。点「复制示例」可拿到模板。",
+            TODO_BATCH_EXAMPLE,
+        ) { executeBatchCommands(it) }
     }
 
     private fun executeBatchCommands(text: String) {

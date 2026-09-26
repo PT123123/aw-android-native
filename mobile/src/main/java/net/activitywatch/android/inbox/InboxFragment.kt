@@ -497,26 +497,13 @@ class InboxFragment : Fragment() {
 
     /** 批量操作指令（笔记）：粘贴 AI 返回的 JSON 并 POST /inbox/notes/batch */
     private fun showBatchCommandsDialog() {
-        val ctx = requireContext()
-        val edit = android.widget.EditText(ctx).apply {
-            hint = "{\"operations\":[{\"action\":\"delete\",\"uuid\":\"...\"}]}"
-            setTextColor(ContextCompat.getColor(ctx, R.color.inbox_text))
-            setHintTextColor(ContextCompat.getColor(ctx, R.color.inbox_sub))
-            setMinLines(5)
-            maxLines = 12
-            gravity = Gravity.TOP or Gravity.START
-            setPadding(24, 24, 24, 24)
-        }
-        androidx.appcompat.app.AlertDialog.Builder(ctx)
-            .setTitle("批量操作指令（笔记）")
-            .setMessage("粘贴 AI 返回的 JSON：action 支持 create/update/delete/restore，目标用 uuid（推荐）或 id。")
-            .setView(edit)
-            .setPositiveButton("执行") { _, _ ->
-                val text = edit.text?.toString()?.trim().orEmpty()
-                if (text.isNotEmpty()) executeBatchCommands(text)
-            }
-            .setNegativeButton("取消", null)
-            .show()
+        promptBatchCommands(
+            requireContext(),
+            "批量操作指令（笔记）",
+            "粘贴 AI 返回的 JSON 并执行。action 支持 create / update / delete / restore / " +
+                "add_tags / remove_tags / set_tags / comment；目标用 uuid（推荐）或 id。点「复制示例」可拿到模板。",
+            NOTE_BATCH_EXAMPLE,
+        ) { executeBatchCommands(it) }
     }
 
     private fun executeBatchCommands(text: String) {
