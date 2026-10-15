@@ -90,6 +90,20 @@ data class PushToResult(
     @SerializedName("encrypted") val encrypted: Boolean = false
 )
 
+// POST /export-envelope：让本机（Rust 侧）导出快照并封好信封，但**不代发**。
+// 热点直连时对端 IP 不在系统默认路由上，Rust 的 reqwest 出不去，/push-to 必然 500；
+// 客户端手里握着那条热点 Network，由它把 [body] 原样转发到对端 /push 即可。
+// 配对密钥从不出服务端接口，客户端拿到的要么是信封要么是明文，安全性与 /push-to 一致。
+data class ExportEnvelopeRequest(
+    @SerializedName("device_id") val deviceId: String? = null
+)
+
+data class ExportEnvelopeResult(
+    @SerializedName("body") val body: String = "",
+    @SerializedName("encrypted") val encrypted: Boolean = false,
+    @SerializedName("size") val size: Int = 0
+)
+
 val Device.displayName: String
     get() = if (alias.isNullOrBlank()) name else alias
 

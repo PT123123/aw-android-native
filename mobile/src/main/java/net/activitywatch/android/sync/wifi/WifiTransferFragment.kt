@@ -17,6 +17,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.gson.Gson
+import com.google.gson.JsonObject
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.CancellationException
@@ -28,7 +29,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.activitywatch.android.R
 import net.activitywatch.android.databinding.FragmentWifiTransferBinding
-import net.activitywatch.android.sync.PushToRequest
+import net.activitywatch.android.sync.ExportEnvelopeRequest
 import net.activitywatch.android.sync.SyncApiClient
 import net.activitywatch.android.sync.SyncFormatters
 import net.activitywatch.android.sync.SyncSnapshot
@@ -373,7 +374,9 @@ class WifiTransferFragment : Fragment() {
      * 1. GET  对端 /info     —— 验证对端 aw-sync 服务可达；
      * 2. GET  对端 /snapshot —— 拉取对端快照（不带 from=，对端按「无共享密钥」返回明文）；
      * 3. POST 本机 /apply    —— 合并对端数据进本机（127.0.0.1，Retrofit）；
-     * 4. POST 本机 /push-to  —— 本机导出并集、按需信封加密后推给对端。
+     * 4. POST 本机 /export-envelope —— 本机导出并集、按需信封加密（Rust 侧，密钥不出服务端），
+     *    报文由本函数借热点 Network 代发到对端 /push。**发送**这一步必须留在客户端：
+     *    Rust 进程内的 reqwest 只走系统默认路由，到不了热点网段里的对端（/push-to 会恒定 500）。
      */
     private suspend fun doTransfer(network: Network?, payload: QrPayload): TransferResult {
         // 1) 验证对端
@@ -398,20 +401,21 @@ class WifiTransferFragment : Fragment() {
         log("合并对端数据到本机…")
         val appliedLocal = localApi.applySnapshot(remoteSnap).applied
 
-        // 4) 让本机把合并后的并集推回对端：导出 + 信封加密都在 Rust 侧做
-        //    （客户端自己 POST 对端 /push 只能发明文，两台机器配对过就会被对端降级防护拒收）
+        // 4) 把本机数据推回对端：导出 + 信封加密都在 Rust 侧做（客户端不碰配对密钥），
+        //    但**发送**必须由本函数借热点 Network 代发——Rust 进程内的 reqwest 走系统默认路由，
+        //    到不了 192.168.152.x 这类只在热点网段里可达的对端，走 /push-to 只会恒定 500。
         log("推送本机数据到对端…")
-        val push = localApi.pushTo(
-            PushToRequest(
-                ip = payload.ip,
-                port = payload.port,
-                deviceId = remoteSnap.sourceDevice?.id,
-                name = remoteSnap.sourceDevice?.name
-            )
+        val envelope = localApi.exportEnvelope(
+            ExportEnvelopeRequest(deviceId = remoteSnap.sourceDevice?.id)
         )
-        if (push.encrypted) log("已用配对密钥加密推送")
+        val respJson = WifiHttp.post(
+            network, payload.ip, payload.port, "/api/0/sync/push", envelope.body
+        )
+        val appliedRemote = gson.fromJson(respJson, JsonObject::class.java)
+            ?.get("applied")?.asInt ?: 0
+        if (envelope.encrypted) log("已用配对密钥加密推送")
 
-        return TransferResult(appliedLocal, push.applied)
+        return TransferResult(appliedLocal, appliedRemote)
     }
 
     // ==================== 工具 ====================
