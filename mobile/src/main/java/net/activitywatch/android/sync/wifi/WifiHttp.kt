@@ -34,6 +34,21 @@ object WifiHttp {
         readTimeoutMs: Int = 90_000
     ): String = request(network, ip, port, "GET", path, null, readTimeoutMs)
 
+    /**
+     * POST 一个 JSON 报文到对端，走的同样是 [network] 指定的热点网络。
+     *
+     * 用于热点直连的回程推送：本机 Rust 服务只能走系统默认路由，出不了热点网段，
+     * 报文得由握着 [Network] 的客户端代发（见 [WifiTransferFragment] 的传输流程）。
+     */
+    fun post(
+        network: Network?,
+        ip: String,
+        port: Int,
+        path: String,
+        body: String,
+        readTimeoutMs: Int = 300_000
+    ): String = request(network, ip, port, "POST", path, body, readTimeoutMs)
+
     private fun request(
         network: Network?,
         ip: String,

@@ -84,6 +84,13 @@ interface SyncApi {
     @POST("api/0/sync/push-to")
     suspend fun pushTo(@Body request: PushToRequest): PushToResult
 
+    /**
+     * 本机导出快照并封好信封，**不代发**：热点直连时对端不在系统默认路由上，
+     * Rust 的 reqwest 发不过去（/push-to 会恒定 500），报文得由客户端借热点 Network 转发。
+     */
+    @POST("api/0/sync/export-envelope")
+    suspend fun exportEnvelope(@Body request: ExportEnvelopeRequest): ExportEnvelopeResult
+
     @GET("api/0/sync/devices/{id}/stats")
     suspend fun getDeviceStats(@Path("id") id: String): DeviceSyncStats
 
